@@ -1,86 +1,100 @@
 import 'package:flutter/material.dart';
-import 'package:utility_bills_manager/data/database/database_helper.dart';
-import 'package:utility_bills_manager/screens/add_edit_bill_screen.dart';
+import 'package:utility_bills_manager/data/models/result.dart';
+import 'package:utility_bills_manager/screens/rentors/add_edit_rentor_screen.dart';
+import 'package:utility_bills_manager/helpers/rentors/rentors_helper.dart';
 
-import '../data/models/bill.dart';
+import '../../data/models/rentor.dart';
 
-class BillListScreen extends StatefulWidget {
-  const BillListScreen({super.key});
+class RentorListScreen extends StatefulWidget {
+  const RentorListScreen({super.key});
 
   @override
-  State<BillListScreen> createState() => _BillListScreenState();
+  State<RentorListScreen> createState() => _RentorListScreenState();
 }
 
-class _BillListScreenState extends State<BillListScreen> {
-  final DatabaseHelper _dbHelper = DatabaseHelper();
-  Future<List<Bill>>? _bills;
-  String _selectedFilter = 'All';
-  String _selectedStort = 'Due Date (Earliest)';
+class _RentorListScreenState extends State<RentorListScreen> {
+  final RentorsHelper _rentorsHelper = RentorsHelper();
+  Future<List<Rentor>>? _rentors;
+  bool _loading = true;
+  String _selectedStort = 'Percentage';
   String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _loadBills();
+    _loadRentors();
   }
 
-  void _loadBills() async {
-    List<Bill> fetchedBills =
-        _selectedFilter == 'All'
-            ? await _dbHelper.getAllBills()
-            : await _dbHelper.getBillsByStatus(_selectedFilter);
+  void _loadRentors() async {
+    List<Rentor> fetchedRentors = List.empty();
 
-    if (_searchQuery.isNotEmpty) {
-      fetchedBills =
-          fetchedBills
-              .where(
-                (bill) => bill.company.toLowerCase().contains(
-                  _searchQuery.toLowerCase(),
-                ),
-              )
-              .toList();
-    }
+    Result<List<Rentor>> result = await _rentorsHelper.readAllRentors();
 
-    setState(() {
-      switch (_selectedStort) {
-        case 'Due Date (Earliest)':
-          {
-            fetchedBills.sort((a, b) => a.dueDate.compareTo(b.dueDate));
-            break;
-          }
-        case 'Due Date (Latest)':
-          {
-            fetchedBills.sort((a, b) => b.dueDate.compareTo(a.dueDate));
-            break;
-          }
-        case 'Amount (Lowest)':
-          {
-            fetchedBills.sort((a, b) => a.amount.compareTo(b.amount));
-            break;
-          }
-        case 'Amount (Highest)':
-          {
-            fetchedBills.sort((a, b) => b.amount.compareTo(a.amount));
-            break;
-          }
+    if (result.isSuccess) {
+      fetchedRentors = result.data!;
+
+      if (_searchQuery.isNotEmpty) {
+        fetchedRentors =
+            fetchedRentors
+                .where(
+                  (rentor) => rentor.name.toLowerCase().contains(
+                    _searchQuery.toLowerCase(),
+                  ),
+                )
+                .toList();
       }
 
-      _bills = Future.value(fetchedBills);
-    });
+      setState(() {
+        switch (_selectedStort) {
+          case 'Percentage':
+            {
+              fetchedRentors.sort((a, b) => a.defaultPercentage.compareTo(b.defaultPercentage));
+              break;
+            }
+          case 'Amount Paid (Lowest)':
+            {
+              fetchedRentors.sort((a, b) => a.amountPaid!.compareTo(b.amountPaid!));
+              break;
+            }
+          case 'Amount Paid (Highest)':
+            {
+              fetchedRentors.sort((a, b) => b.amountPaid!.compareTo(a.amountPaid!));
+              break;
+            }
+          case 'Last Payment Date (Asc)':
+            {
+              fetchedRentors.sort((a, b) => a.lastPaymentDate!.compareTo(b.lastPaymentDate!));
+              break;
+            }
+          case 'Last Payment Date (Desc)':
+            {
+              fetchedRentors.sort((a, b) => b.lastPaymentDate!.compareTo(a.lastPaymentDate!));
+              break;
+            }
+        }
+
+        _rentors = Future.value(fetchedRentors);
+        _loading = false;
+      });
+    }
+    else {
+      _rentors = Future.error(result.errorMessage as Object);
+      _loading = false;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Utility Bills'),
+        title: const Text('Rentors'),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
               decoration: InputDecoration(
-                hintText: 'Search by company...',
+                hintText: 'Search by name...',
                 prefixIcon: const Icon(Icons.search),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -93,7 +107,7 @@ class _BillListScreenState extends State<BillListScreen> {
                 setState(() {
                   _searchQuery = query;
                 });
-                _loadBills();
+                _loadRentors();
               },
             ),
           ),
@@ -106,36 +120,21 @@ class _BillListScreenState extends State<BillListScreen> {
                 setState(() {
                   _searchQuery = '';
                 });
-                _loadBills();
+                _loadRentors();
               },
             ),
-          DropdownButton<String>(
-            value: _selectedFilter,
-            items:
-                ['All', 'Paid', 'Unpaid'].map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-            onChanged: (String? newValue) {
-              if (newValue != null) {
-                setState(() {
-                  _selectedFilter = newValue;
-                });
-                _loadBills();
-              }
-            },
-          ),
           const SizedBox(width: 16),
           DropdownButton<String>(
             value: _selectedStort,
             items:
                 [
-                  'Due Date (Earliest)',
-                  'Due Date (Latest)',
-                  'Amount (Lowest)',
-                  'Amount (Highest)',
+                  'Percentage',
+                  'Amount Owed (Lowest)',
+                  'Amount Owed (Highest)',
+                  'Amount Paid (Lowest)',
+                  'Amount Paid (Highest)',
+                  'Last Payment Date (Asc)',
+                  'Last Payment Date (Desc)',
                 ].map((String value) {
                   return DropdownMenuItem<String>(
                     value: value,
@@ -147,35 +146,38 @@ class _BillListScreenState extends State<BillListScreen> {
                 setState(() {
                   _selectedStort = newValue;
                 });
-                _loadBills();
+                _loadRentors();
               }
             },
           ),
           const SizedBox(width: 16),
         ],
       ),
-      body: FutureBuilder<List<Bill>>(
-        future: _bills,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          :FutureBuilder<List<Rentor>>(
+        future: _rentors,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           } else if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No bills found.'));
+            return const Center(child: Text('No rentors found.'));
           }
 
-          final bills = snapshot.data!;
+          final rentors = snapshot.data!;
           return ListView.builder(
-            itemCount: bills.length,
+            physics: AlwaysScrollableScrollPhysics(),
+            itemCount: rentors.length,
             itemBuilder: (context, index) {
-              final bill = bills[index];
+              final rentor = rentors[index];
               return Card(
                 margin: const EdgeInsets.all(8.0),
                 child: ListTile(
-                  title: Text(bill.company),
+                  title: Text(rentor.name),
                   subtitle: Text(
-                    'Amount: \$${bill.amount.toStringAsFixed(2)}\nDue Date: ${bill.dueDate}\nStatus: ${bill.status}',
+                    'Percentage: \$${rentor.defaultPercentage}%\nAmount Paid: \$${rentor.amountPaid != null ? rentor.amountPaid!.toStringAsFixed(2) : "0"}\nLast Payment Date: ${rentor.lastPaymentDate != null ? rentor.lastPaymentDate! : "N/A"}',
                   ),
                   trailing: PopupMenuButton<String>(
                     onSelected: (value) async {
@@ -183,15 +185,15 @@ class _BillListScreenState extends State<BillListScreen> {
                         final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => AddEditBillScreen(bill: bill),
+                            builder: (context) => AddEditRentorScreen(rentor: rentor),
                           ),
                         );
                         if (result == true) {
-                          _loadBills();
+                          _loadRentors();
                         }
                       } else if (value == 'delete') {
-                        await _dbHelper.deleteBill(bill.id!);
-                        _loadBills();
+                        await _rentorsHelper.deleteRentor(rentor.id!);
+                        _loadRentors();
                       }
                     },
                     itemBuilder:
@@ -216,10 +218,10 @@ class _BillListScreenState extends State<BillListScreen> {
         onPressed: () async {
           final result = await Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const AddEditBillScreen()),
+            MaterialPageRoute(builder: (context) => const AddEditRentorScreen()),
           );
           if (result == true) {
-            _loadBills();
+            _loadRentors();
           }
         },
         child: const Icon(Icons.add),

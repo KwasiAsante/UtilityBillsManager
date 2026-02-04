@@ -1,0 +1,311 @@
+import 'package:enough_mail/enough_mail.dart';
+import 'package:intl/intl.dart';
+import 'package:utility_bills_manager/data/models/bill.dart';
+import 'package:utility_bills_manager/data/models/payment.dart';
+import 'package:utility_bills_manager/utils/email/email_parser.dart';
+
+class BillsParser {
+  static Future<Bill?> parseEmailToBill(MimeMessage message) async {
+    final subject = message.decodeSubject() ?? '';
+    if (subject.contains('Your RBC Royal Bank eStatement is ready') ||
+        subject.contains('eStatement Alert for your Simplii Credit Card') ||
+        subject.contains('Enbridge - Your Payment is Due')) {
+      return null;
+    }
+
+    final hasAttachment = EmailParser.hasAttachment(message);
+    final body =
+        hasAttachment
+            ? await EmailParser.extractEmailAttachment(message)
+            : EmailParser.extractEmailBody(message);
+    final sender = message.from?.firstOrNull?.email ?? '';
+
+    // Try to extract amount from the body or subject
+    final amount = extractSmartAmount(body);
+
+    // Attempt to extract a date
+    final dueDate =
+        extractDueDate(body)?.toIso8601String().split('T').first ??
+        DateTime.now().toIso8601String().split('T').first;
+
+    // Guess the bill type
+    final billType = _inferBillType(sender, subject, body);
+
+    if (amount != null) {
+      return Bill(
+        company: sender,
+        type: billType,
+        amount: amount,
+        dueDate: dueDate,
+        status: amount <= 0 ? PaymentStatus.paid : PaymentStatus.unpaid,
+        notes: subject,
+      );
+    }
+
+    return null; // Couldn't extract a valid bill
+  }
+
+  static BillType _inferBillType(String sender, String subject, String body) {
+    final text = '$sender $subject $body'.toLowerCase();
+
+    if (text.contains('hydro') ||
+        text.contains('electric') ||
+        sender.contains('noreply@alectrautilities.com')) {
+      return BillType.electric;
+    }
+    if (text.contains('gas') ||
+        sender.contains('NoReplyCCC@ngutech.com') ||
+        sender.contains('enbridge.e-bill@enbridgegas.com')) {
+      return BillType.gas;
+    }
+    if (text.contains('water') ||
+        (sender.contains('donotreply@kubra.peelregion.ca') &&
+            subject.contains(
+              'Region of Peel water e-bill account - your bill is ready',
+            ))) {
+      return BillType.water;
+    }
+    if (text.contains('internet') ||
+        text.contains('wifi') ||
+        sender.contains('ebill@bell.ca')) {
+      return BillType.internet;
+    }
+    if (text.contains('rent')) return BillType.rent;
+    if (text.contains('creditcard') ||
+        text.contains('credit card') ||
+        text.contains('your credit statement is available')) {
+      return BillType.creditcard;
+    }
+    if (text.contains('personallineofcredit') ||
+        text.contains('personal line of credit')) {
+      return BillType.personallineofcredit;
+    }
+
+    return BillType.other;
+  }
+
+  static double? extractAmount(String text) {
+    // Look for explicit dollar amounts first, e.g. $123.45
+    final dollarPattern = RegExp(r'\$\s?(\d+[.,]?\d{0,2})');
+    final fallbackPattern = RegExp(
+      r'\b(\d{2,5}[.,]?\d{0,2})\b',
+    ); // fallback for amounts without $
+
+    final dollarMatch = dollarPattern.firstMatch(text);
+    if (dollarMatch != null) {
+      return double.tryParse(dollarMatch.group(1)!.replaceAll(',', ''));
+    }
+
+    final fallbackMatch = fallbackPattern.firstMatch(text);
+    if (fallbackMatch != null) {
+      return double.tryParse(fallbackMatch.group(1)!.replaceAll(',', ''));
+    }
+
+    return null;
+  }
+
+  static double? extractSmartAmount(String text) {
+    final prioritizedKeywords = [
+      'total due',
+      'amount due',
+      'current charges',
+      'total balance',
+      'balance due',
+      'payment due',
+      'a minimum payment of',
+      'account balance',
+      'total amount',
+    ];
+
+    final lines = text.toLowerCase().split('\n');
+    lines.removeWhere((str) => str == "" || str.isEmpty);
+    final dollarPattern = RegExp(r'\$\s?(\d{1,5}(?:[.,]\d{2})?)');
+
+    // 1. Look for matching lines that contain keywords + dollar amounts
+    for (final line in lines) {
+      if (prioritizedKeywords.any((keyword) => line.contains(keyword))) {
+        final match = dollarPattern.firstMatch(line);
+        if (match != null) {
+          return double.tryParse(match.group(1)!.replaceAll(',', ''));
+        } else {
+          final amount = getAmountFromNextIndex(
+            dollarPattern,
+            lines.indexOf(line),
+            lines,
+          );
+          if (amount != null && amount >= 0.00) {
+            return amount;
+          }
+        }
+      }
+    }
+
+    // 2. Fallback: use the **last** unique dollar amount from the text
+    final matches = dollarPattern.allMatches(text);
+    if (matches.isNotEmpty) {
+      final lastMatch = matches.last;
+      return double.tryParse(lastMatch.group(1)!.replaceAll(',', ''));
+    }
+
+    return null;
+  }
+
+  static double? getAmountFromNextIndex(
+    RegExp pattern,
+    int index,
+    List<String> lines,
+  ) {
+    int updatedIndex = index + 1;
+    var line = lines[updatedIndex];
+    var match = pattern.firstMatch(line);
+    if (match != null) {
+      return double.tryParse(match.group(1)!.replaceAll(',', ''));
+    } else {
+      updatedIndex++;
+      line = lines[updatedIndex];
+      match = pattern.firstMatch(line);
+      if (match != null) {
+        return double.tryParse(match.group(1)!.replaceAll(',', ''));
+      } else if (double.tryParse(line) != null) {
+        return double.tryParse(line);
+      } else {
+        return null;
+      }
+    }
+  }
+
+  static DateTime? extractDueDate(String text) {
+    final prioritizedKeywords = [
+      'payment due date',
+      'due date',
+      'invoice due',
+      'payment due',
+      'due by',
+      'your balance will be withdrawn on',
+      'withdrawn on',
+    ];
+
+    final lines = text.toLowerCase().split('\n');
+    lines.removeWhere((str) => str == "" || str.isEmpty);
+    final datePatterns = [
+      RegExp(r'(\d{4}-\d{2}-\d{2})'), // Match date format YYYY-MM-DD
+      RegExp(
+        r'([a-zA-Z]+ \d{1,2}(?:st|nd|rd|th)?,? \d{4})',
+        caseSensitive: false,
+      ), // April 24th, 2025
+      RegExp(r'(\d{1,2} [a-zA-Z]+ \d{4})'), // 24 April 2025
+      RegExp(
+        r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2}\s+\d{4}\b',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}\b',
+        caseSensitive: false,
+      ),
+    ];
+
+    // 1. Look for matching lines that contain keywords + dates
+    for (final line in lines) {
+      if (line.isEmpty) {
+        continue;
+      }
+
+      if (prioritizedKeywords.any((keyword) => line.contains(keyword))) {
+        for (final datePattern in datePatterns) {
+          final match = datePattern.firstMatch(line);
+          if (match != null) {
+            String s = match.group(1)!;
+            DateTime? d = DateTime.tryParse(s);
+            d ??= parseFancyDate(s);
+            return d;
+          } else {
+            final date = getDateFromNextIndex(
+              datePattern,
+              lines.indexOf(line),
+              lines,
+            );
+            if (date != null) {
+              return date;
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Fallback: try to find any date in the text
+    for (final datePattern in datePatterns) {
+      final matches = datePattern.allMatches(text);
+      if (matches.isNotEmpty) {
+        final lastMatch = matches.last;
+        return DateTime.tryParse(lastMatch.group(1)!);
+      }
+    }
+
+    return null;
+  }
+
+  static DateTime? getDateFromNextIndex(
+    RegExp pattern,
+    int index,
+    List<String> lines,
+  ) {
+    int updatedIndex = index + 1;
+    var line = lines[updatedIndex];
+    line.replaceAll(RegExp(r','), "");
+    var match = pattern.firstMatch(line);
+    if (match != null) {
+      String s = match.group(0)!;
+      DateTime? d = DateTime.tryParse(s);
+      d ??= parseFancyDate(s);
+      return d;
+    } else {
+      updatedIndex++;
+      line = lines[updatedIndex];
+      match = pattern.firstMatch(line);
+      if (match != null) {
+        String s = match.group(0)!;
+        DateTime? d = DateTime.tryParse(s);
+        d ??= parseFancyDate(s);
+        return d;
+      } else if (DateTime.tryParse(line) != null) {
+        return DateTime.tryParse(line);
+      } else if (parseFancyDate(line) != null) {
+        return parseFancyDate(line);
+      } else {
+        return null;
+      }
+    }
+  }
+
+  static DateTime? parseFancyDate(String text) {
+    // Remove ordinal suffixes (st, nd, rd, th)
+    final cleaned = text.replaceAllMapped(
+      RegExp(r'(\d+)(st|nd|rd|th)', caseSensitive: false),
+      (match) => match.group(1)!,
+    );
+
+    // Capitalize first letter of the month (if not already)
+    final normalized = cleaned.replaceFirstMapped(
+      RegExp(r'^[a-zA-Z]'),
+      (match) => match.group(0)!.toUpperCase(),
+    );
+
+    // Define supported date formats
+    final formats = [
+      DateFormat("MMMM d, yyyy"), // April 24, 2025
+      DateFormat("MMM d, yyyy"), // Apr 24, 2025
+      DateFormat("MMM d yyyy"), // Apr 24 2025
+    ];
+
+    // Try parsing with each format
+    for (var format in formats) {
+      try {
+        return format.parseStrict(normalized);
+      } catch (_) {
+        // Ignore and try the next format
+      }
+    }
+
+    return null;
+  }
+}

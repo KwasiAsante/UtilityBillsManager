@@ -1,0 +1,45 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "live_share_remote",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "live_share_remote (profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "live_share_remote (release mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+            "name": "linphone_voip",
+            "cwd": "Projects\\Flutter\\linphone_voip",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "linphone_voip (profile mode)",
+            "cwd": "Projects\\Flutter\\linphone_voip",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "linphone_voip (release mode)",
+            "cwd": "Projects\\Flutter\\linphone_voip",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        }
+    ]
+}

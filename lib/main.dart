@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // Desktop
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart'; // Web
-import 'package:utility_bills_manager/data/database/database_helper.dart';
-import 'package:utility_bills_manager/screens/bill_list_screen.dart';
-import 'data/models/bill.dart';
+import 'package:utility_bills_manager/screens/main_tab_screen.dart';
+import 'package:utility_bills_manager/data/models/app_state.dart';
+import 'package:utility_bills_manager/services/api/local_server.dart';
 
 final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
@@ -20,33 +20,59 @@ void main() async {
     databaseFactory = databaseFactoryFfi; // Desktop setup
   }
 
-  final db = DatabaseHelper();
+  if (Platform.isWindows) {
+    AppState().localDB = true;
 
-  // Sample Data for Testing
-  await db.insertBill(Bill(
-    company: 'Electricity Co.',
-    amount: 120.50,
-    dueDate: '2025-04-01',
-    status: 'Unpaid',
-    notes: 'March billing cycle',
-  ));
+    await startServer(); // runs local API server
 
-  await db.insertBill(Bill(
-    company: 'Water Utility',
-    
-    amount: 45.75,
-    dueDate: '2025-03-28',
-    status: 'Paid',
-    notes: 'February billing cycle',
-  ));
+    // final db = DatabaseHelper();
+    // // Sample Data for Testing
+    // await db.createBill(
+    //   Bill(
+    //     company: 'Electricity Co.',
+    //     type: BillType.electric,
+    //     amount: 120.50,
+    //     dueDate: '2025-04-01',
+    //     status: PaymentStatus.unpaid,
+    //     notes: 'March billing cycle',
+    //   ),
+    // );
 
-  const initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const initializationSettings = InitializationSettings(android:initializationSettingsAndroid);
+    // await db.createBill(
+    //   Bill(
+    //     company: 'Water Utility',
+    //     type: BillType.water,
+    //     amount: 45.75,
+    //     dueDate: '2025-03-28',
+    //     status: PaymentStatus.paid,
+    //     notes: 'February billing cycle',
+    //   ),
+    // );
+  } else {
+    AppState().localDB = false;
+  }
+
+  const initializationSettingsAndroid = AndroidInitializationSettings(
+    '@mipmap/ic_launcher',
+  );
+  const darwinSettings = DarwinInitializationSettings();
+  const WindowsInitializationSettings windowsSettings =
+      WindowsInitializationSettings(
+        appName: 'Utility Bills Manager',
+        appUserModelId: "com.kwasi.utility_bills_manager",
+        guid: '94e9c1ef-2491-447e-90fe-cc3eddf2b4c6',
+      );
+  const initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+    iOS: darwinSettings,
+    macOS: darwinSettings,
+    windows: windowsSettings,
+  );
+
   await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
   runApp(const MyApp());
 }
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -73,7 +99,7 @@ class MyApp extends StatelessWidget {
         // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: const BillListScreen(),
+      home: const MainTabScreen(),
     );
   }
 }
