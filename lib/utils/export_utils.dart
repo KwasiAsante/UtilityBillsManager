@@ -24,7 +24,7 @@ class ExportUtils {
     // Save or open PDF
   }
 
-  static exportBillsToCSV(List<Bill> filteredBills, List<Rentor> rentors) {}
+  static void exportBillsToCSV(List<Bill> filteredBills, List<Rentor> rentors) {}
 
-  static exportBillsToPDF(List<Bill> filteredBills, List<Rentor> rentors) {}
+  static void exportBillsToPDF(List<Bill> filteredBills, List<Rentor> rentors) {}
 }

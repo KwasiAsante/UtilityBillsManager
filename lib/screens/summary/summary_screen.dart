@@ -65,7 +65,7 @@ class _SummaryScreenState extends State<SummaryScreen> with SingleTickerProvider
   }
 
   void _exportToCSV() async {
-    await ExportUtils.exportBillsToCSV(_filteredBills, _rentors);
+    ExportUtils.exportBillsToCSV(_filteredBills, _rentors);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Exported to CSV')),
@@ -74,7 +74,7 @@ class _SummaryScreenState extends State<SummaryScreen> with SingleTickerProvider
   }
 
   void _exportToPDF() async {
-    await ExportUtils.exportBillsToPDF(_filteredBills, _rentors);
+    ExportUtils.exportBillsToPDF(_filteredBills, _rentors);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Exported to PDF')),

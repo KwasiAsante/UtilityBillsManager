@@ -94,7 +94,7 @@ class _AddEditBillScreenState extends State<AddEditBillScreen> {
             children: [
               if (!isEditing)
                 DropdownButtonFormField<BillType>(
-                  value: _selectedType,
+                  initialValue: _selectedType,
                   decoration: const InputDecoration(labelText: 'Bill Type'),
                   items: BillType.values.map((type) {
                     return DropdownMenuItem(
@@ -137,7 +137,7 @@ class _AddEditBillScreenState extends State<AddEditBillScreen> {
                 validator: (value) => value!.isEmpty ? 'Enter due date' : null,
               ),
               DropdownButtonFormField<PaymentStatus>(
-                  value: _selectedStatus,
+                  initialValue: _selectedStatus,
                   decoration: const InputDecoration(labelText: 'Payment Status'),
                   items: PaymentStatus.values.map((status) {
                     return DropdownMenuItem(

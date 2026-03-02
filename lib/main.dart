@@ -28,6 +28,32 @@ void main() async {
 
   if (mode == AppMode.server) {
     await startServer(); // runs local API server
+
+    // final db = DatabaseHelper();
+    // // Sample Data for Testing
+    // await db.createBill(
+    //   Bill(
+    //     company: 'Electricity Co.',
+    //     type: BillType.electric,
+    //     amount: 120.50,
+    //     dueDate: '2025-04-01',
+    //     status: PaymentStatus.unpaid,
+    //     notes: 'March billing cycle',
+    //   ),
+    // );
+
+    // await db.createBill(
+    //   Bill(
+    //     company: 'Water Utility',
+    //     type: BillType.water,
+    //     amount: 45.75,
+    //     dueDate: '2025-03-28',
+    //     status: PaymentStatus.paid,
+    //     notes: 'February billing cycle',
+    //   ),
+    // );
+  } else {
+    AppState().localDB = false;
   }
 
   const initializationSettingsAndroid = AndroidInitializationSettings(
@@ -47,7 +73,7 @@ void main() async {
     windows: windowsSettings,
   );
 
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  await flutterLocalNotificationsPlugin.initialize(settings: initializationSettings);
 
   runApp(const MyApp());
 }
