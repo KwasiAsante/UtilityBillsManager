@@ -13,7 +13,7 @@ class RentorsHelper {
 
   RentorsHelper._internal();
 
-  DatabaseHelper? dbHelper = AppState().localDB ? DatabaseHelper() : null;
+  DatabaseHelper? get dbHelper => AppState().localDB ? DatabaseHelper() : null;
 
   // #region CRUD Operations
   // #region Rentor

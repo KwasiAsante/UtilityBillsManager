@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // Desktop
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart'; // Web
+import 'package:utility_bills_manager/config/app_config.dart';
 import 'package:utility_bills_manager/screens/main_tab_screen.dart';
 import 'package:utility_bills_manager/data/models/app_state.dart';
+import 'package:utility_bills_manager/services/api/api_service.dart';
 import 'package:utility_bills_manager/services/api/local_server.dart';
 
 final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
@@ -20,36 +22,12 @@ void main() async {
     databaseFactory = databaseFactoryFfi; // Desktop setup
   }
 
-  if (Platform.isWindows) {
-    AppState().localDB = true;
+  final mode = AppConfig.mode;
+  AppState().localDB = mode == AppMode.server;
+  ApiService.configure(baseUrl: AppConfig.apiBaseUrl);
 
+  if (mode == AppMode.server) {
     await startServer(); // runs local API server
-
-    // final db = DatabaseHelper();
-    // // Sample Data for Testing
-    // await db.createBill(
-    //   Bill(
-    //     company: 'Electricity Co.',
-    //     type: BillType.electric,
-    //     amount: 120.50,
-    //     dueDate: '2025-04-01',
-    //     status: PaymentStatus.unpaid,
-    //     notes: 'March billing cycle',
-    //   ),
-    // );
-
-    // await db.createBill(
-    //   Bill(
-    //     company: 'Water Utility',
-    //     type: BillType.water,
-    //     amount: 45.75,
-    //     dueDate: '2025-03-28',
-    //     status: PaymentStatus.paid,
-    //     notes: 'February billing cycle',
-    //   ),
-    // );
-  } else {
-    AppState().localDB = false;
   }
 
   const initializationSettingsAndroid = AndroidInitializationSettings(

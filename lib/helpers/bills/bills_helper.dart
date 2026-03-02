@@ -13,7 +13,7 @@ class BillsHelper {
 
   BillsHelper._internal();
 
-  DatabaseHelper? dbHelper = AppState().localDB ? DatabaseHelper() : null;
+  DatabaseHelper? get dbHelper => AppState().localDB ? DatabaseHelper() : null;
 
   // #region CRUD Operations
   // #region Bill
@@ -65,7 +65,6 @@ class BillsHelper {
         bills = await dbHelper.readBillsByStatus(status);
       } else {
         bills = await ApiService.bills().getBillsByStatus(status);
-        bills = List.empty();
       }
       return Result.success(data: bills);
     } on Exception catch (e) {

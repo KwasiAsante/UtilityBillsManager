@@ -1,5 +1,6 @@
 import 'package:enough_mail/enough_mail.dart';
 import 'package:flutter/foundation.dart';
+import 'package:utility_bills_manager/config/app_config.dart';
 import 'package:utility_bills_manager/data/models/bill.dart';
 import 'package:utility_bills_manager/helpers/bills/bills_helper.dart';
 import 'package:utility_bills_manager/helpers/database/database_helper.dart';
@@ -20,23 +21,15 @@ class EmailDataHelper {
 
   EmailDataHelper._internal();
 
-  DatabaseHelper? dbHelper = AppState().localDB ? DatabaseHelper() : null;
+  DatabaseHelper? get dbHelper => AppState().localDB ? DatabaseHelper() : null;
 
-  EmailService emailService = EmailService(
-    email: 'kwasigkasante@gmail.com',
-    password: 'ztwb pwzl qoge aens',
-    imapServer: 'imap.gmail.com',
-    imapPort: 993,
-    isImapSecure: true,
+  late final EmailService emailService = EmailService(
+    email: AppConfig.emailAddress,
+    password: AppConfig.emailPassword,
+    imapServer: AppConfig.emailImapServer,
+    imapPort: AppConfig.emailImapPort,
+    isImapSecure: AppConfig.emailImapSecure,
   );
-
-  // EmailService emailService = EmailService(
-  //   email: 'kwasisoftwaredev@gmail.com',
-  //   password: 'ivlf tgsi hjlz khmj',
-  //   imapServer: 'imap.gmail.com',
-  //   imapPort: 993,
-  //   isImapSecure: true
-  // );
 
   final BillsHelper _billsHelper = BillsHelper();
 

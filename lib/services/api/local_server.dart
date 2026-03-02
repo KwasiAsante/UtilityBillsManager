@@ -4,6 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
+import 'package:utility_bills_manager/data/models/bill.dart';
+import 'package:utility_bills_manager/data/models/email_data.dart';
+import 'package:utility_bills_manager/data/models/payment.dart';
+import 'package:utility_bills_manager/data/models/rentor.dart';
 import 'package:utility_bills_manager/helpers/database/database_helper.dart';
 
 // Define the main function to start the server
@@ -75,7 +79,7 @@ Future<void> startServer() async {
       if (kDebugMode) {
         print('Received POST data: $body');
       }
-      final bill = jsonDecode(body);
+      final bill = Bill.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
       int createdBillId = await dbHelper.createBill(bill);
       if (createdBillId >= 0) {
@@ -101,7 +105,7 @@ Future<void> startServer() async {
       if (kDebugMode) {
         print('Received POST data: $body');
       }
-      final bill = jsonDecode(body);
+      final bill = Bill.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
       int numberOfChanges = await dbHelper.updateBill(bill);
       if (numberOfChanges >= 0) {
@@ -121,9 +125,13 @@ Future<void> startServer() async {
   // #region DELETE
 
   // DELETE request to delete an existing bill
-  router.delete('/bill/<id>', (Request request, int id) async {
+  router.delete('/bill/<id>', (Request request, String id) async {
     try {
-      int deletedBills = await dbHelper.deleteBill(id);
+      final parsedId = int.tryParse(id);
+      if (parsedId == null) {
+        return Response.badRequest(body: "Invalid bill id: $id");
+      }
+      int deletedBills = await dbHelper.deleteBill(parsedId);
       if (deletedBills > 0) {
         return Response.ok('Bill deleted');
       } else {
@@ -164,7 +172,7 @@ Future<void> startServer() async {
       if (kDebugMode) {
         print('Received POST data: $body');
       }
-      final rentor = jsonDecode(body);
+      final rentor = Rentor.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
       int createdRentorId = await dbHelper.createRentor(rentor);
       if (createdRentorId >= 0) {
@@ -190,7 +198,7 @@ Future<void> startServer() async {
       if (kDebugMode) {
         print('Received POST data: $body');
       }
-      final rentor = jsonDecode(body);
+      final rentor = Rentor.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
       int numberOfChanges = await dbHelper.updateRentor(rentor);
       if (numberOfChanges >= 0) {
@@ -210,9 +218,13 @@ Future<void> startServer() async {
   // #region DELETE
 
   // DELETE request to delete an existing rentor
-  router.delete('/rentor/<id>', (Request request, int id) async {
+  router.delete('/rentor/<id>', (Request request, String id) async {
     try {
-      int deletedRentors = await dbHelper.deleteRentor(id);
+      final parsedId = int.tryParse(id);
+      if (parsedId == null) {
+        return Response.badRequest(body: "Invalid rentor id: $id");
+      }
+      int deletedRentors = await dbHelper.deleteRentor(parsedId);
       if (deletedRentors > 0) {
         return Response.ok('Rentor deleted');
       } else {
@@ -253,7 +265,8 @@ Future<void> startServer() async {
       if (kDebugMode) {
         print('Received POST data: $body');
       }
-      final payment = jsonDecode(body);
+      final payment =
+          Payment.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
       int createdPaymentId = await dbHelper.createPayment(payment);
       if (createdPaymentId >= 0) {
@@ -279,7 +292,8 @@ Future<void> startServer() async {
       if (kDebugMode) {
         print('Received POST data: $body');
       }
-      final payment = jsonDecode(body);
+      final payment =
+          Payment.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
       int numberOfChanges = await dbHelper.updatePayment(payment);
       if (numberOfChanges >= 0) {
@@ -299,9 +313,13 @@ Future<void> startServer() async {
   // #region DELETE
 
   // DELETE request to delete an existing payment
-  router.delete('/payment/<id>', (Request request, int id) async {
+  router.delete('/payment/<id>', (Request request, String id) async {
     try {
-      int deletedPayments = await dbHelper.deletePayment(id);
+      final parsedId = int.tryParse(id);
+      if (parsedId == null) {
+        return Response.badRequest(body: "Invalid payment id: $id");
+      }
+      int deletedPayments = await dbHelper.deletePayment(parsedId);
       if (deletedPayments > 0) {
         return Response.ok('Payment deleted');
       } else {
@@ -319,9 +337,13 @@ Future<void> startServer() async {
   // #region GET
 
   // GET request to retrieve bill
-  router.get('/email/<id>', (Request request, int id) async {
+  router.get('/email/<id>', (Request request, String id) async {
     try {
-      final bill = await dbHelper.readEmail(id);
+      final parsedId = int.tryParse(id);
+      if (parsedId == null) {
+        return Response.badRequest(body: "Invalid email id: $id");
+      }
+      final bill = await dbHelper.readEmail(parsedId);
       if (bill != null) {
         return Response.ok(
           jsonEncode(bill),
@@ -341,7 +363,7 @@ Future<void> startServer() async {
   // GET request to retrieve all emailData
   router.get('/email/list', (Request request) async {
     try {
-      final emailData = await dbHelper.readUnprocessedEmails();
+      final emailData = await dbHelper.readEmails();
       final emailDataList = emailData.map((e) => e).toList();
       return Response.ok(
         jsonEncode(emailDataList),
@@ -369,7 +391,7 @@ Future<void> startServer() async {
   // GET request to retrieve all emailData
   router.get('/email/list/processed', (Request request) async {
     try {
-      final emailData = await dbHelper.readUnprocessedEmails();
+      final emailData = await dbHelper.readProcessedEmails();
       final emailDataList = emailData.map((e) => e).toList();
       return Response.ok(
         jsonEncode(emailDataList),
@@ -390,7 +412,8 @@ Future<void> startServer() async {
       if (kDebugMode) {
         print('Received POST data: $body');
       }
-      final emailData = jsonDecode(body);
+      final emailData =
+          EmailData.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
       int createdEmailDataId = await dbHelper.createEmailData(emailData);
       if (createdEmailDataId >= 0) {
@@ -416,7 +439,8 @@ Future<void> startServer() async {
       if (kDebugMode) {
         print('Received POST data: $body');
       }
-      final emailData = jsonDecode(body);
+      final emailData =
+          EmailData.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
       int numberOfChanges = await dbHelper.updateEmailData(emailData);
       if (numberOfChanges >= 0) {
@@ -436,9 +460,13 @@ Future<void> startServer() async {
   // #region DELETE
 
   // DELETE request to delete an existing emailData
-  router.delete('/email/<id>', (Request request, int id) async {
+  router.delete('/email/<id>', (Request request, String id) async {
     try {
-      int deletedEmailData = await dbHelper.deleteEmailData(id);
+      final parsedId = int.tryParse(id);
+      if (parsedId == null) {
+        return Response.badRequest(body: "Invalid email id: $id");
+      }
+      int deletedEmailData = await dbHelper.deleteEmailData(parsedId);
       if (deletedEmailData > 0) {
         return Response.ok('EmailData deleted');
       } else {

@@ -8,7 +8,11 @@ import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/data/models/rentor.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://192.168.1.10:8080';
+  static String baseUrl = 'http://127.0.0.1:8080';
+
+  static void configure({required String baseUrl}) {
+    ApiService.baseUrl = baseUrl;
+  }
 
   static BillsApiService bills() {
     final billApiService = BillsApiService._instance;
@@ -103,7 +107,10 @@ class BillsApiService {
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
-        return List<Bill>.from(jsonList);
+        return jsonList
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Bill.fromJson(e))
+            .toList();
       } else {
         if (kDebugMode) {
           print('Failed to load bills: ${response.statusCode} - $response');
@@ -124,7 +131,10 @@ class BillsApiService {
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
-        return List<Bill>.from(jsonList);
+        return jsonList
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Bill.fromJson(e))
+            .toList();
       } else {
         if (kDebugMode) {
           print('Failed to load bills: ${response.statusCode} - $response');
@@ -239,7 +249,10 @@ class RentorsApiService {
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
-        return List<Rentor>.from(jsonList);
+        return jsonList
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Rentor.fromJson(e))
+            .toList();
       } else {
         if (kDebugMode) {
           print('Failed to load rentors: ${response.statusCode} - $response');
@@ -354,7 +367,10 @@ class PaymentsApiService {
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
-        return List<Payment>.from(jsonList);
+        return jsonList
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Payment.fromJson(e))
+            .toList();
       } else {
         if (kDebugMode) {
           print('Failed to load payments: ${response.statusCode} - $response');
@@ -494,7 +510,10 @@ class EmailDataApiService {
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
-        return List<EmailData>.from(jsonList);
+        return jsonList
+            .whereType<Map<String, dynamic>>()
+            .map((e) => EmailData.fromJson(e))
+            .toList();
       } else {
         if (kDebugMode) {
           print(
@@ -519,7 +538,10 @@ class EmailDataApiService {
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
-        return List<EmailData>.from(jsonList);
+        return jsonList
+            .whereType<Map<String, dynamic>>()
+            .map((e) => EmailData.fromJson(e))
+            .toList();
       } else {
         if (kDebugMode) {
           print(
@@ -544,7 +566,10 @@ class EmailDataApiService {
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
-        return List<EmailData>.from(jsonList);
+        return jsonList
+            .whereType<Map<String, dynamic>>()
+            .map((e) => EmailData.fromJson(e))
+            .toList();
       } else {
         if (kDebugMode) {
           print(

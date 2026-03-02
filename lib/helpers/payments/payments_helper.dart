@@ -13,7 +13,7 @@ class PaymentsHelper {
 
   PaymentsHelper._internal();
 
-  DatabaseHelper? dbHelper = AppState().localDB ? DatabaseHelper() : null;
+  DatabaseHelper? get dbHelper => AppState().localDB ? DatabaseHelper() : null;
 
   // #region CRUD Operations
   // Create a Payment

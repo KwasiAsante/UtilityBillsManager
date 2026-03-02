@@ -71,5 +71,9 @@
         "xtr1common": "cpp",
         "xtree": "cpp",
         "xutility": "cpp"
-    }
+    },
+    "dotrush.roslyn.projectOrSolutionFiles": [
+        "d:\\Projects\\Flutter\\utility_bills_manager\\build\\windows\\x64\\utility_bills_manager.sln",
+        "d:\\Projects\\Flutter\\utility_bills_manager\\build\\utility_bills_manager.sln"
+    ]
 }
