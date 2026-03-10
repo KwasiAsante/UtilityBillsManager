@@ -1,4 +1,3 @@
-import 'dart:io' show Platform; // For platform detection
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -7,20 +6,27 @@ import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart'; // Web
 import 'package:utility_bills_manager/config/app_config.dart';
 import 'package:utility_bills_manager/screens/main_tab_screen.dart';
 import 'package:utility_bills_manager/data/models/app_state.dart';
+import 'package:utility_bills_manager/helpers/database/database_helper.dart';
 import 'package:utility_bills_manager/services/api/api_service.dart';
-import 'package:utility_bills_manager/services/api/local_server.dart';
+import 'package:utility_bills_manager/services/api/local_server_stub.dart'
+    if (dart.library.io) 'package:utility_bills_manager/services/api/local_server.dart';
 
 final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.init();
 
   if (kIsWeb) {
     databaseFactory = databaseFactoryFfiWeb; // Web setup
-  } else if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+  } else {
+    // Desktop / mobile setup
     sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi; // Desktop setup
+    databaseFactory = databaseFactoryFfi;
   }
+
+  // Initialize local database on all platforms (including web with FFI web)
+  await DatabaseHelper().database;
 
   final mode = AppConfig.mode;
   AppState().localDB = mode == AppMode.server;

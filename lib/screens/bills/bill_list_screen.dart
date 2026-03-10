@@ -1,6 +1,11 @@
+import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:google_sign_in_web/google_sign_in_web.dart';
+import 'package:google_sign_in_web/web_only.dart' as web;
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/data/models/result.dart';
 import 'package:utility_bills_manager/helpers/email/email_data_helper.dart';
@@ -20,6 +25,7 @@ class _BillListScreenState extends State<BillListScreen> {
   final BillsHelper _billsHelper = BillsHelper();
   final EmailDataHelper _emailDataHelper = EmailDataHelper();
   final ScrollController _scrollController = ScrollController();
+  StreamSubscription<GoogleSignInAuthenticationEvent>? _authSubscription;
   Future<List<Bill>>? _bills;
   bool _loading = true;
   bool _isListScrollable = false;
@@ -30,15 +36,36 @@ class _BillListScreenState extends State<BillListScreen> {
   @override
   void initState() {
     super.initState();
+    _initGoogleSignInForWeb();
     _loadBills();
     _scrollController.addListener(_checkScrollability);
   }
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _scrollController.removeListener(_checkScrollability);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initGoogleSignInForWeb() async {
+    if (!kIsWeb) return;
+
+    final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+    await googleSignIn.initialize(
+      clientId:
+          '910862354798-fm2ttlkjnv5nscsqrsqm0ieou2lva2ub.apps.googleusercontent.com',
+    );
+
+    _authSubscription = googleSignIn.authenticationEvents.listen(
+      (GoogleSignInAuthenticationEvent event) async {
+        if (event is GoogleSignInAuthenticationEventSignIn) {
+          await _emailDataHelper.fetchBillEmails(maxEmails: 50);
+          await _loadBills();
+        }
+      },
+    );
   }
 
   void _checkScrollability() {
@@ -140,6 +167,19 @@ class _BillListScreenState extends State<BillListScreen> {
           ),
         ),
         actions: [
+          if (kIsWeb)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: SizedBox(
+                height: 36,
+                child: web.renderButton(
+                  configuration: GSIButtonConfiguration(
+                    theme: GSIButtonTheme.filledBlack,
+                    text: GSIButtonText.continueWith,
+                  ),
+                ),
+              ),
+            ),
           if (_searchQuery.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.clear),

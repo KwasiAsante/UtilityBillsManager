@@ -5,41 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "live_share_remote",
-            "request": "launch",
-            "type": "dart"
-        },
-        {
-            "name": "live_share_remote (profile mode)",
+            "name": "Flutter Web (Chrome)",
             "request": "launch",
             "type": "dart",
-            "flutterMode": "profile"
-        },
-        {
-            "name": "live_share_remote (release mode)",
-            "request": "launch",
-            "type": "dart",
-            "flutterMode": "release"
-        },
-        {
-            "name": "linphone_voip",
-            "cwd": "Projects\\Flutter\\linphone_voip",
-            "request": "launch",
-            "type": "dart"
-        },
-        {
-            "name": "linphone_voip (profile mode)",
-            "cwd": "Projects\\Flutter\\linphone_voip",
-            "request": "launch",
-            "type": "dart",
-            "flutterMode": "profile"
-        },
-        {
-            "name": "linphone_voip (release mode)",
-            "cwd": "Projects\\Flutter\\linphone_voip",
-            "request": "launch",
-            "type": "dart",
-            "flutterMode": "release"
+            "program": "lib/main.dart",
+            "args": [
+                "--web-port=55365"
+            ],
+            "deviceId": "chrome"
         }
     ]
 }

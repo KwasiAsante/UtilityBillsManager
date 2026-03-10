@@ -1,9 +1,18 @@
 import 'dart:convert';
-import 'dart:io';
+
+import 'package:flutter/services.dart';
 
 enum AppMode { server, client }
 
 class AppConfig {
+  /// Loads optional local secrets from a bundled asset.
+  ///
+  /// Call this once during startup (before reading any config).
+  static Future<void> init({
+    String assetPath = 'assets/config/local_secrets.json',
+  }) =>
+      _LocalSecrets.loadFromAsset(assetPath);
+
   static const String _modeRaw = String.fromEnvironment(
     'APP_MODE',
     defaultValue: 'server',
@@ -82,23 +91,31 @@ class AppConfig {
 ///   "EMAIL_IMAP_SECURE": true
 /// }
 class _LocalSecrets {
-  static Map<String, dynamic>? _cache;
+  static Map<String, dynamic> _cache = <String, dynamic>{};
+  static bool _loaded = false;
 
-  static Map<String, dynamic> get _data {
-    if (_cache != null) return _cache!;
+  static Future<void> loadFromAsset(String assetPath) async {
+    if (_loaded) return;
     try {
-      final file = File('local_secrets.json');
-      if (!file.existsSync()) {
-        _cache = <String, dynamic>{};
+      final contents = await rootBundle.loadString(assetPath);
+      final decoded = jsonDecode(contents);
+      if (decoded is Map<String, dynamic>) {
+        _cache = decoded;
+      } else if (decoded is Map) {
+        _cache = decoded.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
       } else {
-        final contents = file.readAsStringSync();
-        _cache = jsonDecode(contents) as Map<String, dynamic>;
+        _cache = <String, dynamic>{};
       }
     } catch (_) {
       _cache = <String, dynamic>{};
+    } finally {
+      _loaded = true;
     }
-    return _cache!;
   }
+
+  static Map<String, dynamic> get _data => _cache;
 
   static String? getString(String key) {
     final value = _data[key];
