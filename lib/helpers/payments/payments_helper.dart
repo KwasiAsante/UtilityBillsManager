@@ -55,5 +55,35 @@ class PaymentsHelper {
     }
   }
 
+  // Delete all Payments
+  Future<Result<void>> deleteAllPayments() async {
+    final dbHelper = this.dbHelper;
+    if (dbHelper != null) {
+      await dbHelper.deleteAllPayments();
+      return Result.success();
+    } else {
+      try {
+        final paymentsApi = ApiService.payments();
+        final returnValue = await (paymentsApi as dynamic).deleteAllPayments()
+            as String;
+        if (returnValue == "OK") {
+          return Result.success();
+        }
+        return Result.error(errorMessage: returnValue);
+      } on NoSuchMethodError {
+        // Backward-compatible fallback for API variants without bulk delete.
+        final payments = await ApiService.payments().getAllPayments();
+        for (final payment in payments) {
+          if (payment.id != null) {
+            await ApiService.payments().deletePayment(payment.id!);
+          }
+        }
+        return Result.success();
+      } catch (e) {
+        return Result.error(errorMessage: e.toString());
+      }
+    }
+  }
+
   // #endregion
 }

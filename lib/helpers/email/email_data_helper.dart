@@ -136,10 +136,24 @@ class EmailDataHelper {
       final returnValue = await ApiService.emails().updateEmailData(emailData);
       if (returnValue == "OK") {
         return Result.success();
-      }
-      else {
+      } else {
         return Result.error(errorMessage: returnValue);
       }
+    }
+  }
+
+  // Delete all Email Data
+  Future<Result<void>> deleteAllEmails() async {
+    final dbHelper = this.dbHelper;
+    if (dbHelper != null) {
+      await dbHelper.deleteAllEmailData();
+      return Result.success();
+    } else {
+      final returnValue = await ApiService.emails().deleteAllEmailData();
+      if (returnValue == "OK") {
+        return Result.success();
+      }
+      return Result.error(errorMessage: returnValue);
     }
   }
   // #endregion
@@ -171,6 +185,8 @@ class EmailDataHelper {
             }
           }
           finalMessages[message] = emailData;
+        } else {
+          finalMessages[message] = result.data!;
         }
       }
     }
@@ -181,39 +197,68 @@ class EmailDataHelper {
     final messages = await fetchEmails(maxEmails: maxEmails);
     if (messages.isNotEmpty) {
       for (MimeMessage message in messages.keys) {
-        Bill? bill = await BillsParser.parseEmailToBill(message);
-        if (bill != null) {
-          if (kDebugMode) {
-            print(
-              'Bill Parsed: {\n\tID: ${bill.id}\n\tCompany: ${bill.company}\n\tAmount: ${bill.amount}\n\tBill Type: ${bill.type}\n\tDue Date: ${bill.dueDate}\n\tPayment Status: ${bill.status.name}\n\tNotes: ${bill.notes}\n}',
-            );
-            print(
-              '---------------------------------------------------------------------\n\n\n\n\n',
-            );
-          }
-          // Create the bill and get its ID
-          Result<Bill> createResult = await _billsHelper.createBill(bill);
-          if (createResult.isSuccess && createResult.data != null) {
-            var emailData = messages[message];
-            if (emailData != null) {
-              // Create a new EmailData instance with updated values
-              EmailData updatedEmailData = EmailData(
-                id: emailData.id,
-                emailSubject: emailData.emailSubject,
-                emailBody: emailData.emailBody,
-                emailId: emailData.emailId,
-                billId: createResult.data!.billId,
-                processed: true,
+        var billId = messages[message]?.billId;
+        Result<Bill?> billResult = await _billsHelper.readBill(billId ?? '');
+        Bill? bill = billResult.data;
+        if (billResult.isError || bill == null) {
+          bill = await BillsParser.parseEmailToBill(message);
+          if (bill != null) {
+            if (kDebugMode) {
+              print(
+                'Bill Parsed: {\n\tID: ${bill.id}\n\tCompany: ${bill.company}\n\tAmount: ${bill.amount}\n\tBill Type: ${bill.type}\n\tDue Date: ${bill.dueDate}\n\tPayment Status: ${bill.status.name}\n\tNotes: ${bill.notes}\n}',
               );
-              await updateEmailData(updatedEmailData);
+              print(
+                '---------------------------------------------------------------------\n\n\n\n\n',
+              );
+            }
+
+            // Create the bill and get its ID
+            Result<Bill> createResult = await _billsHelper.createBill(bill);
+            if (createResult.isSuccess && createResult.data != null) {
+              var emailData = messages[message];
+              if (emailData != null) {
+                // Create a new EmailData instance with updated values
+                EmailData updatedEmailData = EmailData(
+                  id: emailData.id,
+                  emailSubject: emailData.emailSubject,
+                  emailBody: emailData.emailBody,
+                  emailId: emailData.emailId,
+                  billId: createResult.data!.billId,
+                  processed: true,
+                );
+                await updateEmailData(updatedEmailData);
+              }
+            }
+          } else {
+            if (kDebugMode) {
+              print('Failed to convert Bill: ${message.decodeSubject()}');
+              print(
+                '---------------------------------------------------------------------\n\n\n\n\n',
+              );
             }
           }
         } else {
           if (kDebugMode) {
-            print('Failed to convert Bill: ${message.decodeSubject()}');
+            print(
+              'Bill Found: {\n\tID: ${bill.id}\n\tCompany: ${bill.company}\n\tAmount: ${bill.amount}\n\tBill Type: ${bill.type}\n\tDue Date: ${bill.dueDate}\n\tPayment Status: ${bill.status.name}\n\tNotes: ${bill.notes}\n}',
+            );
             print(
               '---------------------------------------------------------------------\n\n\n\n\n',
             );
+          }
+
+          var emailData = messages[message];
+          if (emailData != null) {
+            // Create a new EmailData instance with updated values
+            EmailData updatedEmailData = EmailData(
+              id: emailData.id,
+              emailSubject: emailData.emailSubject,
+              emailBody: emailData.emailBody,
+              emailId: emailData.emailId,
+              billId: bill.billId,
+              processed: true,
+            );
+            await updateEmailData(updatedEmailData);
           }
         }
       }

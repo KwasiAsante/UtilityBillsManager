@@ -274,3 +274,4 @@ app.*.map.json
 /android/app/release
 
 local_secrets.json
+.vscode/launch.json

@@ -65,13 +65,13 @@ class BillsApiService {
         return "OK";
       } else {
         if (kDebugMode) {
-          print('Failed to create bill: ${response.statusCode} - $response');
+          print('Failed to create bill ${bill.id}: ${response.statusCode} - $response');
         }
         return response.toString();
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error fetching bills: $e');
+        print('Error creating bill: $e');
       }
       return e.toString();
     }
@@ -79,7 +79,6 @@ class BillsApiService {
   // #endregion
 
   // #region Read
-
   Future<Bill?> getBill(String id) async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/bill/$id'));
@@ -89,13 +88,13 @@ class BillsApiService {
         return Bill.fromJson(json);
       } else {
         if (kDebugMode) {
-          print('Failed to load bills: ${response.statusCode} - $response');
+          print('Failed to load bill $id: ${response.statusCode} - $response');
         }
         return null;
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error fetching bills: $e');
+        print('Error fetching bill $id: $e');
       }
       return null;
     }
@@ -163,13 +162,13 @@ class BillsApiService {
         return "OK";
       } else {
         if (kDebugMode) {
-          print('Failed to load bills: ${response.statusCode} - $response');
+          print('Failed to update bill ${bill.id}: ${response.statusCode} - $response');
         }
         return response.toString();
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error fetching bills: $e');
+        print('Error update bill: $e');
       }
       return e.toString();
     }
@@ -186,14 +185,36 @@ class BillsApiService {
       } else {
         if (kDebugMode) {
           print(
-            'Failed to load bills: ${response.statusCode} - ${response.toString()}',
+            'Failed to delete bill $id: ${response.statusCode} - ${response.toString()}',
           );
         }
         return response.toString();
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error fetching bills: $e');
+        print('Error delete bill $id: $e');
+      }
+      return e.toString();
+    }
+  }
+
+  Future<String> deleteAllBills() async {
+    try {
+      final response = await http.delete(Uri.parse('$baseUrl/bill/list'));
+
+      if (response.statusCode == 200) {
+        return "OK";
+      } else {
+        if (kDebugMode) {
+          print(
+            'Failed to delete all bills: ${response.statusCode} - ${response.toString()}',
+          );
+        }
+        return response.toString();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error delete bills: $e');
       }
       return e.toString();
     }
@@ -229,13 +250,13 @@ class RentorsApiService {
         return "OK";
       } else {
         if (kDebugMode) {
-          print('Failed to create rentor: ${response.statusCode} - $response');
+          print('Failed to create rentor ${rentor.id}: ${response.statusCode} - $response');
         }
         return response.toString();
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error fetching rentors: $e');
+        print('Error creating rentor: $e');
       }
       return e.toString();
     }
@@ -243,6 +264,27 @@ class RentorsApiService {
   // #endregion
 
   // #region Read
+  Future<Rentor?> getRentor(String id) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/rentor/$id'));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> json = jsonDecode(response.body);
+        return Rentor.fromJson(json);
+      } else {
+        if (kDebugMode) {
+          print('Failed to load rentor $id: ${response.statusCode} - $response');
+        }
+        return null;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error fetching rentor: $e');
+      }
+      return null;
+    }
+  }
+
   Future<List<Rentor>> getAllRentors() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/rentor/list'));
@@ -281,13 +323,13 @@ class RentorsApiService {
         return "OK";
       } else {
         if (kDebugMode) {
-          print('Failed to load rentors: ${response.statusCode} - $response');
+          print('Failed to update rentor ${rentor.id}: ${response.statusCode} - $response');
         }
         return response.toString();
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error fetching rentors: $e');
+        print('Error updating rentors: $e');
       }
       return e.toString();
     }
@@ -304,14 +346,36 @@ class RentorsApiService {
       } else {
         if (kDebugMode) {
           print(
-            'Failed to load rentors: ${response.statusCode} - ${response.toString()}',
+            'Failed to delete rentor $id: ${response.statusCode} - ${response.toString()}',
           );
         }
         return response.toString();
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error fetching rentors: $e');
+        print('Error delete rentor $id: $e');
+      }
+      return e.toString();
+    }
+  }
+
+  Future<String> deleteAllRentors() async {
+    try {
+      final response = await http.delete(Uri.parse('$baseUrl/rentor/list'));
+
+      if (response.statusCode == 200) {
+        return "OK";
+      } else {
+        if (kDebugMode) {
+          print(
+            'Failed to delete all rentors: ${response.statusCode} - ${response.toString()}',
+          );
+        }
+        return response.toString();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error deleting rentors: $e');
       }
       return e.toString();
     }
@@ -361,6 +425,27 @@ class PaymentsApiService {
   // #endregion
 
   // #region Read
+  Future<Payment?> getPayment(String id) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/payment/list'));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> json = jsonDecode(response.body);
+        return Payment.fromJson(json);
+      } else {
+        if (kDebugMode) {
+          print('Failed to load payment $id: ${response.statusCode} - $response');
+        }
+        return null;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error fetching payment $id: $e');
+      }
+      return null;
+    }
+  }
+
   Future<List<Payment>> getAllPayments() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/payment/list'));
@@ -384,7 +469,7 @@ class PaymentsApiService {
       return [];
     }
   }
-  // #endregion
+  // #endregiosadn
 
   // #region Update
   Future<String> updatePayment(Payment payment) async {
@@ -399,13 +484,13 @@ class PaymentsApiService {
         return "OK";
       } else {
         if (kDebugMode) {
-          print('Failed to load payments: ${response.statusCode} - $response');
+          print('Failed to update payment ${payment.id}: ${response.statusCode} - $response');
         }
         return response.toString();
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error fetching payments: $e');
+        print('Error updating payment: $e');
       }
       return e.toString();
     }
@@ -422,14 +507,36 @@ class PaymentsApiService {
       } else {
         if (kDebugMode) {
           print(
-            'Failed to load payments: ${response.statusCode} - ${response.toString()}',
+            'Failed to delete payment $id: ${response.statusCode} - ${response.toString()}',
           );
         }
         return response.toString();
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error fetching payments: $e');
+        print('Error deleting payment: $e');
+      }
+      return e.toString();
+    }
+  }
+
+  Future<String> deleteAllPayments() async {
+    try {
+      final response = await http.delete(Uri.parse('$baseUrl/payment/list'));
+
+      if (response.statusCode == 200) {
+        return "OK";
+      } else {
+        if (kDebugMode) {
+          print(
+            'Failed to delete all payments: ${response.statusCode} - ${response.toString()}',
+          );
+        }
+        return response.toString();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error deleting payments: $e');
       }
       return e.toString();
     }
@@ -466,14 +573,14 @@ class EmailDataApiService {
       } else {
         if (kDebugMode) {
           print(
-            'Failed to create emailData: ${response.statusCode} - $response',
+            'Failed to create emailData ${emailData.id}: ${response.statusCode} - $response',
           );
         }
         return response.toString();
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error fetching emailDatas: $e');
+        print('Error creating emailData: $e');
       }
       return e.toString();
     }
@@ -491,7 +598,7 @@ class EmailDataApiService {
       } else {
         if (kDebugMode) {
           print(
-            'Failed to load emailData: ${response.statusCode} - $response',
+            'Failed to load emailData $id: ${response.statusCode} - $response',
           );
         }
         return null;
@@ -545,7 +652,7 @@ class EmailDataApiService {
       } else {
         if (kDebugMode) {
           print(
-            'Failed to load emailDatas: ${response.statusCode} - $response',
+            'Failed to load unprocessed emailDatas: ${response.statusCode} - $response',
           );
         }
         return [];
@@ -573,7 +680,7 @@ class EmailDataApiService {
       } else {
         if (kDebugMode) {
           print(
-            'Failed to load emailDatas: ${response.statusCode} - $response',
+            'Failed to load processed emailDatas: ${response.statusCode} - $response',
           );
         }
         return [];
@@ -601,14 +708,14 @@ class EmailDataApiService {
       } else {
         if (kDebugMode) {
           print(
-            'Failed to load emailDatas: ${response.statusCode} - $response',
+            'Failed to update emailData ${emailData.id}: ${response.statusCode} - $response',
           );
         }
         return response.toString();
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error fetching emailDatas: $e');
+        print('Error updating emailData: $e');
       }
       return e.toString();
     }
@@ -625,14 +732,36 @@ class EmailDataApiService {
       } else {
         if (kDebugMode) {
           print(
-            'Failed to load emailDatas: ${response.statusCode} - ${response.toString()}',
+            'Failed to delete emailData: ${response.statusCode} - ${response.toString()}',
           );
         }
         return response.toString();
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error fetching emailDatas: $e');
+        print('Error deleting emailData: $e');
+      }
+      return e.toString();
+    }
+  }
+
+  Future<String> deleteAllEmailData() async {
+    try {
+      final response = await http.delete(Uri.parse('$baseUrl/email/list'));
+
+      if (response.statusCode == 200) {
+        return "OK";
+      } else {
+        if (kDebugMode) {
+          print(
+            'Failed to delete all emailData: ${response.statusCode} - ${response.toString()}',
+          );
+        }
+        return response.toString();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error deleting emailData: $e');
       }
       return e.toString();
     }

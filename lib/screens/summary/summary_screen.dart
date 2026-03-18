@@ -4,6 +4,8 @@ import 'package:utility_bills_manager/data/models/bill.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/data/models/rentor.dart';
 import 'package:utility_bills_manager/helpers/bills/bills_helper.dart';
+import 'package:utility_bills_manager/helpers/email/email_data_helper.dart';
+import 'package:utility_bills_manager/helpers/payments/payments_helper.dart';
 import 'package:utility_bills_manager/helpers/rentors/rentors_helper.dart';
 import 'package:utility_bills_manager/utils/export_utils.dart';
 
@@ -19,6 +21,8 @@ class _SummaryScreenState extends State<SummaryScreen> with SingleTickerProvider
 
   final BillsHelper _billsHelper = BillsHelper();
   final RentorsHelper _rentorsHelper = RentorsHelper();
+  final PaymentsHelper _paymentsHelper = PaymentsHelper();
+  final EmailDataHelper _emailDataHelper = EmailDataHelper();
 
   List<Bill> _bills = [];
   List<Rentor> _rentors = [];
@@ -48,7 +52,78 @@ class _SummaryScreenState extends State<SummaryScreen> with SingleTickerProvider
       });
     }
     else {
-      _loading = false;
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _deleteAllData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete All Data'),
+        content: const Text(
+          'This will permanently delete all emails, bills, and payments from the database.\n\n'
+          'This action cannot be undone. Are you sure you want to continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete All'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _loading = true);
+
+    final emailDeleteResult = await _emailDataHelper.deleteAllEmails();
+    final paymentsDeleteResult = await _paymentsHelper.deleteAllPayments();
+    final billsDeleteResult = await _billsHelper.deleteAllBills();
+
+    final List<String> errors = [];
+    if (emailDeleteResult.isError) {
+      errors.add(
+        emailDeleteResult.errorMessage ??
+            'Failed to delete all emails.',
+      );
+    }
+    if (paymentsDeleteResult.isError) {
+      errors.add(
+        paymentsDeleteResult.errorMessage ??
+            'Failed to delete all payments.',
+      );
+    }
+    if (billsDeleteResult.isError) {
+      errors.add(
+        billsDeleteResult.errorMessage ??
+            'Failed to delete all bills.',
+      );
+    }
+
+    await _loadData();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            errors.isEmpty
+                ? 'All data has been deleted.'
+                : 'Delete failed: ${errors.join(' | ')}',
+          ),
+          backgroundColor: errors.isEmpty ? null : Colors.red,
+        ),
+      );
     }
   }
 
@@ -175,7 +250,12 @@ class _SummaryScreenState extends State<SummaryScreen> with SingleTickerProvider
             icon: const Icon(Icons.picture_as_pdf),
             tooltip: 'Export PDF',
             onPressed: _exportToPDF,
-          )
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_forever, color: Colors.red),
+            tooltip: 'Delete All Data',
+            onPressed: _deleteAllData,
+          ),
         ],
       ),
       body: _loading

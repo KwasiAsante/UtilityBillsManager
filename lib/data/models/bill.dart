@@ -31,7 +31,7 @@ class Bill {
       amount: (json['amount'] ?? 0).toDouble(),
       dueDate: json['dueDate'],
       status: PaymentStatusExtension.fromString(json['status']),
-      notes: json['notes']
+      notes: json['notes'],
     );
   }
 
@@ -44,7 +44,7 @@ class Bill {
       'amount': amount,
       'dueDate': dueDate,
       'status': status.name.toLowerCase(),
-      'notes': notes
+      'notes': notes,
     };
   }
 }
@@ -55,6 +55,7 @@ enum BillType {
   internet,
   water,
   rent,
+  phone,
   creditcard,
   personallineofcredit,
   other,
@@ -73,6 +74,8 @@ extension BillTypeExtension on BillType {
         return 'Water';
       case BillType.rent:
         return 'Rent';
+      case BillType.phone:
+        return 'Phone';
       case BillType.creditcard:
         return 'Credit Card';
       case BillType.personallineofcredit:
@@ -94,6 +97,8 @@ extension BillTypeExtension on BillType {
         return BillType.water;
       case 'rent':
         return BillType.rent;
+      case 'phone':
+        return BillType.phone;
       case 'creditcard':
       case 'credit card':
         return BillType.creditcard;

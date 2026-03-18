@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // Desktop
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart'; // Web
@@ -15,12 +16,16 @@ final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // PDF text extraction (email attachments) uses pdfrx on web/mobile/desktop
+  await pdfrxFlutterInitialize(dismissPdfiumWasmWarnings: true);
   await AppConfig.init();
 
   if (kIsWeb) {
-    databaseFactory = databaseFactoryFfiWeb; // Web setup
-  } else {
-    // Desktop / mobile setup
+    databaseFactory = databaseFactoryFfiWeb;
+  } else if (defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.linux ||
+      defaultTargetPlatform == TargetPlatform.macOS) {
+    // Desktop only — mobile must keep sqflite's default native factory
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }

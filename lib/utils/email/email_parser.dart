@@ -1,25 +1,35 @@
-import 'dart:typed_data';
-
 import 'package:enough_mail/enough_mail.dart';
+import 'package:flutter/foundation.dart';
 import 'package:html/parser.dart' as html_parser;
+import 'package:pdfrx/pdfrx.dart';
 import 'package:utility_bills_manager/data/models/email_data.dart';
-import 'package:utility_bills_manager/utils/files/file_utils.dart';
-import 'package:utility_bills_manager/utils/files/native_pdf_text_extractor.dart';
 
 class EmailParser {
   static String extractEmailBody(MimeMessage message) {
+    if (kDebugMode) {
+      print('Extracting email body');
+    }
     final plainBody = message.decodeTextPlainPart();
     if (plainBody != null && plainBody.trim().isNotEmpty) {
+      if (kDebugMode) {
+        print('Plain body: $plainBody');
+      }
       return plainBody;
     }
 
     final htmlBody = message.decodeTextHtmlPart();
     if (htmlBody != null && htmlBody.trim().isNotEmpty) {
+      if (kDebugMode) {
+        print('HTML body: $htmlBody');
+      }
       // Strip HTML tags and decode entities
       final document = html_parser.parse(htmlBody);
       return document.body?.text ?? '';
     }
 
+    if (kDebugMode) {
+      print('No body found');
+    }
     return '';
   }
 
@@ -58,51 +68,121 @@ class EmailParser {
   }
 
   static Future<String> extractEmailAttachment(MimeMessage message) async {
+    if (kDebugMode) {
+      print('Extracting email attachment');
+    }
     for (final part in message.parts!) {
       if (part.mediaType.isApplication) {
         final filename = part.decodeFileName();
         final data = part.decodeContentBinary();
+        if (kDebugMode) {
+          print('Filename: $filename');
+          print('Data: $data');
+        }
         if (filename != null && data != null) {
+          if (kDebugMode) {
+            print('Extracting text from PDF');
+          }
           return await extractTextFromPdf(filename, data);
+        }
+        if (kDebugMode) {
+          print('No attachment found');
         }
       }
     }
 
+    if (kDebugMode) {
+      print('No attachment found');
+    }
     return '';
   }
 
+  /// Extracts plain text from PDF bytes on **web, mobile, and desktop**.
+  ///
+  /// Uses [pdfrx] with [PdfDocument.openData] so no temp file or platform
+  /// channel is required. On web, ensure pdfrx WASM is set up for production
+  /// (see pdfrx README).
   static Future<String> extractTextFromPdf(
     String filename,
     Uint8List pdfBytes,
   ) async {
-    final doc = await FileUtils.savePdfTemp(pdfBytes, filename);
-    final text = await NativePdfTextExtractor.extractTextFromPdf(doc);
-    return text;
+    if (kDebugMode) {
+      print('Extracting text from PDF (${pdfBytes.length} bytes)');
+    }
+    await pdfrxFlutterInitialize();
+
+    PdfDocument? doc;
+    try {
+      doc = await PdfDocument.openData(
+        pdfBytes,
+        sourceName: filename,
+      );
+      final buffer = StringBuffer();
+      for (final page in doc.pages) {
+        final raw = await page.loadText();
+        if (raw != null && raw.fullText.trim().isNotEmpty) {
+          if (buffer.isNotEmpty) {
+            buffer.writeln();
+          }
+          buffer.write(raw.fullText);
+        }
+      }
+      final text = buffer.toString();
+      if (kDebugMode) {
+        print(
+          'Extracted text from PDF (${doc.pages.length} pages, ${text.length} chars)',
+        );
+      }
+      return text;
+    } catch (e, st) {
+      if (kDebugMode) {
+        print('PDF text extraction failed: $e\n$st');
+      }
+      return '';
+    } finally {
+      await doc?.dispose();
+    }
   }
 
   static Future<EmailData?> parseEmailToEmailData(MimeMessage message) async {
     final subject = message.decodeSubject() ?? '';
+    if (kDebugMode) {
+      print('Subject: $subject');
+    }
     if (subject.contains('Your RBC Royal Bank eStatement is ready') ||
         subject.contains('eStatement Alert for your Simplii Credit Card') ||
         subject.contains('Enbridge - Your Payment is Due')) {
+      if (kDebugMode) {
+        print('Subject is a known email, skipping');
+      }
       return null;
     }
 
     final hasAttachment = EmailParser.hasAttachment(message);
+    if (kDebugMode) {
+      print('Has attachment: $hasAttachment');
+    }
     final body =
         hasAttachment
             ? await EmailParser.extractEmailAttachment(message)
             : EmailParser.extractEmailBody(message);
-
+    if (kDebugMode) {
+      print('Body: $body');
+    }
     if (subject.isNotEmpty && body.isNotEmpty) {
       // Generate a stable billId based on email properties that don't change
       final date = message.decodeDate()?.millisecondsSinceEpoch ?? 0;
       final from = message.from?.first.email ?? '';
-      
+      if (kDebugMode) {
+        print('Date: $date');
+        print('From: $from');
+      }
       // Combine these stable properties to create a unique hash
       final uniqueString = '$date$from$subject';
       final emailId = uniqueString.hashCode.abs();
-
+      if (kDebugMode) {
+        print('Email ID: $emailId');
+      }
       return EmailData(
         emailSubject: subject,
         emailBody: body,

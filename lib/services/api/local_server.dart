@@ -141,12 +141,46 @@ Future<void> startServer() async {
       return Response.badRequest(body: e.toString());
     }
   });
+
+  // DELETE request to delete all bills
+  router.delete('/bill/list', (Request request) async {
+    try {
+      await dbHelper.deleteAllBills();
+      return Response.ok('All bills deleted');
+    } on Exception catch (e) {
+      return Response.badRequest(body: e.toString());
+    }
+  });
   // #endregion
   // #endregion
 
   // #region Rentors
 
   // #region GET
+
+  // GET request to retrieve a rentor by id
+  router.get('/rentor/<id>', (Request request, String id) async {
+    try {
+      final parsedId = int.tryParse(id);
+      if (parsedId == null) {
+        return Response.badRequest(body: "Invalid rentor id: $id");
+      }
+      final rentor = await dbHelper.readRentor(parsedId);
+      if (rentor != null) {
+        return Response.ok(
+          jsonEncode(rentor),
+          headers: {'Content-Type': 'application/json'},
+        );
+      } else {
+        return Response.badRequest(
+          body: "Rentor with id: $id is null",
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+    } on Exception catch (e) {
+      return Response.badRequest(body: e.toString());
+    }
+  });
 
   // GET request to retrieve all rentors
   router.get('/rentor/list', (Request request) async {
@@ -234,12 +268,46 @@ Future<void> startServer() async {
       return Response.badRequest(body: e.toString());
     }
   });
+
+  // DELETE request to delete all rentors
+  router.delete('/rentor/list', (Request request) async {
+    try {
+      await dbHelper.deleteAllRentors();
+      return Response.ok('All rentors deleted');
+    } on Exception catch (e) {
+      return Response.badRequest(body: e.toString());
+    }
+  });
   // #endregion
   // #endregion
 
   // #region Payments
 
   // #region GET
+
+  // GET request to retrieve a payment by id
+  router.get('/payment/<id>', (Request request, String id) async {
+    try {
+      final parsedId = int.tryParse(id);
+      if (parsedId == null) {
+        return Response.badRequest(body: "Invalid payment id: $id");
+      }
+      final payment = await dbHelper.readPayment(parsedId);
+      if (payment != null) {
+        return Response.ok(
+          jsonEncode(payment),
+          headers: {'Content-Type': 'application/json'},
+        );
+      } else {
+        return Response.badRequest(
+          body: "Payment with id: $id is null",
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+    } on Exception catch (e) {
+      return Response.badRequest(body: e.toString());
+    }
+  });
 
   // GET request to retrieve all payments
   router.get('/payment/list', (Request request) async {
@@ -325,6 +393,16 @@ Future<void> startServer() async {
       } else {
         return Response.badRequest(body: "Failed to delete payment");
       }
+    } on Exception catch (e) {
+      return Response.badRequest(body: e.toString());
+    }
+  });
+
+  // DELETE request to delete all payments
+  router.delete('/payment/list', (Request request) async {
+    try {
+      await dbHelper.deleteAllPayments();
+      return Response.ok('All payments deleted');
     } on Exception catch (e) {
       return Response.badRequest(body: e.toString());
     }
@@ -472,6 +550,16 @@ Future<void> startServer() async {
       } else {
         return Response.badRequest(body: "Failed to delete emailData");
       }
+    } on Exception catch (e) {
+      return Response.badRequest(body: e.toString());
+    }
+  });
+
+  // DELETE request to delete all emailData
+  router.delete('/email/list', (Request request) async {
+    try {
+      await dbHelper.deleteAllEmailData();
+      return Response.ok('All emailData deleted');
     } on Exception catch (e) {
       return Response.badRequest(body: e.toString());
     }

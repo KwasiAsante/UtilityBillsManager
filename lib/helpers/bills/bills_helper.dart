@@ -33,10 +33,25 @@ class BillsHelper {
       final returnValue = await ApiService.bills().createBill(bill);
       if (returnValue == "OK") {
         return Result.success(data: bill);
-      }
-      else {
+      } else {
         return Result.error(errorMessage: returnValue);
       }
+    }
+  }
+
+  // Retrieve Bills by ID
+  Future<Result<Bill?>> readBill(String billId) async {
+    final dbHelper = this.dbHelper;
+    try {
+      Bill? bill;
+      if (dbHelper != null) {
+        bill = await dbHelper.readBill(billId);
+      } else {
+        bill = await ApiService.bills().getBill(billId);
+      }
+      return Result.success(data: bill);
+    } on Exception catch (e) {
+      return Result.exception(exception: e);
     }
   }
 
@@ -88,8 +103,7 @@ class BillsHelper {
       final returnValue = await ApiService.bills().updateBill(bill);
       if (returnValue == "OK") {
         return Result.success();
-      }
-      else {
+      } else {
         return Result.error(errorMessage: returnValue);
       }
     }
@@ -109,10 +123,24 @@ class BillsHelper {
       final returnValue = await ApiService.bills().deleteBill(id);
       if (returnValue == "OK") {
         return Result.success();
-      }
-      else {
+      } else {
         return Result.error(errorMessage: returnValue);
       }
+    }
+  }
+
+  // Delete all Bills
+  Future<Result<void>> deleteAllBills() async {
+    final dbHelper = this.dbHelper;
+    if (dbHelper != null) {
+      await dbHelper.deleteAllBills();
+      return Result.success();
+    } else {
+      final returnValue = await ApiService.bills().deleteAllBills();
+      if (returnValue == "OK") {
+        return Result.success();
+      }
+      return Result.error(errorMessage: returnValue);
     }
   }
 

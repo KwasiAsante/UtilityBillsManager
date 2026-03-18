@@ -1,4 +1,5 @@
 import 'package:enough_mail/enough_mail.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:utility_bills_manager/data/models/bill.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
@@ -7,9 +8,15 @@ import 'package:utility_bills_manager/utils/email/email_parser.dart';
 class BillsParser {
   static Future<Bill?> parseEmailToBill(MimeMessage message) async {
     final subject = message.decodeSubject() ?? '';
+    final sender = message.from?.firstOrNull?.email ?? '';
+
     if (subject.contains('Your RBC Royal Bank eStatement is ready') ||
         subject.contains('eStatement Alert for your Simplii Credit Card') ||
-        subject.contains('Enbridge - Your Payment is Due')) {
+        subject.contains('Enbridge - Your Payment is Due') ||
+        subject.contains('Your Freedom Mobile bill is ready') ||
+        subject.contains('Your Bell bill is ready') ||
+        subject.contains('Payment received on your credit account') ||
+        subject.contains('Your credit account: Payment due in')) {
       return null;
     }
 
@@ -18,10 +25,15 @@ class BillsParser {
         hasAttachment
             ? await EmailParser.extractEmailAttachment(message)
             : EmailParser.extractEmailBody(message);
-    final sender = message.from?.firstOrNull?.email ?? '';
 
     // Try to extract amount from the body or subject
     final amount = extractSmartAmount(body);
+
+    if (sender.contains('bell')) {
+      if (kDebugMode) {
+        print('Freedom Mobile bill');
+      }
+    }
 
     // Attempt to extract a date
     final dueDate =
@@ -70,6 +82,9 @@ class BillsParser {
         sender.contains('ebill@bell.ca')) {
       return BillType.internet;
     }
+    if (text.contains('phone') || sender.contains('noreply@freedommobile.ca')) {
+      return BillType.phone;
+    }
     if (text.contains('rent')) return BillType.rent;
     if (text.contains('creditcard') ||
         text.contains('credit card') ||
@@ -117,19 +132,22 @@ class BillsParser {
       'total amount',
     ];
 
-    final lines = text.toLowerCase().split('\n');
+    final normalizedText =
+        text.replaceAll(RegExp(r'[\u00A0\u2007\u202F]'), ' ').toLowerCase();
+    final lines = normalizedText.split('\n');
     lines.removeWhere((str) => str == "" || str.isEmpty);
+    final keywordAmountPattern = RegExp(r'(?:\$\s?)?(\d{1,5}(?:[.,]\d{2})?)\b');
     final dollarPattern = RegExp(r'\$\s?(\d{1,5}(?:[.,]\d{2})?)');
 
     // 1. Look for matching lines that contain keywords + dollar amounts
     for (final line in lines) {
       if (prioritizedKeywords.any((keyword) => line.contains(keyword))) {
-        final match = dollarPattern.firstMatch(line);
+        final match = keywordAmountPattern.firstMatch(line);
         if (match != null) {
           return double.tryParse(match.group(1)!.replaceAll(',', ''));
         } else {
           final amount = getAmountFromNextIndex(
-            dollarPattern,
+            keywordAmountPattern,
             lines.indexOf(line),
             lines,
           );
@@ -183,12 +201,14 @@ class BillsParser {
       'due by',
       'your balance will be withdrawn on',
       'withdrawn on',
+      'payment date'
     ];
 
     final lines = text.toLowerCase().split('\n');
     lines.removeWhere((str) => str == "" || str.isEmpty);
     final datePatterns = [
       RegExp(r'(\d{4}-\d{2}-\d{2})'), // Match date format YYYY-MM-DD
+      RegExp(r'(\d{4}\s+\d{2}\s+\d{2})'), // Match date format YYYY MM DD
       RegExp(
         r'([a-zA-Z]+ \d{1,2}(?:st|nd|rd|th)?,? \d{4})',
         caseSensitive: false,
@@ -295,6 +315,7 @@ class BillsParser {
       DateFormat("MMMM d, yyyy"), // April 24, 2025
       DateFormat("MMM d, yyyy"), // Apr 24, 2025
       DateFormat("MMM d yyyy"), // Apr 24 2025
+      DateFormat("yyyy MM dd"), // 2026 03 23
     ];
 
     // Try parsing with each format

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:utility_bills_manager/data/models/bill.dart';
@@ -25,8 +26,19 @@ class DatabaseHelper {
     return _database!;
   }
 
+  /// Opens the database using the active [databaseFactory].
+  ///
+  /// **Platform setup (must run before first access):**
+  /// - **Web:** `databaseFactory = databaseFactoryFfiWeb` (see sqflite_common_ffi_web).
+  /// - **Desktop:** `sqfliteFfiInit()` then `databaseFactory = databaseFactoryFfi`.
+  /// - **Mobile (iOS/Android):** use default factory (do not set FFI in `main`).
+  ///
+  /// Web persists under a logical name only (IndexedDB); mobile/desktop use
+  /// [getDatabasesPath] + file name.
   Future<Database> _initDatabase() async {
-    final path = join(await getDatabasesPath(), _databaseName);
+    final path = kIsWeb
+        ? _databaseName
+        : join(await getDatabasesPath(), _databaseName);
     return await openDatabase(
       path,
       version: _databaseVersion,
@@ -222,6 +234,22 @@ class DatabaseHelper {
     return await db.insert('rentors', rentor.toJson());
   }
 
+  // Retrieve a Rentor by id
+  Future<Rentor?> readRentor(int id) async {
+    final db = await database;
+    final result = await db.query(
+      'rentors',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return Rentor.fromJson(result.first);
+  }
+
   // Retrieve all Rentors
   Future<List<Rentor>> readAllRentors() async {
     final db = await database;
@@ -245,6 +273,11 @@ class DatabaseHelper {
     final db = await database;
     return await db.delete('rentors', where: 'id = ?', whereArgs: [id]);
   }
+
+  Future<int> deleteAllRentors() async {
+    final db = await database;
+    return await db.delete('rentors');
+  }
   // #endregion
 
   // #region Payment
@@ -252,6 +285,22 @@ class DatabaseHelper {
   Future<int> createPayment(Payment payment) async {
     final db = await database;
     return await db.insert('payments', payment.toJson());
+  }
+
+  // Retrieve a Payment by id
+  Future<Payment?> readPayment(int id) async {
+    final db = await database;
+    final result = await db.query(
+      'payments',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (result.isEmpty) {
+      return null;
+    }
+
+    return Payment.fromJson(result.first);
   }
 
   // Retrieve all Payments
@@ -276,6 +325,11 @@ class DatabaseHelper {
   Future<int> deletePayment(int id) async {
     final db = await database;
     return await db.delete('payments', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<int> deleteAllPayments() async {
+    final db = await database;
+    return await db.delete('payments');
   }
   // #endregion
 
@@ -351,6 +405,11 @@ class DatabaseHelper {
   Future<int> deleteEmailData(int id) async {
     final db = await database;
     return await db.delete('email_data', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<int> deleteAllEmailData() async {
+    final db = await database;
+    return await db.delete('email_data');
   }
   // #endregion
   // #endregion

@@ -1,11 +1,10 @@
-
 import 'dart:convert';
 
 import 'package:enough_mail/enough_mail.dart';
 import 'package:flutter/foundation.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/gmail/v1.dart' as gmail;
 import 'package:http/http.dart' as http;
+import 'package:utility_bills_manager/services/email/google_account_service.dart';
 
 class EmailService {
   final String email;
@@ -31,7 +30,11 @@ class EmailService {
     var didLogin = false;
 
     try {
-      await client.connectToServer(imapServer, imapPort, isSecure: isImapSecure);
+      await client.connectToServer(
+        imapServer,
+        imapPort,
+        isSecure: isImapSecure,
+      );
       await client.login(email, password);
       didLogin = true;
 
@@ -39,9 +42,10 @@ class EmailService {
       if (mailboxes.isEmpty) {
         return [];
       }
-      final billsMailbox = mailboxes
-          .cast<Mailbox>()
-          .firstWhere((box) => box.name.toLowerCase() == 'bills', orElse: () => mailboxes.first);
+      final billsMailbox = mailboxes.cast<Mailbox>().firstWhere(
+        (box) => box.name.toLowerCase() == 'bills',
+        orElse: () => mailboxes.first,
+      );
 
       await client.selectMailbox(billsMailbox);
 
@@ -67,43 +71,45 @@ class EmailService {
     }
   }
 
-  Future<List<MimeMessage>> _fetchRecentEmailsFromGmailWeb({int maxEmails = 100}) async {
+  Future<List<MimeMessage>> _fetchRecentEmailsFromGmailWeb({
+    int maxEmails = 100,
+  }) async {
     try {
-      const scopes = <String>[
-        'https://www.googleapis.com/auth/gmail.readonly',
-      ];
-
-      final GoogleSignIn googleSignIn = GoogleSignIn.instance;
-      await googleSignIn.initialize(
-        clientId:
-            '910862354798-fm2ttlkjnv5nscsqrsqm0ieou2lva2ub.apps.googleusercontent.com',
-      );
-
-      // On web, interactive auth must be triggered from UI (e.g. renderButton).
-      // Here we only perform a lightweight auth attempt, which will succeed
-      // only if the user has already signed in via UI.
-      final Future<GoogleSignInAccount?>? attemptFuture =
-          googleSignIn.attemptLightweightAuthentication();
-      final GoogleSignInAccount? account =
-          attemptFuture != null ? await attemptFuture : null;
-
-      if (account == null) {
+      if (!GoogleAccountService().isInitialized ||
+          !GoogleAccountService().isAuthenticated ||
+          !GoogleAccountService().isSignedIn) {
         if (kDebugMode) {
-          print(
-            'No signed-in Google user found. Trigger Google sign-in from the UI before fetching emails.',
-          );
+          if (!GoogleAccountService().isInitialized) {
+            print('Google account is not initialized');
+          }
+          if (!GoogleAccountService().isAuthenticated) {
+            print('Google account is not authenticated');
+          }
+          if (!GoogleAccountService().isSignedIn) {
+            print('Google account is not signed in');
+          }
         }
         return [];
+      } else if (!GoogleAccountService().isAuthenticated &&
+          !GoogleAccountService().isSignedIn) {
+        await GoogleAccountService().signIn();
+        if (!GoogleAccountService().isSignedIn) {
+          return [];
+        }
       }
 
-      final headers =
-          await account.authorizationClient.authorizationHeaders(scopes);
+      if (!GoogleAccountService().isAuthorized) {
+        await GoogleAccountService().authorize();
+        if (!GoogleAccountService().isAuthorized) {
+          return [];
+        }
+      }
+
+      final headers = GoogleAccountService().authorizationHeaders;
       if (headers == null) {
-        if (kDebugMode) {
-          print('Failed to construct Gmail authorization headers.');
-        }
         return [];
       }
+
       final client = _AuthClient(headers);
       final gmailApi = gmail.GmailApi(client);
 

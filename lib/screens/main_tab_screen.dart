@@ -32,17 +32,12 @@ class _MainTabScreenState extends State<MainTabScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Utility Bills Manager'),
-      ),
-      body: _screens[_selectedIndex],
+      appBar: AppBar(title: const Text('Utility Bills Manager')),
+      body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           border: Border(
-            top: BorderSide(
-              color: Colors.grey.shade300,
-              width: 1.0,
-            ),
+            top: BorderSide(color: Colors.grey.shade300, width: 1.0),
           ),
         ),
         child: Row(
@@ -58,13 +53,21 @@ class _MainTabScreenState extends State<MainTabScreen> {
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label, {bool isMain = false}) {
+  Widget _buildNavItem(
+    int index,
+    IconData icon,
+    String label, {
+    bool isMain = false,
+  }) {
     final isSelected = _selectedIndex == index;
     final theme = Theme.of(context);
-    
+
     return Expanded(
       child: Material(
-        color: isMain ? theme.colorScheme.primary.withValues(alpha: 0.1) : Colors.transparent,
+        color:
+            isMain
+                ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                : Colors.transparent,
         child: InkWell(
           onTap: () => _onItemTapped(index),
           child: Container(
@@ -91,4 +94,4 @@ class _MainTabScreenState extends State<MainTabScreen> {
       ),
     );
   }
-} 
+}
