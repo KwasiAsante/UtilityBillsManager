@@ -9,7 +9,7 @@ import 'package:utility_bills_manager/data/models/rentor.dart';
 class DatabaseHelper {
   static const _databaseName = 'utility_manager.db';
 
-  static const _databaseVersion = 3;
+  static const _databaseVersion = 5;
 
   static final DatabaseHelper _instance = DatabaseHelper._internal();
 
@@ -42,6 +42,10 @@ class DatabaseHelper {
     return await openDatabase(
       path,
       version: _databaseVersion,
+      onConfigure: (db) async {
+        // SQLite does not enforce FKs unless this pragma is enabled per connection.
+        await db.execute('PRAGMA foreign_keys = ON');
+      },
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -71,7 +75,7 @@ class DatabaseHelper {
       await db.execute('''
         CREATE TABLE bills (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          billId TEXT,
+          billId TEXT NOT NULL,
           company TEXT NOT NULL,
           type TEXT NOT NULL,
           amount REAL NOT NULL,
@@ -82,9 +86,15 @@ class DatabaseHelper {
       ''');
 
       await db.execute('''
+        CREATE UNIQUE INDEX idx_bills_billId_unique ON bills (billId)
+      ''');
+
+      await db.execute('''
         CREATE TABLE rentors (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL,
+          email TEXT,
+          phone TEXT,
           defaultPercentage REAL NOT NULL,
           billPercentages TEXT,
           amountPaid REAL,
@@ -96,11 +106,11 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE payments (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        billId INTEGER NOT NULL,
+        billId TEXT,
         rentorId INTEGER NOT NULL,
         amountPaid REAL NOT NULL,
         paymentDate TEXT NOT NULL,
-        FOREIGN KEY (billId) REFERENCES bills (id),
+        FOREIGN KEY (billId) REFERENCES bills (billId) ON DELETE SET NULL,
         FOREIGN KEY (rentorId) REFERENCES rentors (id)
       )
     ''');
@@ -159,6 +169,155 @@ class DatabaseHelper {
 
       // Rename the new table
       await db.execute('ALTER TABLE email_data_new RENAME TO email_data');
+    }
+
+    if (oldVersion < 4) {
+      // Clean up leftovers from interrupted upgrades.
+      await db.execute('DROP TABLE IF EXISTS email_data_new');
+      await db.execute('DROP TABLE IF EXISTS email_data_stage');
+      await db.execute('DROP TABLE IF EXISTS payments_new');
+
+      // Step 1: detach legacy/broken FK from email_data before touching bills.
+      await db.execute('''
+        CREATE TABLE email_data_stage (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          emailSubject TEXT NOT NULL,
+          emailBody TEXT NOT NULL,
+          emailId INTEGER,
+          billId TEXT,
+          processed INTEGER NOT NULL
+        )
+      ''');
+
+      await db.execute('''
+        INSERT INTO email_data_stage (id, emailSubject, emailBody, emailId, billId, processed)
+        SELECT
+          e.id,
+          e.emailSubject,
+          e.emailBody,
+          e.emailId,
+          CASE
+            WHEN e.billId IS NULL THEN NULL
+            WHEN EXISTS (
+              SELECT 1 FROM bills b WHERE b.billId = CAST(e.billId AS TEXT)
+            ) THEN CAST(e.billId AS TEXT)
+            WHEN EXISTS (
+              SELECT 1 FROM bills b WHERE b.id = CAST(e.billId AS INTEGER)
+            ) THEN (
+              SELECT b.billId FROM bills b WHERE b.id = CAST(e.billId AS INTEGER)
+            )
+            ELSE NULL
+          END,
+          e.processed
+        FROM email_data e
+      ''');
+
+      await db.execute('DROP TABLE email_data');
+      await db.execute('ALTER TABLE email_data_stage RENAME TO email_data');
+
+      // Step 2: normalize bills.billId and enforce uniqueness for FK parent key.
+      await db.execute('''
+        UPDATE bills
+        SET billId = 'legacy-' || id
+        WHERE billId IS NULL OR TRIM(billId) = ''
+      ''');
+
+      await db.execute('''
+        UPDATE bills
+        SET billId = billId || '-' || id
+        WHERE billId IN (
+          SELECT billId
+          FROM bills
+          GROUP BY billId
+          HAVING COUNT(*) > 1
+        )
+          AND id NOT IN (
+            SELECT MIN(id)
+            FROM bills
+            GROUP BY billId
+          )
+      ''');
+
+      await db.execute('''
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_bills_billId_unique ON bills (billId)
+      ''');
+
+      // Step 3: recreate email_data with final FK constraint.
+      await db.execute('''
+        CREATE TABLE email_data_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          emailSubject TEXT NOT NULL,
+          emailBody TEXT NOT NULL,
+          emailId INTEGER,
+          billId TEXT,
+          processed INTEGER NOT NULL,
+          FOREIGN KEY (billId) REFERENCES bills (billId) ON DELETE CASCADE
+        )
+      ''');
+
+      await db.execute('''
+        INSERT INTO email_data_new (id, emailSubject, emailBody, emailId, billId, processed)
+        SELECT
+          e.id,
+          e.emailSubject,
+          e.emailBody,
+          e.emailId,
+          CASE
+            WHEN e.billId IS NULL THEN NULL
+            WHEN EXISTS (
+              SELECT 1 FROM bills b WHERE b.billId = e.billId
+            ) THEN e.billId
+            ELSE NULL
+          END,
+          e.processed
+        FROM email_data e
+      ''');
+
+      await db.execute('DROP TABLE email_data');
+      await db.execute('ALTER TABLE email_data_new RENAME TO email_data');
+
+      // Step 4: move payments to logical billId FK with ON DELETE SET NULL.
+      await db.execute('''
+        CREATE TABLE payments_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          billId TEXT,
+          rentorId INTEGER NOT NULL,
+          amountPaid REAL NOT NULL,
+          paymentDate TEXT NOT NULL,
+          FOREIGN KEY (billId) REFERENCES bills (billId) ON DELETE SET NULL,
+          FOREIGN KEY (rentorId) REFERENCES rentors (id)
+        )
+      ''');
+
+      await db.execute('''
+        INSERT INTO payments_new (id, billId, rentorId, amountPaid, paymentDate)
+        SELECT
+          p.id,
+          CASE
+            WHEN p.billId IS NULL THEN NULL
+            WHEN EXISTS (
+              SELECT 1 FROM bills b WHERE b.billId = CAST(p.billId AS TEXT)
+            ) THEN CAST(p.billId AS TEXT)
+            WHEN EXISTS (
+              SELECT 1 FROM bills b WHERE b.id = CAST(p.billId AS INTEGER)
+            ) THEN (
+              SELECT b.billId FROM bills b WHERE b.id = CAST(p.billId AS INTEGER)
+            )
+            ELSE NULL
+          END,
+          p.rentorId,
+          p.amountPaid,
+          p.paymentDate
+        FROM payments p
+      ''');
+
+      await db.execute('DROP TABLE payments');
+      await db.execute('ALTER TABLE payments_new RENAME TO payments');
+    }
+
+    if (oldVersion < 5) {
+      await db.execute('ALTER TABLE rentors ADD COLUMN email TEXT');
+      await db.execute('ALTER TABLE rentors ADD COLUMN phone TEXT');
     }
   }
 

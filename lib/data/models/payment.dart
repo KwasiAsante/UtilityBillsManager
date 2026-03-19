@@ -1,13 +1,13 @@
 class Payment {
   final int? id;
-  final int billId;
+  final String? billId;
   final int rentorId;
   final double amountPaid;
   final String paymentDate;
 
   Payment({
     this.id,
-    required this.billId,
+    this.billId,
     required this.rentorId,
     required this.amountPaid,
     required this.paymentDate,
@@ -24,9 +24,10 @@ class Payment {
   }
 
   factory Payment.fromJson(Map<String, dynamic> map) {
+    final dynamic rawBillId = map['billId'];
     return Payment(
       id: map['id'],
-      billId: map['billId'],
+      billId: rawBillId?.toString(),
       rentorId: map['rentorId'],
       amountPaid: map['amountPaid'],
       paymentDate: map['paymentDate'],

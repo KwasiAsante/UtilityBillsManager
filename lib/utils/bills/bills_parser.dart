@@ -20,6 +20,12 @@ class BillsParser {
       return null;
     }
 
+    if (sender.contains('freedom')) {
+      if (kDebugMode) {
+        print('breakpoint');
+      }
+    }
+
     final hasAttachment = EmailParser.hasAttachment(message);
     final body =
         hasAttachment
@@ -28,12 +34,6 @@ class BillsParser {
 
     // Try to extract amount from the body or subject
     final amount = extractSmartAmount(body);
-
-    if (sender.contains('bell')) {
-      if (kDebugMode) {
-        print('Freedom Mobile bill');
-      }
-    }
 
     // Attempt to extract a date
     final dueDate =

@@ -3,6 +3,8 @@ import 'package:utility_bills_manager/data/models/bill.dart';
 class Rentor {
   final int? id;
   final String name;
+  final String? email;
+  final String? phone;
   final double defaultPercentage;
   final Map<BillType, double> billPercentages; // e.g., {'Electric': 0.1, 'Gas': 0.2}
   final double? amountPaid;
@@ -11,6 +13,8 @@ class Rentor {
   Rentor({
     this.id,
     required this.name,
+    this.email,
+    this.phone,
     required this.defaultPercentage,
     required this.billPercentages,
     this.amountPaid,
@@ -26,6 +30,8 @@ class Rentor {
     return Rentor(
       id: json['id'],
       name: json['name'],
+      email: json['email'],
+      phone: json['phone'],
       defaultPercentage: (json['defaultPercentage'] ?? 0).toDouble(),
       billPercentages: parsedMap,
       amountPaid: json['amountPaid'],
@@ -41,6 +47,8 @@ class Rentor {
     return {
       'id': id,
       'name': name,
+      'email': email,
+      'phone': phone,
       'defaultPercentage': defaultPercentage,
       'billPercentages': encodedMap,
       'amountPaid': amountPaid,

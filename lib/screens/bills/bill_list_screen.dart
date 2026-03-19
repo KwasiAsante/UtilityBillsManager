@@ -324,7 +324,8 @@ class _BillListScreenState extends State<BillListScreen> {
               PaymentStatusExtension.getName(bill.status) == _selectedFilter;
           final matchesSearch =
               _searchQuery.isEmpty ||
-              bill.company.toLowerCase().contains(_searchQuery.toLowerCase());
+              bill.company.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                  bill.companyName.toLowerCase().contains(_searchQuery.toLowerCase());
           final matchesYear =
               _selectedDueYear == null ||
               (dueDate != null && dueDate.year == _selectedDueYear);
@@ -538,7 +539,7 @@ class _BillListScreenState extends State<BillListScreen> {
                           return Card(
                             margin: const EdgeInsets.all(8.0),
                             child: ListTile(
-                              title: Text(bill.company),
+                              title: Text(bill.companyName),
                               subtitle: Text(
                                 'Type: ${bill.type.name}\nAmount: \$${bill.amount.toStringAsFixed(2)}\nDue Date: ${bill.dueDate}\nStatus: ${PaymentStatusExtension.getName(bill.status)}',
                               ),

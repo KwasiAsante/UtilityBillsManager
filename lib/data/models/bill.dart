@@ -47,6 +47,42 @@ class Bill {
       'notes': notes,
     };
   }
+
+  String get companyName {
+    switch (type) {
+      case BillType.electric:
+        return 'Alectra Utilities';
+      case BillType.gas:
+        if (company.toLowerCase().contains('enbridge')) {
+          return 'Enbridge Gas';
+        }
+        return 'Crown Crest Capital';
+      case BillType.internet:
+        return 'Bell Canada';
+      case BillType.water:
+        return 'Region of Peel Water';
+      case BillType.rent:
+        return 'James & Joana Landlords';
+      case BillType.phone:
+        return 'Freedom Mobile';
+      case BillType.creditcard:
+        if (company.toLowerCase().contains('simplii')) {
+          return 'Simplii Financial';
+        } else if (company.toLowerCase().contains('neofinancial')) {
+          return 'Neo Financial';
+        } else if (company.toLowerCase().contains('rbc')) {
+          return 'RBC Royal Bank';
+        } else if (company.toLowerCase().contains('bmo')) {
+          return 'BMO Bank of Montreal';
+        }
+      case BillType.personallineofcredit:
+        return 'Simplii Financial Personal Line of Credit';
+      case BillType.other:
+        return company; // Use the provided company name for "Other"
+    }
+
+    return company; // Fallback to the provided company name if no match is found
+  }
 }
 
 enum BillType {
