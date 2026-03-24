@@ -10,6 +10,18 @@ import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/data/models/rentor.dart';
 import 'package:utility_bills_manager/helpers/database/database_helper.dart';
 
+Map<String, bool> _parseEmailInclude(Map<String, String> query) {
+  final includeBill =
+      (query['bill'] ?? query['includeBill'] ?? query['include_bill'] ?? '')
+          .toLowerCase() ==
+      'true';
+  final includePayment = (query['payment'] ?? '').toLowerCase() == 'true';
+  return {
+    'bill': includeBill,
+    'payment': includePayment,
+  };
+}
+
 // Define the main function to start the server
 Future<void> startServer() async {
   final router = Router();
@@ -127,11 +139,7 @@ Future<void> startServer() async {
   // DELETE request to delete an existing bill
   router.delete('/bill/<id>', (Request request, String id) async {
     try {
-      final parsedId = int.tryParse(id);
-      if (parsedId == null) {
-        return Response.badRequest(body: "Invalid bill id: $id");
-      }
-      int deletedBills = await dbHelper.deleteBill(parsedId);
+      int deletedBills = await dbHelper.deleteBill(id);
       if (deletedBills > 0) {
         return Response.ok('Bill deleted');
       } else {
@@ -161,11 +169,7 @@ Future<void> startServer() async {
   // GET request to retrieve a rentor by id
   router.get('/rentor/<id>', (Request request, String id) async {
     try {
-      final parsedId = int.tryParse(id);
-      if (parsedId == null) {
-        return Response.badRequest(body: "Invalid rentor id: $id");
-      }
-      final rentor = await dbHelper.readRentor(parsedId);
+      final rentor = await dbHelper.readRentor(id);
       if (rentor != null) {
         return Response.ok(
           jsonEncode(rentor),
@@ -254,11 +258,7 @@ Future<void> startServer() async {
   // DELETE request to delete an existing rentor
   router.delete('/rentor/<id>', (Request request, String id) async {
     try {
-      final parsedId = int.tryParse(id);
-      if (parsedId == null) {
-        return Response.badRequest(body: "Invalid rentor id: $id");
-      }
-      int deletedRentors = await dbHelper.deleteRentor(parsedId);
+      int deletedRentors = await dbHelper.deleteRentor(id);
       if (deletedRentors > 0) {
         return Response.ok('Rentor deleted');
       } else {
@@ -285,14 +285,15 @@ Future<void> startServer() async {
 
   // #region GET
 
-  // GET request to retrieve a payment by id
+  // GET request to retrieve a payment by paymentId
   router.get('/payment/<id>', (Request request, String id) async {
     try {
-      final parsedId = int.tryParse(id);
-      if (parsedId == null) {
-        return Response.badRequest(body: "Invalid payment id: $id");
-      }
-      final payment = await dbHelper.readPayment(parsedId);
+      final query = request.requestedUri.queryParameters;
+      final include = <String, bool>{
+        'bill': (query['bill'] ?? '').toLowerCase() == 'true',
+        'rentor': (query['rentor'] ?? '').toLowerCase() == 'true',
+      };
+      final payment = await dbHelper.readPayment(id, include: include);
       if (payment != null) {
         return Response.ok(
           jsonEncode(payment),
@@ -300,7 +301,7 @@ Future<void> startServer() async {
         );
       } else {
         return Response.badRequest(
-          body: "Payment with id: $id is null",
+          body: "Payment with paymentId: $id is null",
           headers: {'Content-Type': 'application/json'},
         );
       }
@@ -312,8 +313,12 @@ Future<void> startServer() async {
   // GET request to retrieve all payments
   router.get('/payment/list', (Request request) async {
     try {
-      final payments = await dbHelper.readAllPayments();
-      final paymentList = payments.map((e) => e).toList();
+      final query = request.requestedUri.queryParameters;
+      final include = <String, bool>{
+        'bill': (query['bill'] ?? '').toLowerCase() == 'true',
+        'rentor': (query['rentor'] ?? '').toLowerCase() == 'true',
+      };
+      final paymentList = await dbHelper.readAllPayments(include: include);
       return Response.ok(
         jsonEncode(paymentList),
         headers: {'Content-Type': 'application/json'},
@@ -383,12 +388,8 @@ Future<void> startServer() async {
   // DELETE request to delete an existing payment
   router.delete('/payment/<id>', (Request request, String id) async {
     try {
-      final parsedId = int.tryParse(id);
-      if (parsedId == null) {
-        return Response.badRequest(body: "Invalid payment id: $id");
-      }
-      int deletedPayments = await dbHelper.deletePayment(parsedId);
-      if (deletedPayments > 0) {
+      int deletedPayment = await dbHelper.deletePayment(id);
+      if (deletedPayment > 0) {
         return Response.ok('Payment deleted');
       } else {
         return Response.badRequest(body: "Failed to delete payment");
@@ -414,17 +415,14 @@ Future<void> startServer() async {
 
   // #region GET
 
-  // GET request to retrieve bill
+  // GET request to retrieve emailData by id
   router.get('/email/<id>', (Request request, String id) async {
     try {
-      final parsedId = int.tryParse(id);
-      if (parsedId == null) {
-        return Response.badRequest(body: "Invalid email id: $id");
-      }
-      final bill = await dbHelper.readEmail(parsedId);
-      if (bill != null) {
+      final include = _parseEmailInclude(request.requestedUri.queryParameters);
+      final emailData = await dbHelper.readEmail(id, include: include);
+      if (emailData != null) {
         return Response.ok(
-          jsonEncode(bill),
+          jsonEncode(emailData),
           headers: {'Content-Type': 'application/json'},
         );
       } else {
@@ -441,7 +439,8 @@ Future<void> startServer() async {
   // GET request to retrieve all emailData
   router.get('/email/list', (Request request) async {
     try {
-      final emailData = await dbHelper.readEmails();
+      final include = _parseEmailInclude(request.requestedUri.queryParameters);
+      final emailData = await dbHelper.readEmails(include: include);
       final emailDataList = emailData.map((e) => e).toList();
       return Response.ok(
         jsonEncode(emailDataList),
@@ -452,10 +451,13 @@ Future<void> startServer() async {
     }
   });
 
-  // GET request to retrieve all emailData
+  // GET request to retrieve all unprocessed emailData
   router.get('/email/list/unprocessed', (Request request) async {
     try {
-      final emailData = await dbHelper.readUnprocessedEmails();
+      final include = _parseEmailInclude(request.requestedUri.queryParameters);
+      final emailData = await dbHelper.readUnprocessedEmails(
+        include: include,
+      );
       final emailDataList = emailData.map((e) => e).toList();
       return Response.ok(
         jsonEncode(emailDataList),
@@ -466,10 +468,13 @@ Future<void> startServer() async {
     }
   });
 
-  // GET request to retrieve all emailData
+  // GET request to retrieve all processed emailData
   router.get('/email/list/processed', (Request request) async {
     try {
-      final emailData = await dbHelper.readProcessedEmails();
+      final include = _parseEmailInclude(request.requestedUri.queryParameters);
+      final emailData = await dbHelper.readProcessedEmails(
+        include: include,
+      );
       final emailDataList = emailData.map((e) => e).toList();
       return Response.ok(
         jsonEncode(emailDataList),
@@ -540,11 +545,7 @@ Future<void> startServer() async {
   // DELETE request to delete an existing emailData
   router.delete('/email/<id>', (Request request, String id) async {
     try {
-      final parsedId = int.tryParse(id);
-      if (parsedId == null) {
-        return Response.badRequest(body: "Invalid email id: $id");
-      }
-      int deletedEmailData = await dbHelper.deleteEmailData(parsedId);
+      int deletedEmailData = await dbHelper.deleteEmailData(id);
       if (deletedEmailData > 0) {
         return Response.ok('EmailData deleted');
       } else {

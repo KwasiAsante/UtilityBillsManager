@@ -19,6 +19,19 @@ class _RentorListScreenState extends State<RentorListScreen> {
   String _selectedStort = 'Percentage';
   String _searchQuery = '';
 
+  int _compareNullable<T extends Comparable<T>>(
+    T? a,
+    T? b, {
+    bool descending = false,
+  }) {
+    if (a == null && b == null) return 0;
+    if (a == null) return 1;
+    if (b == null) return -1;
+
+    final comparison = a.compareTo(b);
+    return descending ? -comparison : comparison;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -48,27 +61,45 @@ class _RentorListScreenState extends State<RentorListScreen> {
         switch (_selectedStort) {
           case 'Percentage':
             {
-              fetchedRentors.sort((a, b) => a.defaultPercentage.compareTo(b.defaultPercentage));
+              fetchedRentors.sort(
+                (a, b) => a.defaultPercentage.compareTo(b.defaultPercentage),
+              );
               break;
             }
           case 'Amount Paid (Lowest)':
             {
-              fetchedRentors.sort((a, b) => a.amountPaid!.compareTo(b.amountPaid!));
+              fetchedRentors.sort(
+                (a, b) => _compareNullable(a.amountPaid, b.amountPaid),
+              );
               break;
             }
           case 'Amount Paid (Highest)':
             {
-              fetchedRentors.sort((a, b) => b.amountPaid!.compareTo(a.amountPaid!));
+              fetchedRentors.sort(
+                (a, b) => _compareNullable(
+                  a.amountPaid,
+                  b.amountPaid,
+                  descending: true,
+                ),
+              );
               break;
             }
           case 'Last Payment Date (Asc)':
             {
-              fetchedRentors.sort((a, b) => a.lastPaymentDate!.compareTo(b.lastPaymentDate!));
+              fetchedRentors.sort(
+                (a, b) => _compareNullable(a.lastPaymentDate, b.lastPaymentDate),
+              );
               break;
             }
           case 'Last Payment Date (Desc)':
             {
-              fetchedRentors.sort((a, b) => b.lastPaymentDate!.compareTo(a.lastPaymentDate!));
+              fetchedRentors.sort(
+                (a, b) => _compareNullable(
+                  a.lastPaymentDate,
+                  b.lastPaymentDate,
+                  descending: true,
+                ),
+              );
               break;
             }
         }
@@ -80,6 +111,43 @@ class _RentorListScreenState extends State<RentorListScreen> {
     else {
       _rentors = Future.error(result.errorMessage as Object);
       _loading = false;
+    }
+  }
+
+  Future<void> _deleteAllRentors() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete All Rentors'),
+        content: const Text(
+          'Are you sure you want to delete all rentors? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final result = await _rentorsHelper.readAllRentors();
+      if (result.isSuccess) {
+        for (final rentor in result.data!) {
+          await _rentorsHelper.deleteRentor(rentor.rentorId);
+        }
+      }
+      if (mounted) {
+        _loadRentors();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('All rentors deleted.')),
+        );
+      }
     }
   }
 
@@ -123,6 +191,11 @@ class _RentorListScreenState extends State<RentorListScreen> {
                 _loadRentors();
               },
             ),
+          IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            tooltip: 'Delete all rentors',
+            onPressed: _deleteAllRentors,
+          ),
           const SizedBox(width: 16),
           DropdownButton<String>(
             value: _selectedStort,
@@ -163,7 +236,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
           } else if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No rentors found.'));
+            return const Center(child: Text('No rentors found. Pull down or click on the Refresh button to sync or click the + button to add a rentor.'));
           }
 
           final rentors = snapshot.data!;
@@ -192,7 +265,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
                           _loadRentors();
                         }
                       } else if (value == 'delete') {
-                        await _rentorsHelper.deleteRentor(rentor.id!);
+                        await _rentorsHelper.deleteRentor(rentor.rentorId);
                         _loadRentors();
                       }
                     },

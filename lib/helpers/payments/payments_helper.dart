@@ -4,6 +4,9 @@ import 'package:utility_bills_manager/data/models/result.dart';
 import 'package:utility_bills_manager/services/api/api_service.dart';
 import 'package:utility_bills_manager/data/models/app_state.dart';
 
+import '../../data/models/bill.dart';
+import '../../data/models/rentor.dart';
+
 class PaymentsHelper {
   static final PaymentsHelper _instance = PaymentsHelper._internal();
 
@@ -22,7 +25,7 @@ class PaymentsHelper {
     if (dbHelper != null) {
       final id = await dbHelper.createPayment(payment);
       if (id >= 0) {
-        return Result.success();
+        return Result.success(data: payment);
       } else {
         return Result.error(
           errorMessage: "Error when creating Payment ${payment.id}",
@@ -31,7 +34,7 @@ class PaymentsHelper {
     } else {
       final returnValue = await ApiService.payments().createPayment(payment);
       if (returnValue == "OK") {
-        return Result.success();
+        return Result.success(data: payment);
       }
       else {
         return Result.error(errorMessage: returnValue);
@@ -39,19 +42,165 @@ class PaymentsHelper {
     }
   }
 
+  // Retrieve Payment
+  Future<Result<Payment?>> readPayment(String id, {Map<String, bool>? include}) async {
+    final dbHelper = this.dbHelper;
+    try {
+      Payment? payment;
+      if (dbHelper != null) {
+        payment = await dbHelper.readPayment(id, include: include);
+      } else {
+        payment = await ApiService.payments().getPayment(id, include: include);
+      }
+      return Result.success(data: payment);
+    } on Exception catch (e) {
+      return Result.exception(exception: e);
+    }
+  }
+
   // Retrieve all Payments
-  Future<Result<List<Payment>>> readAllPayments() async {
+  Future<Result<List<Payment>>> readAllPayments({Map<String, bool>? include}) async {
     final dbHelper = this.dbHelper;
     try {
       List<Payment> payments;
       if (dbHelper != null) {
-        payments = await dbHelper.readAllPayments();
+        payments = await dbHelper.readAllPayments(include: include);
       } else {
-        payments = await ApiService.payments().getAllPayments();
+        payments = await ApiService.payments().getAllPayments(include: include);
       }
       return Result.success(data: payments);
     } on Exception catch (e) {
       return Result.exception(exception: e);
+    }
+  }
+
+  // Update a Payment
+  Future<Result<Payment>> updatePayment(Payment payment) async {
+    final dbHelper = this.dbHelper;
+    if (dbHelper != null) {
+      final id = await dbHelper.updatePayment(payment);
+      if (id >= 0) {
+        return Result.success(data: payment);
+      } else {
+        return Result.error(
+          errorMessage: "Error when updating Payment ${payment.id}",
+        );
+      }
+    } else {
+      final returnValue = await ApiService.payments().updatePayment(payment);
+      if (returnValue == "OK") {
+        return Result.success(data: payment);
+      } else {
+        return Result.error(errorMessage: returnValue);
+      }
+    }
+  }
+
+  Future<Result<Payment>> updatePaymentBillReference(Payment payment, {String? billId, Bill? bill}) async {
+    final dbHelper = this.dbHelper;
+    try {
+      if (bill == null && billId == null) {
+        return Result.error(errorMessage: "Either billId or bill must be provided");
+      }
+
+      if (bill == null && billId != null) {
+        bill = (dbHelper != null)
+            ? await dbHelper.readBill(billId)
+            : await ApiService.bills().getBill(billId);
+
+        if (bill == null) {
+          return Result.error(errorMessage: "Bill with ID $billId not found");
+        }
+      }
+
+      if (bill != null) {
+        payment.addBill(bill);
+        if (dbHelper != null) {
+          int id = await dbHelper.updatePayment(payment);
+          if (id >= 0) {
+            return Result.success(data: payment);
+          } else {
+            return Result.error(
+              errorMessage: "Error when updating Payment ${payment.id} Bill reference",
+            );
+          }
+        } else {
+          final returnValue = await ApiService.payments().updatePayment(payment);
+          if (returnValue == "OK") {
+            return Result.success();
+          } else {
+            return Result.error(errorMessage: returnValue);
+          }
+        }
+      } else {
+        return Result.error(errorMessage: "Bill is null");
+      }
+    } on Exception catch (e) {
+      return Result.exception(exception: e);
+    }
+  }
+
+  Future<Result<Payment>> updatePaymentRentorReference(Payment payment, {String? rentorId, Rentor? rentor}) async {
+    final dbHelper = this.dbHelper;
+    try {
+      if (rentor == null && rentorId == null) {
+        return Result.error(errorMessage: "Either rentorId or rentor must be provided");
+      }
+
+      if (rentor == null && rentorId != null) {
+        rentor = (dbHelper != null)
+            ? await dbHelper.readRentor(rentorId)
+            : await ApiService.rentors().getRentor(rentorId);
+
+        if (rentor == null) {
+          return Result.error(errorMessage: "Rentor with ID $rentorId not found");
+        }
+      }
+
+      if (rentor != null) {
+        payment.rentor = rentor;
+        if (dbHelper != null) {
+          int id = await dbHelper.updatePayment(payment);
+          if (id >= 0) {
+            return Result.success(data: payment);
+          } else {
+            return Result.error(
+              errorMessage: "Error when updating Payment ${payment.id} Rentor reference",
+            );
+          }
+        } else {
+          final returnValue = await ApiService.payments().updatePayment(payment);
+          if (returnValue == "OK") {
+            return Result.success();
+          } else {
+            return Result.error(errorMessage: returnValue);
+          }
+        }
+      } else {
+        return Result.error(errorMessage: "Rentor is null");
+      }
+    } on Exception catch (e) {
+      return Result.exception(exception: e);
+    }
+  }
+
+  // Delete Payment
+  Future<Result<void>> deletePayment(String id) async {
+    final dbHelper = this.dbHelper;
+    if (dbHelper != null) {
+      final billsDeleted = await dbHelper.deletePayment(id);
+      if (billsDeleted > 0) {
+        return Result.success();
+      } else {
+        return Result.error(errorMessage: "Error when deleting Bill $id");
+      }
+    } else {
+      final returnValue = await ApiService.payments().deletePayment(id);
+      if (returnValue == "OK") {
+        return Result.success();
+      } else {
+        return Result.error(errorMessage: returnValue);
+      }
     }
   }
 
@@ -75,7 +224,7 @@ class PaymentsHelper {
         final payments = await ApiService.payments().getAllPayments();
         for (final payment in payments) {
           if (payment.id != null) {
-            await ApiService.payments().deletePayment(payment.id!);
+            await ApiService.payments().deletePayment(payment.paymentId!);
           }
         }
         return Result.success();

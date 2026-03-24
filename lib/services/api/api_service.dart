@@ -176,7 +176,7 @@ class BillsApiService {
   // #endregion
 
   // #region Delete
-  Future<String> deleteBill(int id) async {
+  Future<String> deleteBill(String id) async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/bill/$id'));
 
@@ -337,7 +337,7 @@ class RentorsApiService {
   // #endregion
 
   // #region Delete
-  Future<String> deleteRentor(int id) async {
+  Future<String> deleteRentor(String id) async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/rentor/$id'));
 
@@ -425,9 +425,17 @@ class PaymentsApiService {
   // #endregion
 
   // #region Read
-  Future<Payment?> getPayment(String id) async {
+  Future<Payment?> getPayment(String id, {Map<String, bool>? include}) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/payment/list'));
+      final includeParams = <String, String>{
+        if (include != null)
+          for (final entry in include.entries)
+            if (entry.value) entry.key: 'true',
+      };
+      final uri = Uri.parse(
+        '$baseUrl/payment/$id',
+      ).replace(queryParameters: includeParams.isEmpty ? null : includeParams);
+      final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> json = jsonDecode(response.body);
@@ -446,9 +454,17 @@ class PaymentsApiService {
     }
   }
 
-  Future<List<Payment>> getAllPayments() async {
+  Future<List<Payment>> getAllPayments({Map<String, bool>? include}) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/payment/list'));
+      final includeParams = <String, String>{
+        if (include != null)
+          for (final entry in include.entries)
+            if (entry.value) entry.key: 'true',
+      };
+      final uri = Uri.parse(
+        '$baseUrl/payment/list',
+      ).replace(queryParameters: includeParams.isEmpty ? null : includeParams);
+      final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -498,7 +514,7 @@ class PaymentsApiService {
   // #endregion
 
   // #region Delete
-  Future<String> deletePayment(int id) async {
+  Future<String> deletePayment(String id) async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/payment/$id'));
 
@@ -588,9 +604,17 @@ class EmailDataApiService {
   // #endregion
 
   // #region Read
-  Future<EmailData?> getEmail(int id) async {
+  Future<EmailData?> getEmail(String id, {Map<String, bool>? include}) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/email/$id'));
+      final includeParams = <String, String>{
+        if (include != null)
+          for (final entry in include.entries)
+            if (entry.value) entry.key: 'true',
+      };
+      final uri = Uri.parse('$baseUrl/email/$id').replace(
+        queryParameters: includeParams.isEmpty ? null : includeParams,
+      );
+      final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> json = jsonDecode(response.body);
@@ -611,9 +635,17 @@ class EmailDataApiService {
     }
   }
 
-  Future<List<EmailData>> getEmails() async {
+  Future<List<EmailData>> getEmails({Map<String, bool>? include}) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/email/list'));
+      final includeParams = <String, String>{
+        if (include != null)
+          for (final entry in include.entries)
+            if (entry.value) entry.key: 'true',
+      };
+      final uri = Uri.parse('$baseUrl/email/list').replace(
+        queryParameters: includeParams.isEmpty ? null : includeParams,
+      );
+      final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -637,11 +669,17 @@ class EmailDataApiService {
     }
   }
 
-  Future<List<EmailData>> getUnprocessedEmails() async {
+  Future<List<EmailData>> getUnprocessedEmails({Map<String, bool>? include}) async {
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/email/list/unprocessed'),
+      final includeParams = <String, String>{
+        if (include != null)
+          for (final entry in include.entries)
+            if (entry.value) entry.key: 'true',
+      };
+      final uri = Uri.parse('$baseUrl/email/list/unprocessed').replace(
+        queryParameters: includeParams.isEmpty ? null : includeParams,
       );
+      final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -665,11 +703,17 @@ class EmailDataApiService {
     }
   }
 
-  Future<List<EmailData>> getProcessedEmails() async {
+  Future<List<EmailData>> getProcessedEmails({Map<String, bool>? include}) async {
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/email/list/processed'),
+      final includeParams = <String, String>{
+        if (include != null)
+          for (final entry in include.entries)
+            if (entry.value) entry.key: 'true',
+      };
+      final uri = Uri.parse('$baseUrl/email/list/processed').replace(
+        queryParameters: includeParams.isEmpty ? null : includeParams,
       );
+      final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -723,7 +767,7 @@ class EmailDataApiService {
   // #endregion
 
   // #region Delete
-  Future<String> deleteEmailData(int id) async {
+  Future<String> deleteEmailData(String id) async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/email/$id'));
 

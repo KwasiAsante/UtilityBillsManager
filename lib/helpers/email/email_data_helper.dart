@@ -12,6 +12,12 @@ import 'package:utility_bills_manager/services/email/email_service.dart';
 import 'package:utility_bills_manager/utils/bills/bills_parser.dart';
 import 'package:utility_bills_manager/utils/email/email_parser.dart';
 
+import '../../data/models/payment.dart';
+import '../../data/models/rentor.dart';
+import '../../utils/payments/payments_parser.dart';
+import '../payments/payments_helper.dart';
+import '../rentors/rentors_helper.dart';
+
 class EmailDataHelper {
   static final EmailDataHelper _instance = EmailDataHelper._internal();
 
@@ -32,6 +38,8 @@ class EmailDataHelper {
   );
 
   final BillsHelper _billsHelper = BillsHelper();
+  final PaymentsHelper _paymentsHelper = PaymentsHelper();
+  final RentorsHelper _rentorsHelper = RentorsHelper();
 
   // #region CRUD Operations
   // #region Email Data
@@ -57,15 +65,31 @@ class EmailDataHelper {
     }
   }
 
-  // Retrieve unprocessed Email Data
-  Future<Result<EmailData?>> readEmail(int id) async {
+  // Retrieve Email Data
+  Future<Result<EmailData?>> readEmail(String id, {Map<String, bool>? include}) async {
     final dbHelper = this.dbHelper;
     try {
       EmailData? emailData;
       if (dbHelper != null) {
-        emailData = await dbHelper.readEmail(id);
+        emailData = await dbHelper.readEmail(id, include: include);
       } else {
-        emailData = await ApiService.emails().getEmail(id);
+        emailData = await ApiService.emails().getEmail(id, include: include);
+      }
+      return Result.success(data: emailData);
+    } on Exception catch (e) {
+      return Result.exception(exception: e);
+    }
+  }
+
+  // Retrieve Email Data list
+  Future<Result<List<EmailData>>> readEmails({Map<String, bool>? include}) async {
+    final dbHelper = this.dbHelper;
+    try {
+      List<EmailData> emailData;
+      if (dbHelper != null) {
+        emailData = await dbHelper.readEmails(include: include);
+      } else {
+        emailData = await ApiService.emails().getEmails(include: include);
       }
       return Result.success(data: emailData);
     } on Exception catch (e) {
@@ -74,14 +98,14 @@ class EmailDataHelper {
   }
 
   // Retrieve unprocessed Email Data
-  Future<Result<List<EmailData>>> readEmails() async {
+  Future<Result<List<EmailData>>> readUnprocessedEmails({Map<String, bool>? include}) async {
     final dbHelper = this.dbHelper;
     try {
       List<EmailData> emailData;
       if (dbHelper != null) {
-        emailData = await dbHelper.readEmails();
+        emailData = await dbHelper.readUnprocessedEmails(include: include);
       } else {
-        emailData = await ApiService.emails().getEmails();
+        emailData = await ApiService.emails().getUnprocessedEmails(include: include);
       }
       return Result.success(data: emailData);
     } on Exception catch (e) {
@@ -89,31 +113,15 @@ class EmailDataHelper {
     }
   }
 
-  // Retrieve unprocessed Email Data
-  Future<Result<List<EmailData>>> readUnprocessedEmails() async {
+  // Retrieve processed Email Data
+  Future<Result<List<EmailData>>> readProcessedEmails({Map<String, bool>? include}) async {
     final dbHelper = this.dbHelper;
     try {
       List<EmailData> emailData;
       if (dbHelper != null) {
-        emailData = await dbHelper.readUnprocessedEmails();
+        emailData = await dbHelper.readProcessedEmails(include: include);
       } else {
-        emailData = await ApiService.emails().getUnprocessedEmails();
-      }
-      return Result.success(data: emailData);
-    } on Exception catch (e) {
-      return Result.exception(exception: e);
-    }
-  }
-
-  // Retrieve unprocessed Email Data
-  Future<Result<List<EmailData>>> readProcessedEmails() async {
-    final dbHelper = this.dbHelper;
-    try {
-      List<EmailData> emailData;
-      if (dbHelper != null) {
-        emailData = await dbHelper.readProcessedEmails();
-      } else {
-        emailData = await ApiService.emails().getProcessedEmails();
+        emailData = await ApiService.emails().getProcessedEmails(include: include);
       }
       return Result.success(data: emailData);
     } on Exception catch (e) {
@@ -160,9 +168,9 @@ class EmailDataHelper {
 
   // #region Email
 
-  Future<Map<MimeMessage, EmailData>> fetchEmails({int maxEmails = 100}) async {
+  Future<Map<MimeMessage, EmailData>> fetchEmails(EmailType type, {int maxEmails = 100}) async {
     Map<MimeMessage, EmailData> finalMessages = {};
-    final messages = await emailService.fetchRecentEmails(maxEmails: maxEmails);
+    final messages = await emailService.fetchRecentEmails(type, maxEmails: maxEmails);
     for (MimeMessage message in messages) {
       if (kDebugMode) {
         print('From: ${message.from}');
@@ -176,7 +184,8 @@ class EmailDataHelper {
 
       EmailData? emailData = await EmailParser.parseEmailToEmailData(message);
       if (emailData != null) {
-        Result<EmailData?> result = await readEmail(emailData.getEmailId());
+        Map<String, bool> include = type == EmailType.bill ? {'bill': true} : {'payment': true};
+        Result<EmailData?> result = await readEmail(emailData.getEmailId(), include: include);
         if (result.isError || result.data == null) {
           Result<EmailData> retVal = await createEmailData(emailData);
           if (retVal.isError) {
@@ -194,18 +203,22 @@ class EmailDataHelper {
   }
 
   Future<void> fetchBillEmails({int maxEmails = 100}) async {
-    final messages = await fetchEmails(maxEmails: maxEmails);
+    final messages = await fetchEmails(EmailType.bill, maxEmails: maxEmails);
     if (messages.isNotEmpty) {
       for (MimeMessage message in messages.keys) {
-        var billId = messages[message]?.billId;
-        Result<Bill?> billResult = await _billsHelper.readBill(billId ?? '');
-        Bill? bill = billResult.data;
-        if (billResult.isError || bill == null) {
+        Bill? bill = messages[message]?.bill;
+        if (bill == null) {
+          var billId = messages[message]?.billId;
+          Result<Bill?> billResult = await _billsHelper.readBill(billId ?? '');
+          bill = billResult.isSuccess ? billResult.data : null;
+        }
+
+        if (bill == null) {
           bill = await BillsParser.parseEmailToBill(message);
           if (bill != null) {
             if (kDebugMode) {
               print(
-                'Bill Parsed: {\n\tID: ${bill.id}\n\tCompany: ${bill.company}\n\tAmount: ${bill.amount}\n\tBill Type: ${bill.type}\n\tDue Date: ${bill.dueDate}\n\tPayment Status: ${bill.status.name}\n\tNotes: ${bill.notes}\n}',
+                'Bill Parsed: {\n\tID: ${bill.billId}\n\tCompany: ${bill.company}\n\tAmount: ${bill.amount}\n\tBill Type: ${bill.type}\n\tDue Date: ${bill.dueDate}\n\tPayment Status: ${bill.status.name}\n\tNotes: ${bill.notes}\n}',
               );
               print(
                 '---------------------------------------------------------------------\n\n\n\n\n',
@@ -220,10 +233,13 @@ class EmailDataHelper {
                 // Create a new EmailData instance with updated values
                 EmailData updatedEmailData = EmailData(
                   id: emailData.id,
+                  emailDataId: emailData.emailDataId,
                   emailSubject: emailData.emailSubject,
                   emailBody: emailData.emailBody,
                   emailId: emailData.emailId,
                   billId: createResult.data!.billId,
+                  bill: createResult.data,
+                  paymentId: emailData.paymentId,
                   processed: true,
                 );
                 await updateEmailData(updatedEmailData);
@@ -252,10 +268,101 @@ class EmailDataHelper {
             // Create a new EmailData instance with updated values
             EmailData updatedEmailData = EmailData(
               id: emailData.id,
+              emailDataId: emailData.emailDataId,
               emailSubject: emailData.emailSubject,
               emailBody: emailData.emailBody,
               emailId: emailData.emailId,
               billId: bill.billId,
+              bill: bill,
+              paymentId: emailData.paymentId,
+              processed: true,
+            );
+            await updateEmailData(updatedEmailData);
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> fetchPaymentEmails({int maxEmails = 100}) async {
+    final messages = await fetchEmails(EmailType.payment, maxEmails: maxEmails);
+    if (messages.isNotEmpty) {
+      List<Rentor> rentors = [];
+      final rentorListResult = await _rentorsHelper.readAllRentors();
+      if (rentorListResult.isSuccess && rentorListResult.data != null) {
+        rentors = rentorListResult.data!;
+      }
+
+      for (MimeMessage message in messages.keys) {
+        Payment? payment = messages[message]?.payment;
+        if (payment == null) {
+          var paymentId = messages[message]?.paymentId;
+          Result<Payment?> paymentResult = await _paymentsHelper.readPayment(paymentId ?? '');
+          payment = paymentResult.isSuccess ? paymentResult.data : null;
+        }
+
+        if (payment == null) {
+          payment = await PaymentsParser.parseEmailToPayment(message, rentors: rentors);
+          if (payment != null) {
+            if (kDebugMode) {
+              print(
+                'Payment Parsed: {\n\tID: ${payment.paymentId}\n\tPayment Date: ${payment.paymentDate}\n\tAmount Paid: ${payment.amountPaid}\n\tPaid Rentor: ${payment.rentorName}\n\tBill Paid: \n\t\t${payment.billNames(newLine: true)}\n}',
+              );
+              print(
+                '---------------------------------------------------------------------\n\n\n\n\n',
+              );
+            }
+
+            // Create the payment and get its ID
+            Result<Payment> createResult = await _paymentsHelper.createPayment(payment);
+            if (createResult.isSuccess && createResult.data != null) {
+              var emailData = messages[message];
+              if (emailData != null) {
+                // Create a new EmailData instance with updated values
+                EmailData updatedEmailData = EmailData(
+                  id: emailData.id,
+                  emailDataId: emailData.emailDataId,
+                  emailSubject: emailData.emailSubject,
+                  emailBody: emailData.emailBody,
+                  emailId: emailData.emailId,
+                  billId: emailData.billId,
+                  paymentId: createResult.data!.paymentId,
+                  payment: createResult.data,
+                  processed: true,
+                );
+                await updateEmailData(updatedEmailData);
+              }
+            }
+          } else {
+            if (kDebugMode) {
+              print('Failed to convert Payment: ${message.decodeSubject()}');
+              print(
+                '---------------------------------------------------------------------\n\n\n\n\n',
+              );
+            }
+          }
+        } else {
+          if (kDebugMode) {
+            print(
+              'Payment Found: {\n\tID: ${payment.paymentId}\n\tPayment Date: ${payment.paymentDate}\n\tAmount Paid: ${payment.amountPaid}\n\tPaid Rentor: ${payment.rentorName}\n\tBill Paid: \n\t\t${payment.billNames(newLine: true)}\n}',
+            );
+            print(
+              '---------------------------------------------------------------------\n\n\n\n\n',
+            );
+          }
+
+          var emailData = messages[message];
+          if (emailData != null) {
+            // Create a new EmailData instance with updated values
+            EmailData updatedEmailData = EmailData(
+              id: emailData.id,
+              emailDataId: emailData.emailDataId,
+              emailSubject: emailData.emailSubject,
+              emailBody: emailData.emailBody,
+              emailId: emailData.emailId,
+              billId: emailData.billId,
+              paymentId: payment.paymentId,
+              payment: payment,
               processed: true,
             );
             await updateEmailData(updatedEmailData);

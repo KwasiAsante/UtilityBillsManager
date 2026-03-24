@@ -20,6 +20,8 @@ class AddEditRentorScreen extends StatefulWidget {
 class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _percentageController = TextEditingController();
   final _amountPaidController = TextEditingController();
   final _lastPaymentDateController = TextEditingController();
@@ -29,6 +31,7 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
   final BillsHelper _billsHelper = BillsHelper();
 
   DateTime? _lastPaymentDate;
+  late List<BillType> _selectedBillTypes;
 
   @override
   void initState() {
@@ -36,6 +39,8 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     if (widget.rentor != null) {
       final rentor = widget.rentor!;
       _nameController.text = rentor.name;
+      _emailController.text = rentor.email ?? '';
+      _phoneController.text = rentor.phone ?? '';
       _percentageController.text = rentor.defaultPercentage.toStringAsFixed(2);
       _amountPaidController.text = rentor.amountPaid!.toStringAsFixed(2);
       if (rentor.lastPaymentDate != null) {
@@ -43,23 +48,23 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
         _lastPaymentDate = DateFormat('yyyy-MM-dd').parse(rentor.lastPaymentDate!);
       }
 
-      // Populate existing bill-specific percentages
-      for (var type in BillType.values) {
+      // Populate only existing bill-specific percentages
+      _selectedBillTypes = rentor.billPercentages.keys.toList();
+      for (var type in _selectedBillTypes) {
         _billPercentageControllers[type] = TextEditingController(
-          text: rentor.billPercentages[type]?.toStringAsFixed(2) ?? '',
+          text: rentor.billPercentages[type]!.toStringAsFixed(2),
         );
       }
     } else {
-      // Init empty controllers
-      for (var type in BillType.values) {
-        _billPercentageControllers[type] = TextEditingController();
-      }
+      _selectedBillTypes = [];
     }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
     _percentageController.dispose();
     _amountPaidController.dispose();
     _lastPaymentDateController.dispose();
@@ -105,30 +110,105 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
   return totalOwed;
 }
 
+  void _showAddBillPercentageDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => _AddBillPercentageDialog(
+        selectedBillTypes: _selectedBillTypes,
+        defaultPercentage: _percentageController.text,
+        onAdd: (selectedType, percentage) {
+          setState(() {
+            _selectedBillTypes.add(selectedType);
+            _billPercentageControllers[selectedType] = TextEditingController(
+              text: percentage.toStringAsFixed(2),
+            );
+          });
+        },
+      ),
+    );
+  }
+
+  void _removeBillPercentage(BillType type) {
+    setState(() {
+      _selectedBillTypes.remove(type);
+      _billPercentageControllers[type]?.dispose();
+      _billPercentageControllers.remove(type);
+    });
+  }
+
   Widget _buildBillTypeFields() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 20),
-        const Text('Bill-Specific Percentages', style: TextStyle(fontWeight: FontWeight.bold)),
-        ...BillType.values.map((type) {
-          return TextFormField(
-            controller: _billPercentageControllers[type],
-            decoration: InputDecoration(
-              labelText: '${type.name[0].toUpperCase()}${type.name.substring(1)} %',
-              hintText: 'Leave empty to use default',
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Bill-Specific Percentages', style: TextStyle(fontWeight: FontWeight.bold)),
+            ElevatedButton.icon(
+              onPressed: _selectedBillTypes.length < BillType.values.length
+                  ? _showAddBillPercentageDialog
+                  : null,
+              icon: const Icon(Icons.add),
+              label: const Text('Add'),
             ),
-            keyboardType: TextInputType.number,
-            validator: (value) {
-              if (value == null || value.isEmpty) return null;
-              final percent = double.tryParse(value);
-              if (percent == null || percent < 0 || percent > 100) {
-                return 'Enter a valid percentage';
-              }
-              return null;
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (_selectedBillTypes.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16.0),
+            child: Text(
+              'No bill percentages added yet',
+              style: TextStyle(color: Colors.grey),
+            ),
+          )
+        else
+          ListView.builder(
+            physics: const NeverScrollableScrollPhysics(),
+            shrinkWrap: true,
+            itemCount: _selectedBillTypes.length,
+            itemBuilder: (context, index) {
+              final type = _selectedBillTypes[index];
+              final controller = _billPercentageControllers[type]!;
+              final displayName = '${type.name[0].toUpperCase()}${type.name.substring(1)}';
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: controller,
+                        decoration: InputDecoration(
+                          labelText: '$displayName %',
+                          hintText: 'Leave empty to use default',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        keyboardType: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) return null;
+                          final percent = double.tryParse(value);
+                          if (percent == null || percent < 0 || percent > 100) {
+                            return 'Invalid %';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      onPressed: () => _removeBillPercentage(type),
+                      icon: const Icon(Icons.close, color: Colors.red),
+                      tooltip: 'Remove',
+                    ),
+                  ],
+                ),
+              );
             },
-          );
-        }),
+          ),
       ],
     );
   }
@@ -150,6 +230,8 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     final rentor = Rentor(
       id: widget.rentor?.id,
       name: _nameController.text,
+      email: _emailController.text.isNotEmpty ? _emailController.text : null,
+      phone: _phoneController.text.isNotEmpty ? _phoneController.text : null,
       defaultPercentage: double.parse(_percentageController.text),
       amountPaid: double.tryParse(_amountPaidController.text) ?? 0.0,
       lastPaymentDate: _lastPaymentDate != null ? DateFormat('yyyy-MM-dd').format(_lastPaymentDate!) : null,
@@ -173,7 +255,7 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing ? 'Add Rentor' : 'Edit Rentor'),
+        title: Text(isEditing ? 'Edit Rentor' : 'Add Rentor'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -181,45 +263,63 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
           key: _formKey,
           child: Column(
             children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Name'),
-                validator:
-                    (value) => value!.isEmpty ? 'Enter name name' : null,
-              ),
-              TextFormField(
-                controller: _percentageController,
-                decoration: const InputDecoration(labelText: 'Percentage %'),
-                keyboardType: TextInputType.number,
-                validator: (value) => value!.isEmpty ? 'Enter percentage' : null,
-              ),
-              _buildBillTypeFields(),
-              const SizedBox(height: 20),
-              FutureBuilder<double>(
-                future: _calculateAmountOwed(),
-                builder: (context, snapshot) {
-                  final amount = snapshot.data?.toStringAsFixed(2) ?? '...';
-                  return TextFormField(
-                    enabled: false,
-                    decoration: InputDecoration(
-                      labelText: 'Amount Owed \$',
-                      hintText: amount,
-                    ),
-                  );
-                },
-              ),
-              TextFormField(
-                controller: _amountPaidController,
-                enabled: false,
-                decoration: const InputDecoration(labelText: 'Amount Paid \$'),
-              ),
-              GestureDetector(
-                onTap: _pickDate,
-                child: AbsorbPointer(
-                  child: TextFormField(
-                    controller: _lastPaymentDateController,
-                    decoration: const InputDecoration(labelText: 'Last Payment Date'),
-                    keyboardType: TextInputType.datetime,
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(labelText: 'Name'),
+                        validator:
+                            (value) => value!.isEmpty ? 'Enter name' : null,
+                      ),
+                      TextFormField(
+                        controller: _emailController,
+                        decoration: const InputDecoration(labelText: 'Email'),
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      TextFormField(
+                        controller: _phoneController,
+                        decoration: const InputDecoration(labelText: 'Phone Number'),
+                        keyboardType: TextInputType.phone,
+                      ),
+                      TextFormField(
+                        controller: _percentageController,
+                        decoration: const InputDecoration(labelText: 'Percentage %'),
+                        keyboardType: TextInputType.number,
+                        validator: (value) => value!.isEmpty ? 'Enter percentage' : null,
+                      ),
+                      _buildBillTypeFields(),
+                      const SizedBox(height: 20),
+                      FutureBuilder<double>(
+                        future: _calculateAmountOwed(),
+                        builder: (context, snapshot) {
+                          final amount = snapshot.data?.toStringAsFixed(2) ?? '...';
+                          return TextFormField(
+                            enabled: false,
+                            decoration: InputDecoration(
+                              labelText: 'Amount Owed \$',
+                              hintText: amount,
+                            ),
+                          );
+                        },
+                      ),
+                      TextFormField(
+                        controller: _amountPaidController,
+                        enabled: false,
+                        decoration: const InputDecoration(labelText: 'Amount Paid \$'),
+                      ),
+                      GestureDetector(
+                        onTap: _pickDate,
+                        child: AbsorbPointer(
+                          child: TextFormField(
+                            controller: _lastPaymentDateController,
+                            decoration: const InputDecoration(labelText: 'Last Payment Date'),
+                            keyboardType: TextInputType.datetime,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -235,3 +335,124 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     );
   }
 }
+
+class _AddBillPercentageDialog extends StatefulWidget {
+  final List<BillType> selectedBillTypes;
+  final String? defaultPercentage;
+  final Function(BillType, double) onAdd;
+
+  const _AddBillPercentageDialog({
+    required this.selectedBillTypes,
+    this.defaultPercentage,
+    required this.onAdd,
+  });
+
+  @override
+  State<_AddBillPercentageDialog> createState() => _AddBillPercentageDialogState();
+}
+
+class _AddBillPercentageDialogState extends State<_AddBillPercentageDialog> {
+  BillType? selectedType;
+  final percentageController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    percentageController.text = widget.defaultPercentage ?? '';
+  }
+
+  @override
+  void dispose() {
+    percentageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Bill Percentage'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Select Bill Type:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Column(
+              children: BillType.values.map((type) {
+                // Only show bill types that haven't been selected yet
+                if (widget.selectedBillTypes.contains(type)) {
+                  return const SizedBox.shrink();
+                }
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      selectedType = type;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: Row(
+                      children: [
+                        Radio<BillType>(
+                          value: type,
+                          groupValue: selectedType,
+                          onChanged: (value) {
+                            setState(() {
+                              selectedType = value;
+                            });
+                          },
+                        ),
+                        Expanded(
+                          child: Text('${type.name[0].toUpperCase()}${type.name.substring(1)}'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: percentageController,
+              decoration: const InputDecoration(
+                labelText: 'Percentage %',
+                hintText: 'Enter percentage (0-100)',
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.number,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            if (selectedType == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please select a bill type')),
+              );
+              return;
+            }
+
+            final percent = double.tryParse(percentageController.text.trim());
+            if (percent == null || percent < 0 || percent > 100) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please enter a valid percentage (0-100)')),
+              );
+              return;
+            }
+
+            widget.onAdd(selectedType!, percent);
+            Navigator.pop(context);
+          },
+          child: const Text('Add'),
+        ),
+      ],
+    );
+  }
+}
+

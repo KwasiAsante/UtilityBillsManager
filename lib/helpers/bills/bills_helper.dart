@@ -110,7 +110,7 @@ class BillsHelper {
   }
 
   // Delete a Bill
-  Future<Result<Bill>> deleteBill(int id) async {
+  Future<Result<Bill>> deleteBill(String id) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
       final billsDeleted = await dbHelper.deleteBill(id);

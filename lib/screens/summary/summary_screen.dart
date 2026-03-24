@@ -129,8 +129,7 @@ class _SummaryScreenState extends State<SummaryScreen> with SingleTickerProvider
 
   double _calculateRentorShare(Bill bill, Rentor rentor) {
     final typeKey = bill.type;
-    final percentage =
-        rentor.billPercentages[typeKey] ?? rentor.defaultPercentage;
+    final percentage = rentor.billPercentages[typeKey] ?? 0.0;
     return bill.amount * (percentage / 100);
   }
 

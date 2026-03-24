@@ -1,3 +1,4 @@
+import 'package:enough_mail/codecs.dart';
 import 'package:utility_bills_manager/helpers/database/database_helper.dart';
 import 'package:utility_bills_manager/data/models/rentor.dart';
 import 'package:utility_bills_manager/data/models/result.dart';
@@ -40,6 +41,22 @@ class RentorsHelper {
     }
   }
 
+  // Retrieve Rentor
+  Future<Result<Rentor?>> readRentors(String rentorId) async {
+    final dbHelper = this.dbHelper;
+    try {
+      Rentor? rentor;
+      if (dbHelper != null) {
+        rentor = await dbHelper.readRentor(rentorId);
+      } else {
+        rentor = await ApiService.rentors().getRentor(rentorId);
+      }
+      return Result.success(data: rentor);
+    } on Exception catch (e) {
+      return Result.exception(exception: e);
+    }
+  }
+
   // Retrieve all Rentors
   Future<Result<List<Rentor>>> readAllRentors() async {
     final dbHelper = this.dbHelper;
@@ -79,7 +96,7 @@ class RentorsHelper {
     }
   }
 
-  Future<Result<Rentor>> deleteRentor(int id) async {
+  Future<Result<Rentor>> deleteRentor(String id) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
       final deletedRentors = await dbHelper.deleteRentor(id);

@@ -1,9 +1,7 @@
-import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_web/google_sign_in_web.dart';
 import 'package:google_sign_in_web/web_only.dart' as web;
 import 'package:utility_bills_manager/data/models/payment.dart';
@@ -16,13 +14,17 @@ import 'package:utility_bills_manager/services/email/google_account_service.dart
 import '../../data/models/bill.dart';
 
 class BillListScreen extends StatefulWidget {
-  const BillListScreen({super.key});
+  const BillListScreen({super.key, required this.isVisible});
+
+  final bool isVisible;
 
   @override
   State<BillListScreen> createState() => _BillListScreenState();
 }
 
 class _BillListScreenState extends State<BillListScreen> {
+  static const String _listenerKey = 'BillListScreen';
+
   static const List<String> _monthNames = [
     'January',
     'February',
@@ -41,10 +43,10 @@ class _BillListScreenState extends State<BillListScreen> {
   final BillsHelper _billsHelper = BillsHelper();
   final EmailDataHelper _emailDataHelper = EmailDataHelper();
   final ScrollController _scrollController = ScrollController();
-  StreamSubscription<GoogleSignInAuthenticationEvent>? _authSubscription;
   Future<List<Bill>>? _bills;
   List<Bill> _allBills = [];
   bool _loading = true;
+  bool _isSignedInListenerAttached = false;
   bool _isListScrollable = false;
   String _selectedFilter = 'All';
   String _selectedStort = 'Due Date (Latest)';
@@ -60,15 +62,43 @@ class _BillListScreenState extends State<BillListScreen> {
     } else {
       _loadBills(syncEmails: true);
     }
+    if (widget.isVisible) {
+      _subscribeToSignedInEvents();
+    }
     _scrollController.addListener(_checkScrollability);
   }
 
   @override
+  void didUpdateWidget(covariant BillListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.isVisible && widget.isVisible) {
+      _subscribeToSignedInEvents();
+    } else if (oldWidget.isVisible && !widget.isVisible) {
+      _unsubscribeFromSignedInEvents();
+    }
+  }
+
+  @override
   void dispose() {
-    _authSubscription?.cancel();
+    _unsubscribeFromSignedInEvents();
     _scrollController.removeListener(_checkScrollability);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _subscribeToSignedInEvents() {
+    if (_isSignedInListenerAttached && GoogleAccountService().isSubscribedToSignIn(_listenerKey)) return;
+    GoogleAccountService().onSignedIn(
+      _listenerKey,
+      () => _loadBills(syncEmails: true),
+    );
+    _isSignedInListenerAttached = true;
+  }
+
+  void _unsubscribeFromSignedInEvents() {
+    if (!_isSignedInListenerAttached || !GoogleAccountService().isSubscribedToSignIn(_listenerKey)) return;
+    GoogleAccountService().offSignedIn(_listenerKey);
+    _isSignedInListenerAttached = false;
   }
 
   Future<void> _initGoogleSignInForWeb() async {
@@ -76,25 +106,11 @@ class _BillListScreenState extends State<BillListScreen> {
 
     if (!GoogleAccountService().isInitialized) {
       _loading = false;
-      await GoogleAccountService().initialize(
-        onSignedIn: () => _loadBills(syncEmails: true),
-      );
     }
 
     if (GoogleAccountService().isAuthenticated &&
         GoogleAccountService().isSignedIn) {
       await _loadBills(syncEmails: true);
-    }
-  }
-
-  void _checkScrollability() {
-    if (_scrollController.hasClients) {
-      final isScrollable = _scrollController.position.maxScrollExtent > 0;
-      if (isScrollable != _isListScrollable) {
-        setState(() {
-          _isListScrollable = isScrollable;
-        });
-      }
     }
   }
 
@@ -123,6 +139,51 @@ class _BillListScreenState extends State<BillListScreen> {
         content: Text('Authorize Gmail access before syncing bills.'),
       ),
     );
+  }
+
+  Future<void> _deleteAllBills() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete All Bills'),
+        content: const Text(
+          'Are you sure you want to delete all bills? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      for (final bill in _allBills) {
+        await _billsHelper.deleteBill(bill.billId);
+      }
+      if (mounted) {
+        _loadBills();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('All bills deleted.')),
+        );
+      }
+    }
+  }
+
+  void _checkScrollability() {
+    if (_scrollController.hasClients) {
+      final isScrollable = _scrollController.position.maxScrollExtent > 0;
+      if (isScrollable != _isListScrollable) {
+        setState(() {
+          _isListScrollable = isScrollable;
+        });
+      }
+    }
   }
 
   Future<void> _syncBills() async {
@@ -491,6 +552,11 @@ class _BillListScreenState extends State<BillListScreen> {
                 await _syncBills();
               },
             ),
+          IconButton(
+            icon: const Icon(Icons.delete_sweep),
+            tooltip: 'Delete all bills',
+            onPressed: _deleteAllBills,
+          ),
           const SizedBox(width: 16),
         ],
       ),
@@ -508,7 +574,7 @@ class _BillListScreenState extends State<BillListScreen> {
                     if (!kIsWeb ||
                         (GoogleAccountService().isSignedIn &&
                             GoogleAccountService().isAuthorized)) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
+                      return Center(child: Text('No bills found. Pull down or click on the Refresh button to sync with Gmail or click the + button to add a bill.'));
                     } else {
                       return Center(
                         child: Text(
@@ -558,7 +624,7 @@ class _BillListScreenState extends State<BillListScreen> {
                                       _loadBills();
                                     }
                                   } else if (value == 'delete') {
-                                    await _billsHelper.deleteBill(bill.id!);
+                                    await _billsHelper.deleteBill(bill.billId);
                                     _loadBills();
                                   }
                                 },

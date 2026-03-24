@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../services/email/google_account_service.dart';
 import 'bills/bill_list_screen.dart';
 import 'rentors/rentor_list_screen.dart';
 import 'payments/payment_list_screen.dart';
@@ -13,15 +15,29 @@ class MainTabScreen extends StatefulWidget {
 }
 
 class _MainTabScreenState extends State<MainTabScreen> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 3;
 
-  static const List<Widget> _screens = [
-    BillListScreen(),
-    RentorListScreen(),
-    SummaryScreen(),
-    PaymentListScreen(),
-    EmailListScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      _initGoogleSignInForWeb();
+    }
+  }
+
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    super.dispose();
+  }
+
+  Future<void> _initGoogleSignInForWeb() async {
+    if (!kIsWeb) return;
+
+    if (!GoogleAccountService().isInitialized) {
+      await GoogleAccountService().initialize();
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -31,9 +47,17 @@ class _MainTabScreenState extends State<MainTabScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screens = <Widget>[
+      BillListScreen(isVisible: _selectedIndex == 0),
+      const RentorListScreen(),
+      const SummaryScreen(),
+      PaymentListScreen(isVisible: _selectedIndex == 3),
+      const EmailListScreen(),
+    ];
+
     return Scaffold(
       appBar: AppBar(title: const Text('Utility Bills Manager')),
-      body: IndexedStack(index: _selectedIndex, children: _screens),
+      body: IndexedStack(index: _selectedIndex, children: screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           border: Border(

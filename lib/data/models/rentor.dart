@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:utility_bills_manager/data/models/bill.dart';
+import 'package:uuid/uuid.dart';
 
 class Rentor {
   final int? id;
+  final String rentorId;
   final String name;
   final String? email;
   final String? phone;
@@ -12,6 +16,7 @@ class Rentor {
 
   Rentor({
     this.id,
+    String? rentorId,
     required this.name,
     this.email,
     this.phone,
@@ -19,41 +24,100 @@ class Rentor {
     required this.billPercentages,
     this.amountPaid,
     this.lastPaymentDate,
-  });
+  }) : rentorId = rentorId ?? Uuid().v4();
 
   factory Rentor.fromJson(Map<String, dynamic> json) {
-    Map<String, dynamic> rawMap = json['billPercentages'] ?? {};
-    Map<BillType, double> parsedMap = rawMap.map((key, value) =>
-      MapEntry(BillTypeExtension.fromString(key), (value as num).toDouble())
+    final rawBillPercentages = json['billPercentages'];
+    final Map<String, dynamic> rawMap;
+
+    if (rawBillPercentages is String && rawBillPercentages.isNotEmpty) {
+      final decoded = jsonDecode(rawBillPercentages);
+      rawMap = decoded is Map
+          ? decoded.map((key, value) => MapEntry(key.toString(), value))
+          : <String, dynamic>{};
+    } else if (rawBillPercentages is Map) {
+      rawMap = rawBillPercentages.map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+    } else {
+      rawMap = <String, dynamic>{};
+    }
+
+    final parsedMap = rawMap.map(
+      (key, value) =>
+          MapEntry(BillTypeExtension.fromString(key), (value as num).toDouble()),
     );
 
     return Rentor(
       id: json['id'],
+      rentorId: json['rentorId'] ?? (json['id'] != null ? 'legacy-${json['id']}' : null),
       name: json['name'],
       email: json['email'],
       phone: json['phone'],
       defaultPercentage: (json['defaultPercentage'] ?? 0).toDouble(),
       billPercentages: parsedMap,
-      amountPaid: json['amountPaid'],
+      amountPaid: (json['amountPaid'] as num?)?.toDouble(),
       lastPaymentDate: json['lastPaymentDate'],
     );
   }
 
+  factory Rentor.rentorFromJson(Map<String, dynamic> map) {
+    final rawBillPercentages = map['r_billPercentages'];
+    final Map<String, dynamic> rawMap;
+
+    if (rawBillPercentages is String && rawBillPercentages.isNotEmpty) {
+      final decoded = jsonDecode(rawBillPercentages);
+      rawMap = decoded is Map
+          ? decoded.map((key, value) => MapEntry(key.toString(), value))
+          : <String, dynamic>{};
+    } else if (rawBillPercentages is Map) {
+      rawMap = rawBillPercentages.map(
+            (key, value) => MapEntry(key.toString(), value),
+      );
+    } else {
+      rawMap = <String, dynamic>{};
+    }
+
+    final parsedMap = rawMap.map(
+          (key, value) =>
+          MapEntry(BillTypeExtension.fromString(key), (value as num).toDouble()),
+    );
+
+    return Rentor(
+      id: map['r_id'],
+      rentorId: map['r_rentorId'] ?? (map['r_id'] != null ? 'legacy-${map['r_id']}' : null),
+      name: map['r_name'],
+      email: map['r_email'],
+      phone: map['r_phone'],
+      defaultPercentage: (map['r_defaultPercentage'] ?? 0).toDouble(),
+      billPercentages: parsedMap,
+      amountPaid: (map['r_amountPaid'] as num?)?.toDouble(),
+      lastPaymentDate: map['r_lastPaymentDate'],
+    );
+  }
+
   Map<String, dynamic> toJson() {
-    Map<String, double> encodedMap = billPercentages.map((key, value) =>
-      MapEntry(key.name.toLowerCase(), value)
+    final encodedMap = billPercentages.map(
+      (key, value) => MapEntry(key.name.toLowerCase(), value),
     );
 
     return {
       'id': id,
+      'rentorId': rentorId,
       'name': name,
       'email': email,
       'phone': phone,
       'defaultPercentage': defaultPercentage,
       'billPercentages': encodedMap,
       'amountPaid': amountPaid,
-      'lastPaymentDate': lastPaymentDate
+      'lastPaymentDate': lastPaymentDate,
     };
+  }
+
+  Map<String, dynamic> toDbJson() {
+    final payload = Map<String, dynamic>.from(toJson());
+    payload['billPercentages'] = jsonEncode(payload['billPercentages']);
+    return payload;
   }
 
   static double calculateOwedAmount(Rentor rentor, Bill bill) {

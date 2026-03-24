@@ -35,6 +35,29 @@ class Bill {
     );
   }
 
+  factory Bill.billFromJson(Map<String, dynamic> map) {
+    final rawType = map['b_type'];
+    final rawStatus = map['b_status'];
+
+    final billType = rawType is BillType
+        ? rawType
+        : BillTypeExtension.fromString(rawType?.toString() ?? 'other');
+    final paymentStatus = rawStatus is PaymentStatus
+        ? rawStatus
+        : PaymentStatusExtension.fromString(rawStatus?.toString() ?? 'unknown');
+
+    return Bill(
+      id: map['b_id'],
+      billId: map['b_billId'],
+      company: map['b_company'],
+      type: billType,
+      amount: (map['b_amount'] ?? 0).toDouble(),
+      dueDate: map['b_dueDate'],
+      status: paymentStatus,
+      notes: map['b_notes'],
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

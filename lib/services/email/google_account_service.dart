@@ -36,7 +36,30 @@ class GoogleAccountService {
   bool _isAuthorized = false;
   bool get isAuthorized => _isAuthorized;
 
-  Future<void> initialize({Future<void> Function()? onSignedIn}) async {
+  final Map<String, Function()> _onSignedInListeners = {};
+
+  /// Subscribe to sign-in events
+  void onSignedIn(String className, Function() callback) {
+    _onSignedInListeners[className] = callback;
+  }
+
+  /// Unsubscribe from sign-in events
+  void offSignedIn(String className) {
+    _onSignedInListeners.remove(className);
+  }
+
+  bool isSubscribedToSignIn(String className) {
+    return _onSignedInListeners.containsKey(className);
+  }
+
+  /// Notify all listeners of a sign-in event
+  Future<void> _notifySignedIn() async {
+    for (var listener in _onSignedInListeners.values) {
+      await listener();
+    }
+  }
+
+  Future<void> initialize() async {
     if (!_isInitialized) {
       await googleSignIn
           .initialize(
@@ -54,7 +77,8 @@ class GoogleAccountService {
                     _isAuthenticated = true;
                     signedInAccount = event.user;
                     _isSignedIn = true;
-                    await onSignedIn?.call();
+                    await authorize();
+                    await _notifySignedIn();
                   }
                 })
                 .onError((error, stackTrace) {

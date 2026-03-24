@@ -21,9 +21,9 @@ class EmailService {
     this.isImapSecure = true,
   });
 
-  Future<List<MimeMessage>> fetchRecentEmails({int maxEmails = 100}) async {
+  Future<List<MimeMessage>> fetchRecentEmails(EmailType type, {int maxEmails = 100}) async {
     if (kIsWeb) {
-      return _fetchRecentEmailsFromGmailWeb(maxEmails: maxEmails);
+      return _fetchRecentEmailsFromGmailWeb(type, maxEmails: maxEmails);
     }
 
     final client = ImapClient(isLogEnabled: false);
@@ -43,7 +43,7 @@ class EmailService {
         return [];
       }
       final billsMailbox = mailboxes.cast<Mailbox>().firstWhere(
-        (box) => box.name.toLowerCase() == 'bills',
+        (box) => box.name.toLowerCase() == type.name,
         orElse: () => mailboxes.first,
       );
 
@@ -71,9 +71,7 @@ class EmailService {
     }
   }
 
-  Future<List<MimeMessage>> _fetchRecentEmailsFromGmailWeb({
-    int maxEmails = 100,
-  }) async {
+  Future<List<MimeMessage>> _fetchRecentEmailsFromGmailWeb(EmailType type, {int maxEmails = 100}) async {
     try {
       if (!GoogleAccountService().isInitialized ||
           !GoogleAccountService().isAuthenticated ||
@@ -113,11 +111,11 @@ class EmailService {
       final client = _AuthClient(headers);
       final gmailApi = gmail.GmailApi(client);
 
-      // Adjust Gmail search query as needed for your "bills" mailbox.
+      // Adjust Gmail search query as needed for your mailbox.
       final listResponse = await gmailApi.users.messages.list(
         'me',
         maxResults: maxEmails,
-        q: 'label:bills',
+        q: 'label:${type.name}',
       );
 
       final messageRefs = listResponse.messages ?? const <gmail.Message>[];
@@ -160,5 +158,42 @@ class _AuthClient extends http.BaseClient {
   Future<http.StreamedResponse> send(http.BaseRequest request) {
     request.headers.addAll(_headers);
     return _inner.send(request);
+  }
+}
+
+enum EmailType {
+  bill,
+  payment,
+}
+
+extension EmailTypeExtension on EmailType {
+  String get name {
+    switch (this) {
+      case EmailType.bill:
+        return 'bills';
+      case EmailType.payment:
+        return 'bills-tenant-bills';
+    }
+  }
+
+  static EmailType fromString(String type) {
+    switch (type.toLowerCase()) {
+      case 'bill':
+      case 'bills':
+        return EmailType.bill;
+      case 'payment':
+      case 'payments':
+      case 'bill payment':
+      case 'bill payments':
+      case 'bill_payment':
+      case 'bill_payments':
+      case 'bill-payment':
+      case 'bill-payments':
+      case 'bills-bill-payment':
+      case 'bill-bill-payments':
+        return EmailType.payment;
+      default:
+        throw ArgumentError('Unknown email type: $type');
+    }
   }
 }
