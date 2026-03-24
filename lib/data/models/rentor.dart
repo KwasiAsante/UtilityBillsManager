@@ -101,6 +101,7 @@ class Rentor {
       (key, value) => MapEntry(key.name.toLowerCase(), value),
     );
 
+    ///TODO: amountPaid and lastPaymentDate should not be stored in the database as it is derived data that can be calculated from the payments table. We should remove these columns and calculate them on the fly when needed to avoid data inconsistency and simplify the schema.
     return {
       'id': id,
       'rentorId': rentorId,

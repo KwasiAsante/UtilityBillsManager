@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/helpers/payments/payments_helper.dart';
 
+
+///TODO: Implement Add/Edit Payment Screen with form validation, status dropdown, and save functionality. This is a placeholder for now.
+///TODO: Add functionality to assign or update the assignment a payment to a rentor and display the assigned rentor in the payment list and details screen. This will require updating the Payment model, database schema, and UI to support rentor associations. The search and selection of the rentor should be based on the rentor name. A popup dialog should be used to display the list of rentors and allow filtering based on the above criteria and the selection should be a single-select with radio buttons or a dropdown. A rentor can be deassigned from a payment by clicking on some X or cancellation button next to the controller displaying the assigned rentor.
+///TODO: Add functionality to assign or update the assignment of a payment to 1 or more bills and display the associated bills in the payment list and details screen. This will require updating the Payment model, database schema, and UI to support bill associations. The search and selection of the bills should be based on the bill type, due date, and/or the company. A popup dialog should be used to display the list of bills and allow filtering based on the above criteria and the selection should be a multi-select with checkboxes. A bill can be deassigned from a payment by clicking on some X or cancellation button next to the controller displaying the associated bills in the payment details screen.
 class AddEditPaymentScreen extends StatefulWidget {
   final Payment? payment;
 
