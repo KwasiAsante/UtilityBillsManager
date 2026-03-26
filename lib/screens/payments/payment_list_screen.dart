@@ -126,6 +126,9 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
         GoogleAccountService().isSignedIn) {
       await _loadPayments(syncEmails: true);
     }
+    else {
+      await _loadPayments(syncEmails: false);
+    }
   }
 
   Future<void> _authorizeGoogleAccount() async {
@@ -628,7 +631,7 @@ class _PaymentListScreenState extends State<PaymentListScreen> {
                     child: ListTile(
                       title: Text(payment.bills == null || payment.bills!.isEmpty
                           ? "${payment.rentorName} - Payment Date: ${payment.paymentDate}"
-                          : payment.billNames()),
+                          : payment.billNames(newLine: true)),
                       subtitle:Text(payment.bills != null && payment.bills!.isNotEmpty
                           ? 'Paid By: ${payment.rentorName}\n'
                           'Amount Paid: \$${payment.amountPaid.toStringAsFixed(2)}\n'

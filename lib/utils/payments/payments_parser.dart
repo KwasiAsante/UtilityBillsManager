@@ -1,5 +1,4 @@
 import 'package:enough_mail/enough_mail.dart';
-import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/utils/email/email_parser.dart';
@@ -10,22 +9,6 @@ class PaymentsParser {
   static Future<Payment?> parseEmailToPayment(MimeMessage message, {List<Rentor>? rentors}) async {
     final subject = message.decodeSubject() ?? '';
     final sender = message.from?.firstOrNull?.email ?? '';
-
-    // if (subject.contains('Your RBC Royal Bank eStatement is ready') ||
-    //     subject.contains('eStatement Alert for your Simplii Credit Card') ||
-    //     subject.contains('Enbridge - Your Payment is Due') ||
-    //     subject.contains('Your Freedom Mobile payment is ready') ||
-    //     subject.contains('Your Bell payment is ready') ||
-    //     subject.contains('Payment received on your credit account') ||
-    //     subject.contains('Your credit account: Payment due in')) {
-    //   return null;
-    // }
-
-    // if (sender.contains('freedom')) {
-    //   if (kDebugMode) {
-    //     print('breakpoint');
-    //   }
-    // }
 
     final hasAttachment = EmailParser.hasAttachment(message);
     final body =

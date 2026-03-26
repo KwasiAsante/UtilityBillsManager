@@ -377,39 +377,22 @@ class _AddBillPercentageDialogState extends State<_AddBillPercentageDialog> {
           children: [
             const Text('Select Bill Type:', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            Column(
-              children: BillType.values.map((type) {
-                // Only show bill types that haven't been selected yet
-                if (widget.selectedBillTypes.contains(type)) {
-                  return const SizedBox.shrink();
-                }
-                return InkWell(
-                  onTap: () {
-                    setState(() {
-                      selectedType = type;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    child: Row(
-                      children: [
-                        Radio<BillType>(
+            RadioGroup<BillType>(
+              groupValue: selectedType,
+              onChanged: (value) {
+                setState(() {
+                  selectedType = value;
+                });
+              },
+              child: Column(
+                children: BillType.values
+                    .where((type) => !widget.selectedBillTypes.contains(type))
+                    .map((type) => RadioListTile<BillType>(
+                          title: Text('${type.name[0].toUpperCase()}${type.name.substring(1)}'),
                           value: type,
-                          groupValue: selectedType,
-                          onChanged: (value) {
-                            setState(() {
-                              selectedType = value;
-                            });
-                          },
-                        ),
-                        Expanded(
-                          child: Text('${type.name[0].toUpperCase()}${type.name.substring(1)}'),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
+                        ))
+                    .toList(),
+              )
             ),
             const SizedBox(height: 20),
             TextField(

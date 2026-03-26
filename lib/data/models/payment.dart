@@ -57,7 +57,7 @@ class Payment {
 
   String billNames({bool newLine = false}) {
     if (bills != null && bills!.isNotEmpty) {
-      return bills!.map((b) => '${b.type.name}: ${b.company} - ${b.dueDate}').join(newLine ? '\n' : ', ');
+      return bills!.map((b) => '${b.type.name}: ${b.companyName} - ${b.dueDate}').join(newLine ? '\n' : ', ');
     } else {
       return 'Unknown Bills';
     }
