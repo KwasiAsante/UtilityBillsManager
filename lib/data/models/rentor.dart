@@ -11,8 +11,8 @@ class Rentor {
   final String? phone;
   final double defaultPercentage;
   final Map<BillType, double> billPercentages; // e.g., {'Electric': 0.1, 'Gas': 0.2}
-  final double? amountPaid;
-  final String? lastPaymentDate;
+  double? amountPaid;
+  String? lastPaymentDate;
 
   Rentor({
     this.id,
@@ -55,9 +55,7 @@ class Rentor {
       email: json['email'],
       phone: json['phone'],
       defaultPercentage: (json['defaultPercentage'] ?? 0).toDouble(),
-      billPercentages: parsedMap,
-      amountPaid: (json['amountPaid'] as num?)?.toDouble(),
-      lastPaymentDate: json['lastPaymentDate'],
+      billPercentages: parsedMap
     );
   }
 
@@ -91,8 +89,6 @@ class Rentor {
       phone: map['r_phone'],
       defaultPercentage: (map['r_defaultPercentage'] ?? 0).toDouble(),
       billPercentages: parsedMap,
-      amountPaid: (map['r_amountPaid'] as num?)?.toDouble(),
-      lastPaymentDate: map['r_lastPaymentDate'],
     );
   }
 
@@ -101,7 +97,6 @@ class Rentor {
       (key, value) => MapEntry(key.name.toLowerCase(), value),
     );
 
-    ///TODO: amountPaid and lastPaymentDate should not be stored in the database as it is derived data that can be calculated from the payments table. We should remove these columns and calculate them on the fly when needed to avoid data inconsistency and simplify the schema.
     return {
       'id': id,
       'rentorId': rentorId,
@@ -109,9 +104,7 @@ class Rentor {
       'email': email,
       'phone': phone,
       'defaultPercentage': defaultPercentage,
-      'billPercentages': encodedMap,
-      'amountPaid': amountPaid,
-      'lastPaymentDate': lastPaymentDate,
+      'billPercentages': encodedMap
     };
   }
 

@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:google_sign_in_web/google_sign_in_web.dart';
+import 'package:google_sign_in_web/web_only.dart' as web;
 
 class GoogleAccountService {
   static final GoogleAccountService _instance =
@@ -153,5 +156,83 @@ class GoogleAccountService {
     _isAuthenticated = false;
     _isAuthorized = false;
     _isInitialized = false;
+  }
+
+  Widget buildWebGoogleAction(Function() onPressed) {
+    if (isSignedIn) {
+      if (isAuthorized) {
+        return const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 8.0),
+          child: Tooltip(
+            message: 'Gmail access authorized',
+            child: Icon(Icons.mark_email_read),
+          ),
+        );
+      }
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        child: SizedBox(
+          height: 36,
+          child: OutlinedButton.icon(
+            onPressed: onPressed,
+            icon: const Icon(Icons.lock_open),
+            label: const Text('Authorize Gmail'),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      child: SizedBox(
+        height: 36,
+        child: web.renderButton(
+          configuration: GSIButtonConfiguration(
+            theme: GSIButtonTheme.filledBlack,
+            text: GSIButtonText.continueWith,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget? buildWebWarningBanner() {
+    if (!kIsWeb) return null;
+
+    if (isSignedIn && isAuthorized) return null;
+
+    final String message;
+    final IconData icon;
+
+    if (!isSignedIn || !isAuthenticated) {
+      message =
+      'You are not signed in to your Google account. Sign in via the button in the top-right corner to sync bills from Gmail.';
+      icon = Icons.account_circle_outlined;
+    } else {
+      message =
+      'Gmail access has not been authorized. Tap "Authorize Gmail" in the top-right corner to allow the app to read your bill emails.';
+      icon = Icons.lock_outlined;
+    }
+
+    return MaterialBanner(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      leading: Icon(icon, color: Colors.orange.shade800),
+      backgroundColor: Colors.orange.shade50,
+      dividerColor: Colors.transparent,
+      content: Text(
+        message,
+        style: TextStyle(color: Colors.orange.shade900, fontSize: 13),
+      ),
+      actions: const [SizedBox.shrink()],
+    );
+  }
+
+  void showAuthorizationRequiredMessage(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Authorize Gmail access before syncing bills.'),
+      ),
+    );
   }
 }

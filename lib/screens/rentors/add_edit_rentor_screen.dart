@@ -42,7 +42,9 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
       _emailController.text = rentor.email ?? '';
       _phoneController.text = rentor.phone ?? '';
       _percentageController.text = rentor.defaultPercentage.toStringAsFixed(2);
-      _amountPaidController.text = rentor.amountPaid!.toStringAsFixed(2);
+      if (rentor.amountPaid != null) {
+        _amountPaidController.text = rentor.amountPaid!.toStringAsFixed(2);
+      }
       if (rentor.lastPaymentDate != null) {
         _lastPaymentDateController.text = rentor.lastPaymentDate!;
         _lastPaymentDate = DateFormat('yyyy-MM-dd').parse(rentor.lastPaymentDate!);

@@ -77,6 +77,14 @@ class AppConfig {
         'EMAIL_IMAP_SECURE',
         defaultValue: true,
       );
+
+  static DateTime get defaultEarliestDateTime => DateTime.now().subtract(const Duration(days: 60));
+  static String get earliestEmailDateEnv =>
+      const String.fromEnvironment('EMAIL_EARLIEST_DATE', defaultValue: '');
+  static DateTime get emailEarliestDate =>
+      _LocalSecrets.getDateTime('EMAIL_EARLIEST_DATE') ??
+          DateTime.tryParse(earliestEmailDateEnv) ??
+          defaultEarliestDateTime;
 }
 
 /// Loads optional local secrets from a JSON file that is NOT bundled
@@ -140,6 +148,18 @@ class _LocalSecrets {
       final lower = value.toLowerCase();
       if (lower == 'true') return true;
       if (lower == 'false') return false;
+    }
+    return null;
+  }
+
+  static DateTime? getDateTime(String key) {
+    final value = _data[key];
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (_) {
+        return null;
+      }
     }
     return null;
   }

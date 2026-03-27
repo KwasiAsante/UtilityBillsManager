@@ -41,8 +41,8 @@ class EmailDataHelper {
   final PaymentsHelper _paymentsHelper = PaymentsHelper();
   final RentorsHelper _rentorsHelper = RentorsHelper();
 
-  // #region CRUD Operations
-  // #region Email Data
+  // region CRUD Operations
+  // region Email Data
   // Create Email Data
   Future<Result<EmailData>> createEmailData(EmailData emailData) async {
     final dbHelper = this.dbHelper;
@@ -164,13 +164,13 @@ class EmailDataHelper {
       return Result.error(errorMessage: returnValue);
     }
   }
-  // #endregion
+  // endregion
+  // endregion
 
-  // #region Email
-
-  Future<Map<MimeMessage, EmailData>> fetchEmails(EmailType type, {int maxEmails = 100}) async {
+  // region Email
+  Future<Map<MimeMessage, EmailData>> fetchEmails(EmailType type, {int maxEmails = 50, DateTime? earliestEmailDate}) async {
     Map<MimeMessage, EmailData> finalMessages = {};
-    final messages = await emailService.fetchRecentEmails(type, maxEmails: maxEmails);
+    final messages = await emailService.fetchRecentEmails(type, maxEmails: maxEmails, earliestEmailDate: earliestEmailDate);
     for (MimeMessage message in messages) {
       if (kDebugMode) {
         print('From: ${message.from}');
@@ -202,8 +202,8 @@ class EmailDataHelper {
     return finalMessages;
   }
 
-  Future<void> fetchBillEmails({int maxEmails = 100}) async {
-    final messages = await fetchEmails(EmailType.bill, maxEmails: maxEmails);
+  Future<void> fetchBillEmails({int maxEmails = 50, DateTime? earliestEmailDate}) async {
+    final messages = await fetchEmails(EmailType.bill, maxEmails: maxEmails, earliestEmailDate: earliestEmailDate);
     if (messages.isNotEmpty) {
       for (MimeMessage message in messages.keys) {
         Bill? bill = messages[message]?.bill;
@@ -284,8 +284,8 @@ class EmailDataHelper {
     }
   }
 
-  Future<void> fetchPaymentEmails({int maxEmails = 100}) async {
-    final messages = await fetchEmails(EmailType.payment, maxEmails: maxEmails);
+  Future<void> fetchPaymentEmails({int maxEmails = 50, DateTime? earliestEmailDate}) async {
+    final messages = await fetchEmails(EmailType.payment, maxEmails: maxEmails, earliestEmailDate: earliestEmailDate);
     if (messages.isNotEmpty) {
       List<Rentor> rentors = [];
       final rentorListResult = await _rentorsHelper.readAllRentors();
@@ -371,7 +371,5 @@ class EmailDataHelper {
       }
     }
   }
-
-  // #endregion
-  // #endregion
+  // endregion
 }

@@ -242,6 +242,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
           final rentors = snapshot.data!;
           return ListView.builder(
             physics: AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.only(bottom: 80),
             itemCount: rentors.length,
             itemBuilder: (context, index) {
               final rentor = rentors[index];

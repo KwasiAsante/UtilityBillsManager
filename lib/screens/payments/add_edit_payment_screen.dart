@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/data/models/rentor.dart';
-import 'package:utility_bills_manager/data/models/result.dart';
-import 'package:utility_bills_manager/helpers/payments/payments_helper.dart';
-import 'package:utility_bills_manager/helpers/rentors/rentors_helper.dart';
 
 import '../../data/models/bill.dart';
+import '../../data/models/payment.dart';
+import '../../data/models/rentor.dart';
+import '../../data/models/result.dart';
 import '../../helpers/bills/bills_helper.dart';
+import '../../helpers/payments/payments_helper.dart';
+import '../../helpers/rentors/rentors_helper.dart';
+import '../../utils/constants.dart';
+import '../../utils/dialogs/due_date_filter_sheet.dart';
+import '../bills/add_edit_bill_screen.dart';
+import '../rentors/add_edit_rentor_screen.dart';
 
 class AddEditPaymentScreen extends StatefulWidget {
   final Payment? payment;
@@ -116,28 +120,29 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
       }
     }
 
-    if (context.mounted)  {
-      showDialog(
-          context: context,
-          builder: (context) => _RentorPickerDialog(
-            currentSelectedRentor: _selectedRentor,
-            allRentors: _allRentors,
-            rentorsHelper: _rentorsHelper,
-            onAdd: (Rentor? selectedRentor, List<Rentor> allRentors) {
-              setState(() {
-                _allRentors = allRentors;
-                _selectedRentor = selectedRentor;
-                if (_selectedRentor == null) {
-                  _clearRentorSelection();
-                }
-                else {
-                  _rentorController.text = selectedRentor?.name ?? '';
-                }
-              });
-            },
-          )
-      );
-    }
+    setState(() {
+      if (context.mounted)  {
+        showDialog(context: context,
+            builder: (context) => _RentorPickerDialog(
+              currentSelectedRentor: _selectedRentor,
+              allRentors: _allRentors,
+              rentorsHelper: _rentorsHelper,
+              onAdd: (Rentor? selectedRentor, List<Rentor> allRentors) {
+                setState(() {
+                  _allRentors = allRentors;
+                  _selectedRentor = selectedRentor;
+                  if (_selectedRentor == null) {
+                    _clearRentorSelection();
+                  }
+                  else {
+                    _rentorController.text = selectedRentor?.name ?? '';
+                  }
+                });
+              },
+            )
+        );
+      }
+    });
   }
   //endregion
 
@@ -261,6 +266,33 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
                     ),
                     const SizedBox(width: 8),
                     IconButton(
+                      onPressed: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddEditBillScreen(bill: bill),
+                          ),
+                        );
+                        if (result == true) {
+                          final updatedResult = await _billsHelper.readBill(bill.billId);
+                          if (updatedResult.isSuccess && updatedResult.data != null) {
+                            setState(() {
+                              final idx = _selectedBills.indexWhere((b) => b.billId == bill.billId);
+                              if (idx != -1) {
+                                _selectedBills[idx] = updatedResult.data!;
+                                final updatedBill = _selectedBills[idx];
+                                _billControllers[bill.billId]?.text =
+                                    '${updatedBill.type.name}: ${updatedBill.companyName} - ${updatedBill.dueDate}';
+                              }
+                            });
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.edit_outlined),
+                      tooltip: 'Edit bill',
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
                       onPressed: () => _removeBill(bill.billId),
                       icon: const Icon(Icons.close, color: Colors.red),
                       tooltip: 'Remove',
@@ -299,6 +331,8 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
 
     _selectedRentor = null;
     _allRentors = [];
+
+    ///TODO: Update the last payment date and amount paid for the rentor and the payment status of the bills
 
     if (mounted) {
       Navigator.pop(context, true);
@@ -343,12 +377,34 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (_selectedRentor != null)
+                      if (_selectedRentor != null) ...[
+                        IconButton(
+                          tooltip: 'Edit rentor',
+                          onPressed: () async {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AddEditRentorScreen(rentor: _selectedRentor),
+                              ),
+                            );
+                            if (result == true && _selectedRentor != null) {
+                              final updated = await _rentorsHelper.readRentors(_selectedRentor!.rentorId);
+                              if (updated.isSuccess) {
+                                setState(() {
+                                  _selectedRentor = updated.data;
+                                  _rentorController.text = _selectedRentor?.name ?? '';
+                                });
+                              }
+                            }
+                          },
+                          icon: const Icon(Icons.edit_outlined),
+                        ),
                         IconButton(
                           tooltip: 'De-assign rentor',
                           onPressed: _clearRentorSelection,
                           icon: const Icon(Icons.cancel_outlined),
                         ),
+                      ],
                       IconButton(
                         tooltip: 'Search rentors',
                         onPressed: _showRentorPickerDialog,
@@ -396,12 +452,40 @@ class _RentorPickerDialogState extends State<_RentorPickerDialog> {
   late RentorsHelper rentorsHelper;
   String searchQuery = '';
 
+  bool _loading = true;
+
   @override
   void initState() {
     super.initState();
     selectedRentor = widget.currentSelectedRentor;
     allRentors = widget.allRentors;
     rentorsHelper = widget.rentorsHelper;
+    if (allRentors.isEmpty) {
+      setState(() => _loading = true);
+
+      rentorsHelper.readAllRentors().then((result) {
+        String errorMessage = '';
+
+        setState(() {
+          if (!result.isSuccess) {
+            errorMessage = result.errorMessage ?? 'Failed to load rentors.';
+          }
+          else {
+            allRentors = result.data!;
+          }
+
+          if (allRentors.isEmpty && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(errorMessage.isEmpty ? 'No rentors available.' : errorMessage)),
+            );
+          }
+
+          _loading = false;
+        });
+      });
+    } else {
+      setState(() => _loading = false);
+    }
   }
 
   @override
@@ -470,15 +554,15 @@ class _RentorPickerDialogState extends State<_RentorPickerDialog> {
                       }
                     }
 
-                    if (allRentors.isEmpty && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(errorMessage.isEmpty ? 'No rentors available.' : errorMessage),
-                        ),
-                      );
-                    }
-
                     setState(() {
+                      if (allRentors.isEmpty && context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(errorMessage.isEmpty ? 'No rentors available.' : errorMessage),
+                          ),
+                        );
+                      }
+
                       searchQuery = '';
                     });
                   },
@@ -486,7 +570,9 @@ class _RentorPickerDialogState extends State<_RentorPickerDialog> {
                 ),
               ],
             ),
-            RadioGroup<Rentor>(
+            _loading
+                ? const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: CircularProgressIndicator())
+                : RadioGroup<Rentor>(
               groupValue: selectedFilteredRentor,
               onChanged: (rentor) {
                 setState(() {
@@ -509,7 +595,6 @@ class _RentorPickerDialogState extends State<_RentorPickerDialog> {
       actions: [
         TextButton(
           onPressed: () {
-            widget.onAdd(selectedRentor, allRentors);
             Navigator.pop(context);
           },
           child: const Text('Cancel'),
@@ -558,28 +643,19 @@ class _BillSelectionDialog extends StatefulWidget {
 }
 
 class _BillSelectionDialogState extends State<_BillSelectionDialog> {
-  static const List<String> _monthNames = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
-
   List<Bill> selectedBills = [];
   List<Bill> allBills = [];
+  List<Bill> filteredBills = [];
+  bool allFilteredSelected = false;
   late BillsHelper billsHelper;
 
   String searchQuery = '';
   int? _selectedDueYear;
   int? _selectedDueMonth;
+  DateTime? _dateRangeStart;
+  DateTime? _dateRangeEnd;
+
+  bool _loading = true;
 
   @override
   void initState() {
@@ -594,6 +670,35 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
                 widget.initialDueMonth! <= 12
             ? widget.initialDueMonth
             : null;
+
+    if (allBills.isEmpty) {
+      setState(() => _loading = true);
+
+      billsHelper.readAllBills().then((result) {
+        String errorMessage = '';
+
+        setState(() {
+          if (!result.isSuccess) {
+            errorMessage = result.errorMessage ?? 'Failed to load rentors.';
+          }
+          else {
+            allBills = result.data!;
+          }
+
+          if (allBills.isEmpty && context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(errorMessage.isEmpty ? 'No bills available.' : errorMessage)),
+            );
+          }
+
+          _updateDisplayedBills();
+          _loading = false;
+        });
+      });
+    } else {
+      _updateDisplayedBills();
+      setState(() => _loading = false);
+    }
   }
 
   @override
@@ -622,6 +727,35 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
     });
   }
 
+  void _updateDisplayedBills() {
+    filteredBills = allBills
+        .where((bill) {
+      final matchesSearch = searchQuery.isEmpty ||
+          bill.company.toLowerCase().contains(searchQuery.toLowerCase()) ||
+          bill.companyName.toLowerCase().contains(searchQuery.toLowerCase());
+      final dueDate = _parseDueDate(bill);
+      final matchesYear =
+          _selectedDueYear == null ||
+              (dueDate != null && dueDate.year == _selectedDueYear);
+      final matchesMonth =
+          _selectedDueMonth == null ||
+              (dueDate != null && dueDate.month == _selectedDueMonth);
+      final matchesDateRange =
+          (_dateRangeStart == null && _dateRangeEnd == null) ||
+              (dueDate != null &&
+                  (_dateRangeStart == null ||
+                      !dueDate.isBefore(_dateRangeStart!)) &&
+                  (_dateRangeEnd == null || !dueDate.isAfter(_dateRangeEnd!)));
+      return matchesSearch && matchesYear && matchesMonth && matchesDateRange;
+    })
+        .toList()
+      ..sort((a, b) => b.dueDate.compareTo(a.dueDate));
+
+    allFilteredSelected = filteredBills.isNotEmpty &&
+        filteredBills.every(
+                (bill) => selectedBills.any((selected) => selected.billId == bill.billId));
+  }
+
   DateTime? _parseDueDate(Bill bill) {
     return DateTime.tryParse(bill.dueDate);
   }
@@ -644,146 +778,54 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
   }
 
   bool get _hasActiveDueDateFilter =>
-      _selectedDueYear != null || _selectedDueMonth != null;
+      _selectedDueYear != null ||
+          _selectedDueMonth != null ||
+          _dateRangeStart != null ||
+          _dateRangeEnd != null;
 
   String _buildDueDateFilterTooltip() {
+    if (_dateRangeStart != null || _dateRangeEnd != null) {
+      final start =
+      _dateRangeStart != null
+          ? DueDateFilterSheet.formatDate(_dateRangeStart!)
+          : 'Any';
+      final end =
+      _dateRangeEnd != null
+          ? DueDateFilterSheet.formatDate(_dateRangeEnd!)
+          : 'Any';
+      return 'Date range: $start – $end';
+    }
     final yearLabel = _selectedDueYear?.toString() ?? 'All years';
     final monthLabel =
         _selectedDueMonth == null
             ? 'All months'
-            : _monthNames[_selectedDueMonth! - 1];
+            : AppConstants.monthNames[_selectedDueMonth! - 1];
     return 'Due date filter: $yearLabel, $monthLabel';
   }
 
   Future<void> _openDueDateFilterSheet() async {
-    int? tempYear = _selectedDueYear;
-    int? tempMonth = _selectedDueMonth;
-
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final availableYears = _getAvailableDueYears();
-            final safeYear =
-                tempYear != null && availableYears.contains(tempYear)
-                    ? tempYear
-                    : null;
-
-            return Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Due Date Filters',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int?>(
-                    initialValue: safeYear,
-                    decoration: const InputDecoration(labelText: 'Year'),
-                    items: [
-                      const DropdownMenuItem<int?>(
-                        value: null,
-                        child: Text('All years'),
-                      ),
-                      ...availableYears.map(
-                        (year) => DropdownMenuItem<int?>(
-                          value: year,
-                          child: Text(year.toString()),
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      setModalState(() {
-                        tempYear = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int?>(
-                    initialValue: tempMonth,
-                    decoration: const InputDecoration(labelText: 'Month'),
-                    items: [
-                      const DropdownMenuItem<int?>(
-                        value: null,
-                        child: Text('All months'),
-                      ),
-                      ...List.generate(
-                        12,
-                        (index) => DropdownMenuItem<int?>(
-                          value: index + 1,
-                          child: Text(_monthNames[index]),
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      setModalState(() {
-                        tempMonth = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () {
-                          setModalState(() {
-                            tempYear = null;
-                            tempMonth = null;
-                          });
-                        },
-                        child: const Text('Clear'),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          setState(() {
-                            _selectedDueYear = tempYear;
-                            _selectedDueMonth = tempMonth;
-                          });
-                        },
-                        child: const Text('Apply'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+    final result = await DueDateFilterSheet.show(
+      context,
+      availableYears: _getAvailableDueYears(),
+      current: DueDateFilterResult(
+        selectedYear: _selectedDueYear,
+        selectedMonth: _selectedDueMonth,
+        dateRangeStart: _dateRangeStart,
+        dateRangeEnd: _dateRangeEnd,
+      ),
     );
+    if (result == null) return;
+    setState(() {
+      _selectedDueYear = result.selectedYear;
+      _selectedDueMonth = result.selectedMonth;
+      _dateRangeStart = result.dateRangeStart;
+      _dateRangeEnd = result.dateRangeEnd;
+    });
+    _updateDisplayedBills();
   }
 
   @override
   Widget build(BuildContext context) {
-    final filteredBills = allBills
-        .where((bill) {
-          final matchesSearch = searchQuery.isEmpty ||
-              bill.company.toLowerCase().contains(searchQuery.toLowerCase()) ||
-              bill.companyName.toLowerCase().contains(searchQuery.toLowerCase());
-          final dueDate = _parseDueDate(bill);
-          final matchesYear =
-              _selectedDueYear == null ||
-              (dueDate != null && dueDate.year == _selectedDueYear);
-          final matchesMonth =
-              _selectedDueMonth == null ||
-              (dueDate != null && dueDate.month == _selectedDueMonth);
-          return matchesSearch && matchesYear && matchesMonth;
-        })
-        .toList()
-      ..sort((a, b) => b.dueDate.compareTo(a.dueDate));
-
-    final allFilteredSelected = filteredBills.isNotEmpty &&
-        filteredBills.every(
-            (bill) => selectedBills.any((selected) => selected.billId == bill.billId));
-
     return AlertDialog(
       title: const Text('Assign Bills'),
       content: SingleChildScrollView(
@@ -802,6 +844,7 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
                           setState(() {
                             searchQuery = '';
                           });
+                          _updateDisplayedBills();
                         },
                         icon: const Icon(Icons.clear),
                       ),
@@ -810,6 +853,7 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
                       setState(() {
                         searchQuery = value.toLowerCase().trim();
                       });
+                      _updateDisplayedBills();
                     },
                   ),
                 ),
@@ -840,7 +884,10 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
                       setState(() {
                         _selectedDueYear = null;
                         _selectedDueMonth = null;
+                        _dateRangeStart = null;
+                        _dateRangeEnd = null;
                       });
+                      _updateDisplayedBills();
                     },
                   ),
                 IconButton(
@@ -873,24 +920,25 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
                 ),
               ],
             ),
-            Column(
-              children: filteredBills.map((bill) {
-                final isSelected = selectedBills.any((selected) => selected.billId == bill.billId);
-                return CheckboxListTile(
-                  title: Text(bill.companyName),
-                  subtitle: Text('Type: ${bill.type.name}\nAmount: \$${bill.amount.toStringAsFixed(2)}\nDue Date: ${bill.dueDate}\nStatus: ${PaymentStatusExtension.getName(bill.status)}'),
-                  value: isSelected,
-                  onChanged: (value) {
-                    setState(() {
-                      if (value == true) {
-                        selectedBills.add(bill);
-                      } else {
-                        selectedBills.removeWhere((selected) => selected.billId == bill.billId);
-                      }
-                    });
-                  },
-                );
-              }).toList(),
+            _loading
+                ? const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: CircularProgressIndicator())
+                : Column(children: filteredBills.map((bill) {
+                  final isSelected = selectedBills.any((selected) => selected.billId == bill.billId);
+                  return CheckboxListTile(
+                    title: Text(bill.companyName),
+                    subtitle: Text('Type: ${bill.type.name}\nAmount: \$${bill.amount.toStringAsFixed(2)}\nDue Date: ${bill.dueDate}\nStatus: ${PaymentStatusExtension.getName(bill.status)}'),
+                    value: isSelected,
+                    onChanged: (value) {
+                      setState(() {
+                        if (value == true) {
+                          selectedBills.add(bill);
+                        } else {
+                          selectedBills.removeWhere((selected) => selected.billId == bill.billId);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
             ),
             const SizedBox(height: 20)
           ],
@@ -899,7 +947,6 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
       actions: [
         TextButton(
           onPressed: () {
-            widget.onAdd(selectedBills, allBills);
             Navigator.pop(context);
           },
           child: const Text('Cancel'),

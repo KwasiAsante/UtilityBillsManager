@@ -4,7 +4,9 @@ import 'package:enough_mail/enough_mail.dart';
 import 'package:flutter/foundation.dart';
 import 'package:googleapis/gmail/v1.dart' as gmail;
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:utility_bills_manager/services/email/google_account_service.dart';
+
 
 class EmailService {
   final String email;
@@ -21,9 +23,9 @@ class EmailService {
     this.isImapSecure = true,
   });
 
-  Future<List<MimeMessage>> fetchRecentEmails(EmailType type, {int maxEmails = 100}) async {
+  Future<List<MimeMessage>> fetchRecentEmails(EmailType type, {int maxEmails = 50, DateTime? earliestEmailDate}) async {
     if (kIsWeb) {
-      return _fetchRecentEmailsFromGmailWeb(type, maxEmails: maxEmails);
+      return _fetchRecentEmailsFromGmailWeb(type, maxEmails: maxEmails, earliestEmailDate: earliestEmailDate);
     }
 
     final client = ImapClient(isLogEnabled: false);
@@ -49,12 +51,49 @@ class EmailService {
 
       await client.selectMailbox(billsMailbox);
 
-      final fetchResult = await client.fetchRecentMessages(
-        messageCount: maxEmails,
-        criteria: 'BODY[]',
-      );
+      FetchImapResult? fetchResult;
 
-      return fetchResult.messages;
+      if (earliestEmailDate != null) {
+        try {
+          // Search for messages within date range using IMAP SEARCH
+          final now = DateTime.now();
+
+          final searchResult = await client.searchMessagesWithQuery(
+            SearchQueryBuilder.from(
+              '',
+              SearchQueryType.allTextHeaders,
+              since: earliestEmailDate,
+              before: now.add(const Duration(days: 1)), // BEFORE is exclusive in IMAP
+            ),
+          );
+
+          final matchingSequence = searchResult.matchingSequence;
+          if (matchingSequence != null && matchingSequence.isNotEmpty && !matchingSequence.isNil) {
+            // Get message IDs and limit to maxEmails (newest ones)
+            final allIds = matchingSequence.toList();
+            final startIdx = allIds.length > maxEmails ? allIds.length - maxEmails : 0;
+            final limitedIds = allIds.sublist(startIdx);
+
+            // Fetch the limited set of messages
+            fetchResult = await client.fetchMessages(
+              MessageSequence.fromIds(limitedIds),
+              'BODY[]',
+            );
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            print('SEARCH failed, falling back to fetchRecentMessages: $e');
+          }
+        }
+      }
+      else {
+        fetchResult = await client.fetchRecentMessages(
+          messageCount: maxEmails,
+          criteria: 'BODY[]',
+        );
+      }
+
+      return fetchResult?.messages ?? [];
     } catch (e) {
       if (kDebugMode) {
         print('Error fetching emails via IMAP: $e');
@@ -71,7 +110,7 @@ class EmailService {
     }
   }
 
-  Future<List<MimeMessage>> _fetchRecentEmailsFromGmailWeb(EmailType type, {int maxEmails = 100}) async {
+  Future<List<MimeMessage>> _fetchRecentEmailsFromGmailWeb(EmailType type, {int maxEmails = 50, DateTime? earliestEmailDate}) async {
     try {
       if (!GoogleAccountService().isInitialized ||
           !GoogleAccountService().isAuthenticated ||
@@ -112,10 +151,16 @@ class EmailService {
       final gmailApi = gmail.GmailApi(client);
 
       // Adjust Gmail search query as needed for your mailbox.
+      String query = 'label:${type.name}';
+      if (earliestEmailDate != null) {
+        var dateFormat = DateFormat('yyyy/MM/dd');
+        // Gmail: after:<older-date> before:<newer-date>
+        query += ' after:${dateFormat.format(earliestEmailDate)} before:${dateFormat.format(DateTime.now())}';
+      }
       final listResponse = await gmailApi.users.messages.list(
         'me',
         maxResults: maxEmails,
-        q: 'label:${type.name}',
+        q: query,
       );
 
       final messageRefs = listResponse.messages ?? const <gmail.Message>[];

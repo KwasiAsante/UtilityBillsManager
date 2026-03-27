@@ -2,16 +2,19 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:google_sign_in_web/google_sign_in_web.dart';
-import 'package:google_sign_in_web/web_only.dart' as web;
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/data/models/result.dart';
-import 'package:utility_bills_manager/helpers/email/email_data_helper.dart';
-import 'package:utility_bills_manager/screens/bills/add_edit_bill_screen.dart';
-import 'package:utility_bills_manager/helpers/bills/bills_helper.dart';
-import 'package:utility_bills_manager/services/email/google_account_service.dart';
 
+import '../../config/app_config.dart';
 import '../../data/models/bill.dart';
+import '../../data/models/payment.dart';
+import '../../data/models/result.dart';
+import '../../helpers/bills/bills_helper.dart';
+import '../../helpers/email/email_data_helper.dart';
+import '../../screens/base/google_sign_in_screen_state.dart';
+import '../../utils/constants.dart';
+import '../../utils/dialogs/due_date_filter_sheet.dart';
+import '../../utils/dialogs/sync_options_dialog.dart';
+
+import 'add_edit_bill_screen.dart';
 
 class BillListScreen extends StatefulWidget {
   const BillListScreen({super.key, required this.isVisible});
@@ -22,48 +25,55 @@ class BillListScreen extends StatefulWidget {
   State<BillListScreen> createState() => _BillListScreenState();
 }
 
-class _BillListScreenState extends State<BillListScreen> {
-  static const String _listenerKey = 'BillListScreen';
+class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
+  //region GoogleSignInScreenState contract
+  @override
+  String get googleListenerKey => 'BillListScreen';
 
-  static const List<String> _monthNames = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-  ];
+  @override
+  Future<void> onGoogleSignedIn({bool canSync = true}) async {
+    await _loadBills(
+      syncEmails: canSync,
+      earliestEmailDate: AppConfig.emailEarliestDate,
+    );
+  }
+
+  @override
+  void onWebGoogleNotInitialized() {
+    setState(() => _loading = false);
+  }
+  //endregion
 
   final BillsHelper _billsHelper = BillsHelper();
   final EmailDataHelper _emailDataHelper = EmailDataHelper();
   final ScrollController _scrollController = ScrollController();
+
   Future<List<Bill>>? _bills;
   List<Bill> _allBills = [];
   bool _loading = true;
-  bool _isSignedInListenerAttached = false;
   bool _isListScrollable = false;
   String _selectedFilter = 'All';
   String _selectedStort = 'Due Date (Latest)';
   int? _selectedDueYear;
   int? _selectedDueMonth;
+  DateTime? _dateRangeStart;
+  DateTime? _dateRangeEnd;
   String _searchQuery = '';
 
+  //region Lifecycle
   @override
   void initState() {
     super.initState();
     if (kIsWeb) {
-      _initGoogleSignInForWeb();
+      initGoogleSignInForWeb();
     } else {
-      _loadBills(syncEmails: true);
+      _loadBills(
+        syncEmails: true,
+        earliestEmailDate: AppConfig.emailEarliestDate,
+      );
     }
     if (widget.isVisible) {
-      _subscribeToSignedInEvents();
+      subscribeToSignedInEvents();
     }
     _scrollController.addListener(_checkScrollability);
   }
@@ -72,94 +82,90 @@ class _BillListScreenState extends State<BillListScreen> {
   void didUpdateWidget(covariant BillListScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!oldWidget.isVisible && widget.isVisible) {
-      _subscribeToSignedInEvents();
+      subscribeToSignedInEvents();
     } else if (oldWidget.isVisible && !widget.isVisible) {
-      _unsubscribeFromSignedInEvents();
+      unsubscribeFromSignedInEvents();
     }
   }
 
   @override
   void dispose() {
-    _unsubscribeFromSignedInEvents();
+    unsubscribeFromSignedInEvents();
     _scrollController.removeListener(_checkScrollability);
     _scrollController.dispose();
     super.dispose();
   }
+  //endregion
 
-  void _subscribeToSignedInEvents() {
-    if (_isSignedInListenerAttached && GoogleAccountService().isSubscribedToSignIn(_listenerKey)) return;
-    GoogleAccountService().onSignedIn(
-      _listenerKey,
-      () => _loadBills(syncEmails: true),
+  //region Bills
+  Future<void> _syncBills() async {
+    if (kIsWeb && !googleAccountService.isAuthorized) {
+      googleAccountService.showAuthorizationRequiredMessage(context);
+      return;
+    }
+
+    final options = await SyncOptionsDialog.show(context);
+    if (options == null) return;
+
+    await _loadBills(
+      syncEmails: true,
+      earliestEmailDate: options.earliestDate,
+      maxEmails: options.maxEmails,
     );
-    _isSignedInListenerAttached = true;
   }
 
-  void _unsubscribeFromSignedInEvents() {
-    if (!_isSignedInListenerAttached || !GoogleAccountService().isSubscribedToSignIn(_listenerKey)) return;
-    GoogleAccountService().offSignedIn(_listenerKey);
-    _isSignedInListenerAttached = false;
-  }
+  Future<void> _loadBills({
+    bool syncEmails = false,
+    DateTime? earliestEmailDate,
+    int maxEmails = 50,
+  }) async {
+    setState(() => _loading = true);
 
-  Future<void> _initGoogleSignInForWeb() async {
-    if (!kIsWeb) return;
-
-    if (!GoogleAccountService().isInitialized) {
-      _loading = false;
+    if (syncEmails && (!kIsWeb || googleAccountService.isAuthorized)) {
+      await _emailDataHelper.fetchBillEmails(
+        earliestEmailDate: earliestEmailDate,
+        maxEmails: maxEmails,
+      );
     }
 
-    if (GoogleAccountService().isAuthenticated &&
-        GoogleAccountService().isSignedIn) {
-      await _loadBills(syncEmails: true);
-    }
-  }
-
-  Future<void> _authorizeGoogleAccount() async {
-    await GoogleAccountService().authorize();
+    final Result<List<Bill>> result = await _billsHelper.readAllBills();
 
     if (!mounted) return;
 
-    if (GoogleAccountService().isAuthorized) {
-      await _loadBills(syncEmails: true);
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Gmail access authorized.')));
+    if (result.isSuccess) {
+      _allBills = result.data!;
+      _updateDisplayedBills();
     } else {
-      setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gmail authorization was not granted.')),
-      );
+      setState(() {
+        _bills = Future.error(result.errorMessage as Object);
+        _loading = false;
+      });
     }
-  }
-
-  void _showAuthorizationRequiredMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Authorize Gmail access before syncing bills.'),
-      ),
-    );
   }
 
   Future<void> _deleteAllBills() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete All Bills'),
-        content: const Text(
-          'Are you sure you want to delete all bills? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete All Bills'),
+            content: const Text(
+              'Are you sure you want to delete all bills? This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
@@ -168,212 +174,11 @@ class _BillListScreenState extends State<BillListScreen> {
       }
       if (mounted) {
         _loadBills();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('All bills deleted.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('All bills deleted.')));
       }
     }
-  }
-
-  void _checkScrollability() {
-    if (_scrollController.hasClients) {
-      final isScrollable = _scrollController.position.maxScrollExtent > 0;
-      if (isScrollable != _isListScrollable) {
-        setState(() {
-          _isListScrollable = isScrollable;
-        });
-      }
-    }
-  }
-
-  Future<void> _syncBills() async {
-    if (kIsWeb && !GoogleAccountService().isAuthorized) {
-      _showAuthorizationRequiredMessage();
-      return;
-    }
-
-    await _loadBills(syncEmails: true);
-  }
-
-  Widget _buildWebGoogleAction() {
-    final googleAccountService = GoogleAccountService();
-
-    if (googleAccountService.isSignedIn) {
-      if (googleAccountService.isAuthorized) {
-        return const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 8.0),
-          child: Tooltip(
-            message: 'Gmail access authorized',
-            child: Icon(Icons.mark_email_read),
-          ),
-        );
-      }
-
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-        child: SizedBox(
-          height: 36,
-          child: OutlinedButton.icon(
-            onPressed: _authorizeGoogleAccount,
-            icon: const Icon(Icons.lock_open),
-            label: const Text('Authorize Gmail'),
-          ),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-      child: SizedBox(
-        height: 36,
-        child: web.renderButton(
-          configuration: GSIButtonConfiguration(
-            theme: GSIButtonTheme.filledBlack,
-            text: GSIButtonText.continueWith,
-          ),
-        ),
-      ),
-    );
-  }
-
-  DateTime? _parseDueDate(Bill bill) {
-    return DateTime.tryParse(bill.dueDate);
-  }
-
-  List<int> _getAvailableDueYears() {
-    final years = <int>{};
-    for (final bill in _allBills) {
-      final dueDate = _parseDueDate(bill);
-      if (dueDate != null) {
-        years.add(dueDate.year);
-      }
-    }
-
-    if (years.isEmpty) {
-      years.add(DateTime.now().year);
-    }
-
-    final sortedYears = years.toList()..sort((a, b) => b.compareTo(a));
-    return sortedYears;
-  }
-
-  bool get _hasActiveDueDateFilter =>
-      _selectedDueYear != null || _selectedDueMonth != null;
-
-  String _buildDueDateFilterTooltip() {
-    final yearLabel = _selectedDueYear?.toString() ?? 'All years';
-    final monthLabel =
-        _selectedDueMonth == null
-            ? 'All months'
-            : _monthNames[_selectedDueMonth! - 1];
-    return 'Due date filter: $yearLabel, $monthLabel';
-  }
-
-  Future<void> _openDueDateFilterSheet() async {
-    int? tempYear = _selectedDueYear;
-    int? tempMonth = _selectedDueMonth;
-
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final availableYears = _getAvailableDueYears();
-            final safeYear =
-                tempYear != null && availableYears.contains(tempYear)
-                    ? tempYear
-                    : null;
-
-            return Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Due Date Filters',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int?>(
-                    initialValue: safeYear,
-                    decoration: const InputDecoration(labelText: 'Year'),
-                    items: [
-                      const DropdownMenuItem<int?>(
-                        value: null,
-                        child: Text('All years'),
-                      ),
-                      ...availableYears.map(
-                        (year) => DropdownMenuItem<int?>(
-                          value: year,
-                          child: Text(year.toString()),
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      setModalState(() {
-                        tempYear = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int?>(
-                    initialValue: tempMonth,
-                    decoration: const InputDecoration(labelText: 'Month'),
-                    items: [
-                      const DropdownMenuItem<int?>(
-                        value: null,
-                        child: Text('All months'),
-                      ),
-                      ...List.generate(
-                        12,
-                        (index) => DropdownMenuItem<int?>(
-                          value: index + 1,
-                          child: Text(_monthNames[index]),
-                        ),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      setModalState(() {
-                        tempMonth = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () {
-                          setModalState(() {
-                            tempYear = null;
-                            tempMonth = null;
-                          });
-                        },
-                        child: const Text('Clear'),
-                      ),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          setState(() {
-                            _selectedDueYear = tempYear;
-                            _selectedDueMonth = tempMonth;
-                          });
-                          _updateDisplayedBills();
-                        },
-                        child: const Text('Apply'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
   }
 
   void _updateDisplayedBills() {
@@ -386,14 +191,26 @@ class _BillListScreenState extends State<BillListScreen> {
           final matchesSearch =
               _searchQuery.isEmpty ||
               bill.company.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                  bill.companyName.toLowerCase().contains(_searchQuery.toLowerCase());
+              bill.companyName.toLowerCase().contains(
+                _searchQuery.toLowerCase(),
+              );
           final matchesYear =
               _selectedDueYear == null ||
               (dueDate != null && dueDate.year == _selectedDueYear);
           final matchesMonth =
               _selectedDueMonth == null ||
               (dueDate != null && dueDate.month == _selectedDueMonth);
-          return matchesFilter && matchesSearch && matchesYear && matchesMonth;
+          final matchesDateRange =
+              (_dateRangeStart == null && _dateRangeEnd == null) ||
+              (dueDate != null &&
+                  (_dateRangeStart == null ||
+                      !dueDate.isBefore(_dateRangeStart!)) &&
+                  (_dateRangeEnd == null || !dueDate.isAfter(_dateRangeEnd!)));
+          return matchesFilter &&
+              matchesSearch &&
+              matchesYear &&
+              matchesMonth &&
+              matchesDateRange;
         }).toList();
 
     switch (_selectedStort) {
@@ -416,30 +233,90 @@ class _BillListScreenState extends State<BillListScreen> {
       _loading = false;
     });
   }
+  //endregion
 
-  Future<void> _loadBills({bool syncEmails = false}) async {
-    setState(() {
-      _loading = true;
-    });
+  //region Date Filtering
+  DateTime? _parseDueDate(Bill bill) {
+    return DateTime.tryParse(bill.dueDate);
+  }
 
-    if (syncEmails && (!kIsWeb || GoogleAccountService().isAuthorized)) {
-      await _emailDataHelper.fetchBillEmails(maxEmails: 50);
+  List<int> _getAvailableDueYears() {
+    final years = <int>{};
+    for (final bill in _allBills) {
+      final dueDate = _parseDueDate(bill);
+      if (dueDate != null) {
+        years.add(dueDate.year);
+      }
     }
 
-    final Result<List<Bill>> result = await _billsHelper.readAllBills();
+    if (years.isEmpty) {
+      years.add(DateTime.now().year);
+    }
 
-    if (!mounted) return;
+    final sortedYears = years.toList()..sort((a, b) => b.compareTo(a));
+    return sortedYears;
+  }
 
-    if (result.isSuccess) {
-      _allBills = result.data!;
-      _updateDisplayedBills();
-    } else {
-      setState(() {
-        _bills = Future.error(result.errorMessage as Object);
-        _loading = false;
-      });
+  bool get _hasActiveDueDateFilter =>
+      _selectedDueYear != null ||
+          _selectedDueMonth != null ||
+          _dateRangeStart != null ||
+          _dateRangeEnd != null;
+
+  String _buildDueDateFilterTooltip() {
+    if (_dateRangeStart != null || _dateRangeEnd != null) {
+      final start =
+          _dateRangeStart != null
+              ? DueDateFilterSheet.formatDate(_dateRangeStart!)
+              : 'Any';
+      final end =
+          _dateRangeEnd != null
+              ? DueDateFilterSheet.formatDate(_dateRangeEnd!)
+              : 'Any';
+      return 'Date range: $start – $end';
+    }
+    final yearLabel = _selectedDueYear?.toString() ?? 'All years';
+    final monthLabel =
+        _selectedDueMonth == null
+            ? 'All months'
+            : AppConstants.monthNames[_selectedDueMonth! - 1];
+    return 'Due date filter: $yearLabel, $monthLabel';
+  }
+
+  Future<void> _openDueDateFilterSheet() async {
+    final result = await DueDateFilterSheet.show(
+      context,
+      availableYears: _getAvailableDueYears(),
+      current: DueDateFilterResult(
+        selectedYear: _selectedDueYear,
+        selectedMonth: _selectedDueMonth,
+        dateRangeStart: _dateRangeStart,
+        dateRangeEnd: _dateRangeEnd,
+      ),
+    );
+    if (result == null) return;
+    setState(() {
+      _selectedDueYear = result.selectedYear;
+      _selectedDueMonth = result.selectedMonth;
+      _dateRangeStart = result.dateRangeStart;
+      _dateRangeEnd = result.dateRangeEnd;
+    });
+    _updateDisplayedBills();
+  }
+  //endregion
+
+  //region Scroll
+  void _checkScrollability() {
+    if (_scrollController.hasClients) {
+      final isScrollable = _scrollController.position.maxScrollExtent > 0;
+      if (isScrollable != _isListScrollable) {
+        setState(() {
+          _isListScrollable = isScrollable;
+        });
+      }
     }
   }
+  //endregion
 
   @override
   Widget build(BuildContext context) {
@@ -471,7 +348,8 @@ class _BillListScreenState extends State<BillListScreen> {
           ),
         ),
         actions: [
-          if (kIsWeb) _buildWebGoogleAction(),
+          if (kIsWeb)
+            googleAccountService.buildWebGoogleAction(authorizeGoogleAccount),
           IconButton(
             tooltip: _buildDueDateFilterTooltip(),
             icon: Icon(
@@ -489,6 +367,8 @@ class _BillListScreenState extends State<BillListScreen> {
                 setState(() {
                   _selectedDueYear = null;
                   _selectedDueMonth = null;
+                  _dateRangeStart = null;
+                  _dateRangeEnd = null;
                 });
                 _updateDisplayedBills();
               },
@@ -560,94 +440,118 @@ class _BillListScreenState extends State<BillListScreen> {
           const SizedBox(width: 16),
         ],
       ),
-      body:
-          _loading
-              ? const Center(child: CircularProgressIndicator())
-              : FutureBuilder<List<Bill>>(
-                future: _bills,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    if (!kIsWeb ||
-                        (GoogleAccountService().isSignedIn &&
-                            GoogleAccountService().isAuthorized)) {
-                      return Center(child: Text('No bills found. Pull down or click on the Refresh button to sync with Gmail or click the + button to add a bill.'));
-                    } else {
-                      return Center(
-                        child: Text(
-                          'Please sign in to your Google account to view bills.',
-                        ),
-                      );
-                    }
-                  }
+      body: Column(
+        children: [
+          if (googleAccountService.buildWebWarningBanner() != null)
+            googleAccountService.buildWebWarningBanner()!,
+          Expanded(
+            child:
+                _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : FutureBuilder<List<Bill>>(
+                        future: _bills,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          } else if (snapshot.hasError) {
+                            return Center(
+                              child: Text('Error: ${snapshot.error}'),
+                            );
+                          } else if (!snapshot.hasData ||
+                              snapshot.data!.isEmpty) {
+                            if (!kIsWeb ||
+                                (googleAccountService.isSignedIn &&
+                                    googleAccountService.isAuthorized)) {
+                              return const Center(
+                                child: Text(
+                                  'No bills found. Pull down or click on the Refresh button to sync with Gmail or click the + button to add a bill.',
+                                ),
+                              );
+                            } else {
+                              return const Center(
+                                child: Text(
+                                  'Please sign in to your Google account to view bills.',
+                                ),
+                              );
+                            }
+                          }
 
-                  final bills = snapshot.data!;
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      await Future.delayed(Duration(seconds: 2));
-                      await _syncBills();
-                    },
-                    child: ScrollConfiguration(
-                      behavior: ScrollConfiguration.of(context).copyWith(
-                        dragDevices: {
-                          PointerDeviceKind.touch,
-                          PointerDeviceKind.mouse,
-                        },
-                      ),
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        itemCount: bills.length,
-                        itemBuilder: (context, index) {
-                          final bill = bills[index];
-                          return Card(
-                            margin: const EdgeInsets.all(8.0),
-                            child: ListTile(
-                              title: Text(bill.companyName),
-                              subtitle: Text(
-                                'Type: ${bill.type.name}\nAmount: \$${bill.amount.toStringAsFixed(2)}\nDue Date: ${bill.dueDate}\nStatus: ${PaymentStatusExtension.getName(bill.status)}',
-                              ),
-                              trailing: PopupMenuButton<String>(
-                                onSelected: (value) async {
-                                  if (value == 'edit') {
-                                    final result = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder:
-                                            (context) =>
-                                                AddEditBillScreen(bill: bill),
-                                      ),
-                                    );
-                                    if (result == true) {
-                                      _loadBills();
-                                    }
-                                  } else if (value == 'delete') {
-                                    await _billsHelper.deleteBill(bill.billId);
-                                    _loadBills();
-                                  }
+                          final bills = snapshot.data!;
+                          return RefreshIndicator(
+                            onRefresh: () async {
+                              await Future.delayed(const Duration(seconds: 2));
+                              await _syncBills();
+                            },
+                            child: ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(
+                                context,
+                              ).copyWith(
+                                dragDevices: {
+                                  PointerDeviceKind.touch,
+                                  PointerDeviceKind.mouse,
                                 },
-                                itemBuilder:
-                                    (context) => [
-                                      const PopupMenuItem(
-                                        value: 'edit',
-                                        child: Text('Edit'),
+                              ),
+                              child: ListView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.only(bottom: 80),
+                                itemCount: bills.length,
+                                itemBuilder: (context, index) {
+                                  final bill = bills[index];
+                                  return Card(
+                                    margin: const EdgeInsets.all(8.0),
+                                    child: ListTile(
+                                      title: Text(bill.companyName),
+                                      subtitle: Text(
+                                        'Type: ${bill.type.name}\nAmount: \$${bill.amount.toStringAsFixed(2)}\nDue Date: ${bill.dueDate}\nStatus: ${PaymentStatusExtension.getName(bill.status)}',
                                       ),
-                                      const PopupMenuItem(
-                                        value: 'delete',
-                                        child: Text('Delete'),
+                                      trailing: PopupMenuButton<String>(
+                                        onSelected: (value) async {
+                                          if (value == 'edit') {
+                                            final result = await Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder:
+                                                    (context) => AddEditBillScreen(
+                                                      bill: bill,
+                                                    ),
+                                              ),
+                                            );
+                                            if (result == true) {
+                                              _loadBills();
+                                            }
+                                          } else if (value == 'delete') {
+                                            await _billsHelper.deleteBill(
+                                              bill.billId,
+                                            );
+                                            _loadBills();
+                                          }
+                                        },
+                                        itemBuilder:
+                                            (context) => [
+                                              const PopupMenuItem(
+                                                value: 'edit',
+                                                child: Text('Edit'),
+                                              ),
+                                              const PopupMenuItem(
+                                                value: 'delete',
+                                                child: Text('Delete'),
+                                              ),
+                                            ],
                                       ),
-                                    ],
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                           );
                         },
                       ),
-                    ),
-                  );
-                },
-              ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final result = await Navigator.push(
