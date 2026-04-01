@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:utility_bills_manager/helpers/database/database_helper.dart';
 import 'package:utility_bills_manager/data/models/rentor.dart';
 import 'package:utility_bills_manager/data/models/result.dart';
 import 'package:utility_bills_manager/services/api/api_service.dart';
 import 'package:utility_bills_manager/data/models/app_state.dart';
+
+import '../../data/models/payment.dart';
 
 class RentorsHelper {
   static final RentorsHelper _instance = RentorsHelper._internal();
@@ -41,7 +44,7 @@ class RentorsHelper {
   }
 
   // Retrieve Rentor
-  Future<Result<Rentor?>> readRentors(String rentorId) async {
+  Future<Result<Rentor?>> readRentor(String rentorId) async {
     final dbHelper = this.dbHelper;
     try {
       Rentor? rentor;
@@ -113,6 +116,34 @@ class RentorsHelper {
       }
       else {
         return Result.error(errorMessage: returnValue);
+      }
+    }
+  }
+
+  Future<void> updateRentorPaymentInfo(Payment payment, {Rentor? rentor, String? rentorId}) async {
+    if (rentor == null && rentorId == null) {
+      return;
+    }
+
+    if (rentor == null) {
+      final readResult = await readRentor(rentorId!);
+      if (readResult.isSuccess) {
+        rentor = readResult.data!;
+      } else {
+        return;
+      }
+    }
+
+    rentor.updateLastPaymentDate(payments: [payment]);
+    final results = await updateRentor(rentor);
+    if (!results.isSuccess) {
+      if (kDebugMode) {
+        print("Error updating rentor payment info: ${results.errorMessage}");
+      }
+    }
+    else {
+      if (kDebugMode) {
+        print("Successfully updated rentor payment info for rentor ${rentor.id}");
       }
     }
   }

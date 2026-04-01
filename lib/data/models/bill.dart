@@ -8,7 +8,8 @@ class Bill {
   final double amount;
   final BillType type;
   final String dueDate;
-  final PaymentStatus status;
+  // TODO: Figure out a way to store the amount already paid for this bill, so that we can calculate the remaining amount for each rentor. Possibly add a new field "amountPaid" that gets updated whenever a payment is made towards this bill? Maybe move the amountPaid field from the Rentor model to the Bill model, since it's more directly related to the bill itself rather than the rentor?
+  PaymentStatus status;
   final String? notes;
 
   Bill({

@@ -49,7 +49,7 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
       _paymentDateController.text = payment.paymentDate?.toString() ?? '';
 
       if (payment.rentor == null && payment.rentorId != null) {
-        _rentorsHelper.readRentors(payment.rentorId!).then((result) {
+        _rentorsHelper.readRentor(payment.rentorId!).then((result) {
           if (result.isSuccess) {
             setState(() {
               _selectedRentor = result.data;
@@ -332,7 +332,13 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
     _selectedRentor = null;
     _allRentors = [];
 
-    ///TODO: Update the last payment date and amount paid for the rentor and the payment status of the bills
+    if ((payment.billIds != null && payment.billIds!.isNotEmpty) || (payment.bills != null && payment.bills!.isNotEmpty)) {
+      await _billsHelper.updatePaymentStatuses(payment, bills: payment.bills, billIds: payment.billIds, rentor: payment.rentor, rentorId: payment.rentorId);
+    }
+
+    if (payment.rentorId != null && payment.rentorId!.isNotEmpty || payment.rentor != null) {
+      await _rentorsHelper.updateRentorPaymentInfo(payment, rentorId: payment.rentorId, rentor: payment.rentor);
+    }
 
     if (mounted) {
       Navigator.pop(context, true);
@@ -388,7 +394,7 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
                               ),
                             );
                             if (result == true && _selectedRentor != null) {
-                              final updated = await _rentorsHelper.readRentors(_selectedRentor!.rentorId);
+                              final updated = await _rentorsHelper.readRentor(_selectedRentor!.rentorId);
                               if (updated.isSuccess) {
                                 setState(() {
                                   _selectedRentor = updated.data;

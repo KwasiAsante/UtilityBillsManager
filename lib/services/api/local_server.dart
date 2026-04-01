@@ -70,7 +70,10 @@ Future<void> startServer() async {
   // GET request to retrieve bills by status
   router.get('/bill/list/<status>', (Request request, String status) async {
     try {
-      final bills = await dbHelper.readBillsByStatus(status);
+      final query = request.requestedUri.queryParameters;
+      String ids = query['bill_ids'] ?? '';
+      List<String>? billIds = ids.isNotEmpty ? ids.split(',') : null;
+      final bills = await dbHelper.readBillsByStatus(status, ids: billIds);
       final billList = bills.map((e) => e).toList();
       return Response.ok(
         jsonEncode(billList),
@@ -318,7 +321,11 @@ Future<void> startServer() async {
         'bill': (query['bill'] ?? '').toLowerCase() == 'true',
         'rentor': (query['rentor'] ?? '').toLowerCase() == 'true',
       };
-      final paymentList = await dbHelper.readAllPayments(include: include);
+
+      String ids = query['payment_ids'] ?? '';
+      List<String>? paymentIds = ids.isNotEmpty ? ids.split(',') : null;
+
+      final paymentList = await dbHelper.readAllPayments(include: include, ids: paymentIds);
       return Response.ok(
         jsonEncode(paymentList),
         headers: {'Content-Type': 'application/json'},

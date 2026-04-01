@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:utility_bills_manager/data/models/result.dart';
 import 'package:utility_bills_manager/screens/rentors/add_edit_rentor_screen.dart';
@@ -14,8 +16,11 @@ class RentorListScreen extends StatefulWidget {
 
 class _RentorListScreenState extends State<RentorListScreen> {
   final RentorsHelper _rentorsHelper = RentorsHelper();
+  final ScrollController _scrollController = ScrollController();
+
   Future<List<Rentor>>? _rentors;
   bool _loading = true;
+  bool _isListScrollable = false;
   String _selectedStort = 'Percentage';
   String _searchQuery = '';
 
@@ -36,9 +41,18 @@ class _RentorListScreenState extends State<RentorListScreen> {
   void initState() {
     super.initState();
     _loadRentors();
+
+    _scrollController.addListener(_checkScrollability);
   }
 
-  void _loadRentors() async {
+  @override
+  void dispose() {
+    _scrollController.removeListener(_checkScrollability);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadRentors() async {
     List<Rentor> fetchedRentors = List.empty();
 
     Result<List<Rentor>> result = await _rentorsHelper.readAllRentors();
@@ -151,6 +165,19 @@ class _RentorListScreenState extends State<RentorListScreen> {
     }
   }
 
+  //region Scroll
+  void _checkScrollability() {
+    if (_scrollController.hasClients) {
+      final isScrollable = _scrollController.position.maxScrollExtent > 0;
+      if (isScrollable != _isListScrollable) {
+        setState(() {
+          _isListScrollable = isScrollable;
+        });
+      }
+    }
+  }
+  //endregion
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -191,11 +218,19 @@ class _RentorListScreenState extends State<RentorListScreen> {
                 _loadRentors();
               },
             ),
+          if (!_isListScrollable)
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () async {
+                await _loadRentors();
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.delete_sweep),
             tooltip: 'Delete all rentors',
             onPressed: _deleteAllRentors,
           ),
+          const SizedBox(width: 16),
           const SizedBox(width: 16),
           DropdownButton<String>(
             value: _selectedStort,
@@ -240,38 +275,50 @@ class _RentorListScreenState extends State<RentorListScreen> {
           }
 
           final rentors = snapshot.data!;
-          return ListView.builder(
-            physics: AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(bottom: 80),
-            itemCount: rentors.length,
-            itemBuilder: (context, index) {
-              final rentor = rentors[index];
-              return Card(
-                margin: const EdgeInsets.all(8.0),
-                child: ListTile(
-                  title: Text(rentor.name),
-                  subtitle: Text(
-                    'Percentage: \$${rentor.defaultPercentage}%\nAmount Paid: \$${rentor.amountPaid != null ? rentor.amountPaid!.toStringAsFixed(2) : "0"}\nLast Payment Date: ${rentor.lastPaymentDate != null ? rentor.lastPaymentDate! : "N/A"}',
-                  ),
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (value) async {
-                      if (value == 'edit') {
-                        final result = await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddEditRentorScreen(rentor: rentor),
-                          ),
-                        );
-                        if (result == true) {
-                          _loadRentors();
-                        }
-                      } else if (value == 'delete') {
-                        await _rentorsHelper.deleteRentor(rentor.rentorId);
-                        _loadRentors();
-                      }
-                    },
-                    itemBuilder:
-                        (context) => [
+          return RefreshIndicator(
+            onRefresh: () async {
+              await Future.delayed(Duration(seconds: 2));
+              await _loadRentors();
+            },
+            child: ScrollConfiguration(
+              behavior: ScrollConfiguration.of(context).copyWith(
+                dragDevices: {
+                  PointerDeviceKind.touch,
+                  PointerDeviceKind.mouse,
+                },
+              ),
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.only(bottom: 80),
+                itemCount: rentors.length,
+                itemBuilder: (context, index) {
+                  final rentor = rentors[index];
+                  return Card(
+                    margin: const EdgeInsets.all(8.0),
+                    child: ListTile(
+                      title: Text(rentor.name),
+                      subtitle: Text(
+                        'Percentage: \$${rentor.defaultPercentage}%\nAmount Paid: \$${rentor.amountPaid != null ? rentor.amountPaid!.toStringAsFixed(2) : "0"}\nLast Payment Date: ${rentor.lastPaymentDate != null ? rentor.lastPaymentDate! : "N/A"}',
+                      ),
+                      trailing: PopupMenuButton<String>(
+                        onSelected: (value) async {
+                          if (value == 'edit') {
+                            final result = await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => AddEditRentorScreen(rentor: rentor),
+                              ),
+                            );
+                            if (result == true) {
+                              _loadRentors();
+                            }
+                          } else if (value == 'delete') {
+                            await _rentorsHelper.deleteRentor(rentor.rentorId);
+                            _loadRentors();
+                          }
+                        },
+                        itemBuilder:
+                            (context) => [
                           const PopupMenuItem(
                             value: 'edit',
                             child: Text('Edit'),
@@ -281,10 +328,12 @@ class _RentorListScreenState extends State<RentorListScreen> {
                             child: Text('Delete'),
                           ),
                         ],
-                  ),
-                ),
-              );
-            },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           );
         },
       ),

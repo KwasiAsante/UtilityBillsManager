@@ -59,14 +59,14 @@ class PaymentsHelper {
   }
 
   // Retrieve all Payments
-  Future<Result<List<Payment>>> readAllPayments({Map<String, bool>? include}) async {
+  Future<Result<List<Payment>>> readAllPayments({Map<String, bool>? include, List<String>? paymentIds}) async {
     final dbHelper = this.dbHelper;
     try {
       List<Payment> payments;
       if (dbHelper != null) {
-        payments = await dbHelper.readAllPayments(include: include);
+        payments = await dbHelper.readAllPayments(include: include, ids: paymentIds);
       } else {
-        payments = await ApiService.payments().getAllPayments(include: include);
+        payments = await ApiService.payments().getAllPayments(include: include, ids: paymentIds);
       }
       return Result.success(data: payments);
     } on Exception catch (e) {

@@ -143,6 +143,18 @@ class Payment {
       paymentDate: map['p_paymentDate'],
     );
   }
+
+  DateTime? get paymentDateTime {
+    if (paymentDate != null) {
+      try {
+        return DateTime.parse(paymentDate!);
+      } catch (e) {
+        // Handle parsing error if needed
+        return null;
+      }
+    }
+    return null;
+  }
 }
 
 enum PaymentStatus {

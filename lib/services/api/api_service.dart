@@ -124,9 +124,14 @@ class BillsApiService {
     }
   }
 
-  Future<List<Bill>> getBillsByStatus(String status) async {
+  Future<List<Bill>> getBillsByStatus(String status, {List<String>? ids}) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/bill/list/$status'));
+      final queryParams = <String, String>{
+        if (ids != null)
+          'bill_ids': ids.join(','),
+      };
+      final uri = Uri.parse('$baseUrl/bill/list/$status').replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+      final response = await http.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -454,16 +459,19 @@ class PaymentsApiService {
     }
   }
 
-  Future<List<Payment>> getAllPayments({Map<String, bool>? include}) async {
+  Future<List<Payment>> getAllPayments({Map<String, bool>? include, List<String>? ids}) async {
     try {
-      final includeParams = <String, String>{
+      final queryParams = <String, String>{
         if (include != null)
           for (final entry in include.entries)
             if (entry.value) entry.key: 'true',
+
+        if (ids != null)
+          'payment_ids': ids.join(','),
       };
       final uri = Uri.parse(
         '$baseUrl/payment/list',
-      ).replace(queryParameters: includeParams.isEmpty ? null : includeParams);
+      ).replace(queryParameters: queryParams.isEmpty ? null : queryParams);
       final response = await http.get(uri);
 
       if (response.statusCode == 200) {

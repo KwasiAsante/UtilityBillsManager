@@ -1,8 +1,13 @@
+import 'package:flutter/foundation.dart';
+import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/helpers/database/database_helper.dart';
 import 'package:utility_bills_manager/data/models/bill.dart';
 import 'package:utility_bills_manager/data/models/result.dart';
 import 'package:utility_bills_manager/services/api/api_service.dart';
 import 'package:utility_bills_manager/data/models/app_state.dart';
+
+import '../../data/models/rentor.dart';
+import '../rentors/rentors_helper.dart';
 
 class BillsHelper {
   static final BillsHelper _instance = BillsHelper._internal();
@@ -72,15 +77,19 @@ class BillsHelper {
   }
 
   // Retrieve all Bills
-  Future<Result<List<Bill>>> readBillsByStatus(String status) async {
+  Future<Result<List<Bill>>> readBillsByStatus({String? status, PaymentStatus? paymentStatus, List<String>? billIds}) async {
     final dbHelper = this.dbHelper;
     try {
-      List<Bill> bills;
-      if (dbHelper != null) {
-        bills = await dbHelper.readBillsByStatus(status);
-      } else {
-        bills = await ApiService.bills().getBillsByStatus(status);
+      if (status == null && paymentStatus != null) {
+        status = paymentStatus.name.toLowerCase();
+      } else if (status == null && paymentStatus == null) {
+        return Result.error(errorMessage: "Either status or paymentStatus must be provided");
       }
+
+      List<Bill> bills = (dbHelper != null)
+          ? await dbHelper.readBillsByStatus(status!, ids: billIds)
+          : await ApiService.bills().getBillsByStatus(status!, ids: billIds);
+
       return Result.success(data: bills);
     } on Exception catch (e) {
       return Result.exception(exception: e);
@@ -144,6 +153,99 @@ class BillsHelper {
     }
   }
 
+  Future<void> updatePaymentStatuses(Payment payment, {List<Bill>? bills, List<String>? billIds, Rentor? rentor, String? rentorId}) async {
+    if (bills == null && billIds == null) {
+      return;
+    }
+
+    if (bills == null && billIds != null && billIds.isNotEmpty) {
+      final readResult = await readBillsByStatus(paymentStatus: PaymentStatus.unpaid, billIds: billIds);
+      if (readResult.isSuccess && readResult.data != null) {
+        bills = readResult.data!;
+      } else {
+        if (kDebugMode) {
+          print("Error reading bills for payment status update: ${readResult.errorMessage}");
+        }
+        return;
+      }
+    }
+
+    if (rentor == null && rentorId != null) {
+      final rentorResult = await RentorsHelper().readRentor(rentorId);
+      if (rentorResult.isSuccess && rentorResult.data != null) {
+        rentor = rentorResult.data!;
+      } else {
+        if (kDebugMode) {
+          print("Error reading rentor for payment status update: ${rentorResult.errorMessage}");
+        }
+        return;
+      }
+    }
+
+    if (bills != null) {
+      double remainingAmount = payment.amountPaid;
+      for (var bill in bills) {
+        double amount = await updateLastPaymentStatus(remainingAmount, bill: bill, rentor: rentor);
+        remainingAmount = amount;
+      }
+    }
+    else {
+      if (kDebugMode) {
+        print("No bills found for payment status update");
+      }
+      return;
+    }
+  }
+
+  Future<double> updateLastPaymentStatus(double amountPaid, {Bill? bill, Rentor? rentor}) async {
+    if (bill == null) {
+      if (kDebugMode) {
+        print("No bill provided for last payment status update");
+      }
+      return 0.0;
+    }
+
+    final PaymentStatus formerStatus = bill.status;
+
+    final billAmount = bill.amount;
+    double amountPaidTowardsBill = amountPaid;
+    if (rentor != null) {
+      final owedAmount = rentor.owedAmount(bill);
+      if (owedAmount <= 0) {
+        if (kDebugMode) {
+          print("Rentor ${rentor.rentorId} has no owed amount for bill ${bill.billId}, skipping payment status update");
+        }
+        return 0.0;
+      }
+
+      if (amountPaidTowardsBill > owedAmount) {
+        amountPaidTowardsBill = owedAmount;
+      }
+    }
+    final amountOwed = billAmount - amountPaidTowardsBill;
+    if (amountOwed <= 0) {
+      bill.status = PaymentStatus.paid;
+    } else if (amountOwed < billAmount) {
+      bill.status = PaymentStatus.partial;
+    } else {
+      bill.status = PaymentStatus.unpaid;
+    }
+
+    final result = await updateBill(bill);
+    if (result.isError) {
+      if (kDebugMode) {
+        print("Error updating bill ${bill.billId} status: ${result.errorMessage}");
+      }
+    }
+    else {
+      if (kDebugMode) {
+        print("Successfully updated bill ${bill.billId} status from ${formerStatus.name} to ${bill.status.name}");
+      }
+    }
+
+    amountPaid -= amountPaidTowardsBill;
+    return amountPaid;
+  }
   // #endregion
   // #endregion
 }

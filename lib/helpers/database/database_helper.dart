@@ -10,7 +10,7 @@ class DatabaseHelper {
   //region Initialization
   static const _databaseName = 'utility_manager.db';
 
-  static const _databaseVersion = 10;
+  static const _databaseVersion = 11;
 
   static final DatabaseHelper _instance = DatabaseHelper._internal();
 
@@ -100,7 +100,8 @@ class DatabaseHelper {
           email TEXT,
           phone TEXT,
           defaultPercentage REAL NOT NULL,
-          billPercentages TEXT
+          billPercentages TEXT,
+          lastPaymentDate TEXT
         )
       ''');
 
@@ -511,6 +512,10 @@ class DatabaseHelper {
         ''',
       );
     }
+
+    if (oldVersion < 11) {
+      await _ensureColumn(db, 'rentors', 'lastPaymentDate', 'TEXT');
+    }
   }
   //endregion
 
@@ -600,26 +605,26 @@ class DatabaseHelper {
     await db.execute(indexSql);
   }
 
-  /// Migrates a table and recreates multiple indexes
-  Future<void> _migrateTableWithIndexes(
-    Database db, {
-    required String oldTableName,
-    required String newTableName,
-    required String createTableSql,
-    required String insertSelectSql,
-    required List<String> indexSqls,
-  }) async {
-    await _migrateTable(
-      db,
-      oldTableName: oldTableName,
-      newTableName: newTableName,
-      createTableSql: createTableSql,
-      insertSelectSql: insertSelectSql,
-    );
-    for (final indexSql in indexSqls) {
-      await db.execute(indexSql);
-    }
-  }
+  // /// Migrates a table and recreates multiple indexes
+  // Future<void> _migrateTableWithIndexes(
+  //   Database db, {
+  //   required String oldTableName,
+  //   required String newTableName,
+  //   required String createTableSql,
+  //   required String insertSelectSql,
+  //   required List<String> indexSqls,
+  // }) async {
+  //   await _migrateTable(
+  //     db,
+  //     oldTableName: oldTableName,
+  //     newTableName: newTableName,
+  //     createTableSql: createTableSql,
+  //     insertSelectSql: insertSelectSql,
+  //   );
+  //   for (final indexSql in indexSqls) {
+  //     await db.execute(indexSql);
+  //   }
+  // }
 
   Future<void> _rebuildPaymentsTable(
     Database db, {
@@ -733,7 +738,7 @@ class DatabaseHelper {
       rows.map((r) => Map<String, Object?>.from(r)).toList();
 
   /// Builds a SQL query for payment with optional rentor include
-  String _buildPaymentQuery({required bool includeRentor}) {
+  String _buildPaymentQuery({required bool includeRentor, List<String>? ids}) {
     if (!includeRentor) {
       return "SELECT p.* FROM payments p";
     }
@@ -751,16 +756,18 @@ class DatabaseHelper {
       'r.phone AS r_phone',
       'r.defaultPercentage AS r_defaultPercentage',
       'r.billPercentages AS r_billPercentages',
+      'r.lastPaymentDate AS r_lastPaymentDate',
     ];
 
     return '''
       SELECT ${selects.join(', ')}
       FROM payments p
       LEFT JOIN rentors r ON r.rentorId = p.rentorId
+      ${ids != null && ids.isNotEmpty ? 'WHERE p.paymentId IN (${ids.map((_) => '?').join(', ')})' : ''}
     ''';
   }
 
-  /// Hyrates bill IDs into payment result from junction table
+  /// Hydrates bill IDs into payment result from junction table
   Future<void> _hydrateBillIds(
     Database db, {
     required String paymentId,
@@ -939,13 +946,15 @@ class DatabaseHelper {
   }
 
   // Retrieve all Bills
-  Future<List<Bill>> readBillsByStatus(String status) async {
+  Future<List<Bill>> readBillsByStatus(String status, {List<String>? ids}) async {
     final db = await database;
+    String placeholders = ids != null && ids.isNotEmpty ? ids.map((_) => '?').join(', ') : '';
     final result = await db.query(
       'bills',
-      where: 'status = ?',
-      whereArgs: [status.toLowerCase()],
+      where: placeholders.isEmpty ? 'status = ?' : 'status = ? AND billId IN ($placeholders)',
+      whereArgs: [status.toLowerCase(), ...(ids != null && ids.isNotEmpty ? ids : [])],
     );
+
     return result.map((map) => Bill.fromJson(map)).toList();
   }
 
@@ -1087,7 +1096,7 @@ class DatabaseHelper {
   }
 
   // Retrieve all Payments
-  Future<List<Payment>> readAllPayments({Map<String, bool>? include}) async {
+  Future<List<Payment>> readAllPayments({Map<String, bool>? include, List<String>? ids}) async {
     final db = await database;
     final includeBill = include?['bill'] == true;
     final includeRentor = include?['rentor'] == true;
@@ -1096,9 +1105,10 @@ class DatabaseHelper {
     Map<String, List<Map<String, dynamic>>> billsResult = {};
 
     if (!includeRentor) {
-      result = _toMutableRows(await db.query('payments'));
+      String placeholders = ids != null && ids.isNotEmpty ? ids.map((_) => '?').join(', ') : '';
+      result = _toMutableRows(placeholders.isEmpty ? await db.query('payments') : await db.query('payments', where: 'paymentId IN ($placeholders)', whereArgs: ids));
     } else {
-      final query = _buildPaymentQuery(includeRentor: true);
+      final query = _buildPaymentQuery(includeRentor: true, ids: ids);
       result = _toMutableRows(await db.rawQuery(query));
     }
 
