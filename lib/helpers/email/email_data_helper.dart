@@ -150,6 +150,21 @@ class EmailDataHelper {
     }
   }
 
+  // Delete Email Data by emailDataId
+  Future<Result<void>> deleteEmailData(String emailDataId) async {
+    final dbHelper = this.dbHelper;
+    if (dbHelper != null) {
+      await dbHelper.deleteEmailDataByEmailDataId(emailDataId);
+      return Result.success();
+    } else {
+      final returnValue = await ApiService.emails().deleteEmailData(emailDataId);
+      if (returnValue == "OK") {
+        return Result.success();
+      }
+      return Result.error(errorMessage: returnValue);
+    }
+  }
+
   // Delete all Email Data
   Future<Result<void>> deleteAllEmails() async {
     final dbHelper = this.dbHelper;

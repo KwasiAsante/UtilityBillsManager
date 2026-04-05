@@ -51,7 +51,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
       const RentorListScreen(),
       const SummaryScreen(),
       PaymentListScreen(isVisible: _selectedIndex == 3),
-      const EmailListScreen(),
+      EmailListScreen(isVisible: _selectedIndex == 4),
     ];
 
     return Scaffold(

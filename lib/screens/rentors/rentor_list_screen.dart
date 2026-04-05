@@ -255,6 +255,15 @@ class _RentorListScreenState extends State<RentorListScreen> {
                   return Card(
                     margin: const EdgeInsets.all(8.0),
                     child: ListTile(
+                      onTap: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                AddEditRentorScreen(rentor: rentor),
+                          ),
+                        );
+                      },
                       title: Text(rentor.name),
                       subtitle: Text(
                         'Percentage: \$${rentor.defaultPercentage}%\nLast Payment Date: ${rentor.lastPaymentDate != null ? rentor.lastPaymentDate! : "N/A"}',
@@ -280,6 +289,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
                           ),
                           const PopupMenuItem(
                             value: 'delete',
+                            textStyle: TextStyle(color: Colors.red),
                             child: Text('Delete'),
                           ),
                         ],

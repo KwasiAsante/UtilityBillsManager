@@ -509,6 +509,15 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                                   return Card(
                                     margin: const EdgeInsets.all(8.0),
                                     child: ListTile(
+                                      onTap: () async {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                AddEditBillScreen(bill: bill),
+                                          ),
+                                        );
+                                      },
                                       title: Text(bill.companyName),
                                       subtitle: Text(
                                         'Type: ${bill.type.name}\nAmount: \$${bill.amount.toStringAsFixed(2)}\nDue Date: ${bill.dueDate}\nStatus: ${PaymentStatusExtension.getName(bill.status)}',
@@ -539,6 +548,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                                               ),
                                               const PopupMenuItem(
                                                 value: 'delete',
+                                                textStyle: TextStyle(color: Colors.red),
                                                 child: Text('Delete'),
                                               ),
                                             ],

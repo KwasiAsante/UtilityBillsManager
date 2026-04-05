@@ -480,6 +480,15 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
                           return Card(
                             margin: const EdgeInsets.all(8.0),
                             child: ListTile(
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        AddEditPaymentScreen(payment: payment),
+                                  ),
+                                );
+                              },
                               title: Text(payment.bills == null || payment.bills!.isEmpty
                                   ? "${payment.rentorName} - Payment Date: ${payment.paymentDate}"
                                   : payment.billNames(newLine: true)),
@@ -511,6 +520,7 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
                                   ),
                                   const PopupMenuItem(
                                     value: 'delete',
+                                    textStyle: TextStyle(color: Colors.red),
                                     child: Text('Delete'),
                                   ),
                                 ],

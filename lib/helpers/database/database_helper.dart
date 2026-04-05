@@ -1383,10 +1383,16 @@ class DatabaseHelper {
     );
   }
 
-  // Delete a Email Data
+  // Delete Email Data by emailId
   Future<int> deleteEmailData(String id) async {
     final db = await database;
     return await db.delete('email_data', where: 'emailId = ?', whereArgs: [id]);
+  }
+
+  // Delete Email Data by emailDataId (UUID)
+  Future<int> deleteEmailDataByEmailDataId(String emailDataId) async {
+    final db = await database;
+    return await db.delete('email_data', where: 'emailDataId = ?', whereArgs: [emailDataId]);
   }
 
   Future<int> deleteAllEmailData() async {

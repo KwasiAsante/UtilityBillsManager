@@ -36,6 +36,12 @@ class EmailDataRepository extends ChangeNotifier {
     return result;
   }
 
+  Future<Result<void>> delete(String emailDataId) async {
+    final result = await _helper.deleteEmailData(emailDataId);
+    if (result.isSuccess) await reload();
+    return result;
+  }
+
   Future<Result<void>> deleteAll() async {
     final result = await _helper.deleteAllEmails();
     if (result.isSuccess) await reload();
