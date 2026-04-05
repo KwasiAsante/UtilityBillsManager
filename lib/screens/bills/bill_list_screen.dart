@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../../config/app_config.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
-import '../../data/models/result.dart';
+import '../../data/repositories/bills_repository.dart';
 import '../../helpers/bills/bills_helper.dart';
 import '../../helpers/email/email_data_helper.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
@@ -45,6 +45,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   //endregion
 
   final BillsHelper _billsHelper = BillsHelper();
+  final BillsRepository _billsRepository = BillsRepository();
   final EmailDataHelper _emailDataHelper = EmailDataHelper();
   final ScrollController _scrollController = ScrollController();
 
@@ -76,6 +77,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
       subscribeToSignedInEvents();
     }
     _scrollController.addListener(_checkScrollability);
+    _billsRepository.addListener(_onBillsUpdated);
   }
 
   @override
@@ -91,9 +93,23 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   @override
   void dispose() {
     unsubscribeFromSignedInEvents();
+    _billsRepository.removeListener(_onBillsUpdated);
     _scrollController.removeListener(_checkScrollability);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onBillsUpdated() {
+    if (!mounted) return;
+    if (_billsRepository.lastError != null) {
+      setState(() {
+        _bills = Future.error(_billsRepository.lastError!);
+        _loading = false;
+      });
+    } else {
+      _allBills = _billsRepository.bills;
+      _updateDisplayedBills();
+    }
   }
   //endregion
 
@@ -128,19 +144,9 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
       );
     }
 
-    final Result<List<Bill>> result = await _billsHelper.readAllBills();
-
     if (!mounted) return;
-
-    if (result.isSuccess) {
-      _allBills = result.data!;
-      _updateDisplayedBills();
-    } else {
-      setState(() {
-        _bills = Future.error(result.errorMessage as Object);
-        _loading = false;
-      });
-    }
+    await _billsRepository.reload();
+    // _onBillsUpdated() handles the rest via listener
   }
 
   Future<void> _deleteAllBills() async {
@@ -172,11 +178,12 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
       for (final bill in _allBills) {
         await _billsHelper.deleteBill(bill.billId);
       }
+
+      await _billsRepository.reload();
       if (mounted) {
-        _loadBills();
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('All bills deleted.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('All bills deleted.'))
+        );
       }
     }
   }
@@ -425,13 +432,12 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
               }
             },
           ),
-          if (!_isListScrollable)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () async {
-                await _syncBills();
-              },
-            ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              await _syncBills();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.delete_sweep),
             tooltip: 'Delete all bills',
@@ -510,7 +516,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                                       trailing: PopupMenuButton<String>(
                                         onSelected: (value) async {
                                           if (value == 'edit') {
-                                            final result = await Navigator.push(
+                                            await Navigator.push(
                                               context,
                                               MaterialPageRoute(
                                                 builder:
@@ -519,14 +525,10 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                                                     ),
                                               ),
                                             );
-                                            if (result == true) {
-                                              _loadBills();
-                                            }
                                           } else if (value == 'delete') {
-                                            await _billsHelper.deleteBill(
+                                            await _billsRepository.delete(
                                               bill.billId,
                                             );
-                                            _loadBills();
                                           }
                                         },
                                         itemBuilder:
@@ -554,13 +556,10 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          final result = await Navigator.push(
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const AddEditBillScreen()),
           );
-          if (result == true) {
-            _loadBills();
-          }
         },
         child: const Icon(Icons.add),
       ),

@@ -8,7 +8,7 @@ class Bill {
   final double amount;
   final BillType type;
   final String dueDate;
-  // TODO: Figure out a way to store the amount already paid for this bill, so that we can calculate the remaining amount for each rentor. Possibly add a new field "amountPaid" that gets updated whenever a payment is made towards this bill? Maybe move the amountPaid field from the Rentor model to the Bill model, since it's more directly related to the bill itself rather than the rentor?
+  double? amountPaid;
   PaymentStatus status;
   final String? notes;
 
@@ -21,6 +21,7 @@ class Bill {
     required this.dueDate,
     required this.status,
     required this.notes,
+    this.amountPaid,
   }) : billId = billId ?? Uuid().v4();
 
   factory Bill.fromJson(Map<String, dynamic> json) {
@@ -33,6 +34,7 @@ class Bill {
       dueDate: json['dueDate'],
       status: PaymentStatusExtension.fromString(json['status']),
       notes: json['notes'],
+      amountPaid: (json['amountPaid'] as num?)?.toDouble(),
     );
   }
 
@@ -56,6 +58,7 @@ class Bill {
       dueDate: map['b_dueDate'],
       status: paymentStatus,
       notes: map['b_notes'],
+      amountPaid: (map['b_amountPaid'] as num?)?.toDouble(),
     );
   }
 
@@ -69,6 +72,7 @@ class Bill {
       'dueDate': dueDate,
       'status': status.name.toLowerCase(),
       'notes': notes,
+      'amountPaid': amountPaid,
     };
   }
 

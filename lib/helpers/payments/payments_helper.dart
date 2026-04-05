@@ -6,6 +6,7 @@ import 'package:utility_bills_manager/data/models/app_state.dart';
 
 import '../../data/models/bill.dart';
 import '../../data/models/rentor.dart';
+import '../bills/bills_helper.dart';
 
 class PaymentsHelper {
   static final PaymentsHelper _instance = PaymentsHelper._internal();
@@ -187,16 +188,27 @@ class PaymentsHelper {
   // Delete Payment
   Future<Result<void>> deletePayment(String id) async {
     final dbHelper = this.dbHelper;
+
+    // Fetch the payment before deleting so we can reverse bill statuses.
+    final paymentResult = await readPayment(id, include: {'bill': true});
+    final payment = paymentResult.isSuccess ? paymentResult.data : null;
+
     if (dbHelper != null) {
-      final billsDeleted = await dbHelper.deletePayment(id);
-      if (billsDeleted > 0) {
+      final rowsDeleted = await dbHelper.deletePayment(id);
+      if (rowsDeleted > 0) {
+        if (payment != null && payment.billIds != null && payment.billIds!.isNotEmpty) {
+          await BillsHelper().reversePaymentStatusForBills(payment, payment.billIds!);
+        }
         return Result.success();
       } else {
-        return Result.error(errorMessage: "Error when deleting Bill $id");
+        return Result.error(errorMessage: "Error when deleting Payment $id");
       }
     } else {
       final returnValue = await ApiService.payments().deletePayment(id);
       if (returnValue == "OK") {
+        if (payment != null && payment.billIds != null && payment.billIds!.isNotEmpty) {
+          await BillsHelper().reversePaymentStatusForBills(payment, payment.billIds!);
+        }
         return Result.success();
       } else {
         return Result.error(errorMessage: returnValue);
@@ -207,24 +219,39 @@ class PaymentsHelper {
   // Delete all Payments
   Future<Result<void>> deleteAllPayments() async {
     final dbHelper = this.dbHelper;
+
+    // Fetch all payments before deleting so we can reverse bill statuses.
+    final allPaymentsResult = await readAllPayments(include: {'bill': true});
+    final allPayments = allPaymentsResult.isSuccess ? (allPaymentsResult.data ?? []) : <Payment>[];
+
     if (dbHelper != null) {
       await dbHelper.deleteAllPayments();
+      for (final payment in allPayments) {
+        if (payment.billIds != null && payment.billIds!.isNotEmpty) {
+          await BillsHelper().reversePaymentStatusForBills(payment, payment.billIds!);
+        }
+      }
       return Result.success();
     } else {
       try {
-        final paymentsApi = ApiService.payments();
-        final returnValue = await (paymentsApi as dynamic).deleteAllPayments()
-            as String;
+        final returnValue = await ApiService.payments().deleteAllPayments();
         if (returnValue == "OK") {
+          for (final payment in allPayments) {
+            if (payment.billIds != null && payment.billIds!.isNotEmpty) {
+              await BillsHelper().reversePaymentStatusForBills(payment, payment.billIds!);
+            }
+          }
           return Result.success();
         }
         return Result.error(errorMessage: returnValue);
       } on NoSuchMethodError {
         // Backward-compatible fallback for API variants without bulk delete.
-        final payments = await ApiService.payments().getAllPayments();
-        for (final payment in payments) {
-          if (payment.id != null) {
+        for (final payment in allPayments) {
+          if (payment.paymentId != null) {
             await ApiService.payments().deletePayment(payment.paymentId!);
+            if (payment.billIds != null && payment.billIds!.isNotEmpty) {
+              await BillsHelper().reversePaymentStatusForBills(payment, payment.billIds!);
+            }
           }
         }
         return Result.success();

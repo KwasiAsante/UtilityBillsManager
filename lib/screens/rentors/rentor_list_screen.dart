@@ -1,7 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:utility_bills_manager/data/models/result.dart';
+import 'package:utility_bills_manager/data/repositories/rentors_repository.dart';
 import 'package:utility_bills_manager/screens/rentors/add_edit_rentor_screen.dart';
 import 'package:utility_bills_manager/helpers/rentors/rentors_helper.dart';
 
@@ -16,9 +16,11 @@ class RentorListScreen extends StatefulWidget {
 
 class _RentorListScreenState extends State<RentorListScreen> {
   final RentorsHelper _rentorsHelper = RentorsHelper();
+  final RentorsRepository _rentorsRepository = RentorsRepository();
   final ScrollController _scrollController = ScrollController();
 
   Future<List<Rentor>>? _rentors;
+  List<Rentor> _allRentors = [];
   bool _loading = true;
   bool _isListScrollable = false;
   String _selectedStort = 'Percentage';
@@ -40,92 +42,54 @@ class _RentorListScreenState extends State<RentorListScreen> {
   @override
   void initState() {
     super.initState();
-    _loadRentors();
-
+    _rentorsRepository.addListener(_onRentorsUpdated);
+    _rentorsRepository.reload();
     _scrollController.addListener(_checkScrollability);
   }
 
   @override
   void dispose() {
+    _rentorsRepository.removeListener(_onRentorsUpdated);
     _scrollController.removeListener(_checkScrollability);
     _scrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadRentors() async {
-    List<Rentor> fetchedRentors = List.empty();
-
-    Result<List<Rentor>> result = await _rentorsHelper.readAllRentors();
-
-    if (result.isSuccess) {
-      fetchedRentors = result.data!;
-
-      if (_searchQuery.isNotEmpty) {
-        fetchedRentors =
-            fetchedRentors
-                .where(
-                  (rentor) => rentor.name.toLowerCase().contains(
-                    _searchQuery.toLowerCase(),
-                  ),
-                )
-                .toList();
-      }
-
+  void _onRentorsUpdated() {
+    if (!mounted) return;
+    if (_rentorsRepository.lastError != null) {
       setState(() {
-        switch (_selectedStort) {
-          case 'Percentage':
-            {
-              fetchedRentors.sort(
-                (a, b) => a.defaultPercentage.compareTo(b.defaultPercentage),
-              );
-              break;
-            }
-          case 'Amount Paid (Lowest)':
-            {
-              fetchedRentors.sort(
-                (a, b) => _compareNullable(a.amountPaid, b.amountPaid),
-              );
-              break;
-            }
-          case 'Amount Paid (Highest)':
-            {
-              fetchedRentors.sort(
-                (a, b) => _compareNullable(
-                  a.amountPaid,
-                  b.amountPaid,
-                  descending: true,
-                ),
-              );
-              break;
-            }
-          case 'Last Payment Date (Asc)':
-            {
-              fetchedRentors.sort(
-                (a, b) => _compareNullable(a.lastPaymentDate, b.lastPaymentDate),
-              );
-              break;
-            }
-          case 'Last Payment Date (Desc)':
-            {
-              fetchedRentors.sort(
-                (a, b) => _compareNullable(
-                  a.lastPaymentDate,
-                  b.lastPaymentDate,
-                  descending: true,
-                ),
-              );
-              break;
-            }
-        }
-
-        _rentors = Future.value(fetchedRentors);
+        _rentors = Future.error(_rentorsRepository.lastError!);
         _loading = false;
       });
+    } else {
+      _allRentors = _rentorsRepository.rentors;
+      _updateDisplayedRentors();
     }
-    else {
-      _rentors = Future.error(result.errorMessage as Object);
+  }
+
+  void _updateDisplayedRentors() {
+    var displayed = _allRentors.where((rentor) =>
+      _searchQuery.isEmpty ||
+      rentor.name.toLowerCase().contains(_searchQuery.toLowerCase())
+    ).toList();
+
+    switch (_selectedStort) {
+      case 'Percentage':
+        displayed.sort((a, b) => a.defaultPercentage.compareTo(b.defaultPercentage));
+        break;
+      case 'Last Payment Date (Asc)':
+        displayed.sort((a, b) => _compareNullable(a.lastPaymentDate, b.lastPaymentDate));
+        break;
+      case 'Last Payment Date (Desc)':
+        displayed.sort((a, b) => _compareNullable(a.lastPaymentDate, b.lastPaymentDate, descending: true));
+        break;
+    }
+
+    setState(() {
+      _rentors = Future.value(displayed);
       _loading = false;
-    }
+    });
   }
 
   Future<void> _deleteAllRentors() async {
@@ -150,14 +114,12 @@ class _RentorListScreenState extends State<RentorListScreen> {
     );
 
     if (confirmed == true) {
-      final result = await _rentorsHelper.readAllRentors();
-      if (result.isSuccess) {
-        for (final rentor in result.data!) {
-          await _rentorsHelper.deleteRentor(rentor.rentorId);
-        }
+      for (final rentor in _allRentors) {
+        await _rentorsHelper.deleteRentor(rentor.rentorId);
       }
+
+      await _rentorsRepository.reload();
       if (mounted) {
-        _loadRentors();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('All rentors deleted.')),
         );
@@ -202,7 +164,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
                 setState(() {
                   _searchQuery = query;
                 });
-                _loadRentors();
+                _updateDisplayedRentors();
               },
             ),
           ),
@@ -215,16 +177,15 @@ class _RentorListScreenState extends State<RentorListScreen> {
                 setState(() {
                   _searchQuery = '';
                 });
-                _loadRentors();
+                _updateDisplayedRentors();
               },
             ),
-          if (!_isListScrollable)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () async {
-                await _loadRentors();
-              },
-            ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              await _rentorsRepository.reload();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.delete_sweep),
             tooltip: 'Delete all rentors',
@@ -239,8 +200,6 @@ class _RentorListScreenState extends State<RentorListScreen> {
                   'Percentage',
                   'Amount Owed (Lowest)',
                   'Amount Owed (Highest)',
-                  'Amount Paid (Lowest)',
-                  'Amount Paid (Highest)',
                   'Last Payment Date (Asc)',
                   'Last Payment Date (Desc)',
                 ].map((String value) {
@@ -254,7 +213,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
                 setState(() {
                   _selectedStort = newValue;
                 });
-                _loadRentors();
+                _updateDisplayedRentors();
               }
             },
           ),
@@ -278,7 +237,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
           return RefreshIndicator(
             onRefresh: () async {
               await Future.delayed(Duration(seconds: 2));
-              await _loadRentors();
+              await _rentorsRepository.reload();
             },
             child: ScrollConfiguration(
               behavior: ScrollConfiguration.of(context).copyWith(
@@ -298,23 +257,19 @@ class _RentorListScreenState extends State<RentorListScreen> {
                     child: ListTile(
                       title: Text(rentor.name),
                       subtitle: Text(
-                        'Percentage: \$${rentor.defaultPercentage}%\nAmount Paid: \$${rentor.amountPaid != null ? rentor.amountPaid!.toStringAsFixed(2) : "0"}\nLast Payment Date: ${rentor.lastPaymentDate != null ? rentor.lastPaymentDate! : "N/A"}',
+                        'Percentage: \$${rentor.defaultPercentage}%\nLast Payment Date: ${rentor.lastPaymentDate != null ? rentor.lastPaymentDate! : "N/A"}',
                       ),
                       trailing: PopupMenuButton<String>(
                         onSelected: (value) async {
                           if (value == 'edit') {
-                            final result = await Navigator.push(
+                            await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => AddEditRentorScreen(rentor: rentor),
                               ),
                             );
-                            if (result == true) {
-                              _loadRentors();
-                            }
                           } else if (value == 'delete') {
-                            await _rentorsHelper.deleteRentor(rentor.rentorId);
-                            _loadRentors();
+                            await _rentorsRepository.delete(rentor.rentorId);
                           }
                         },
                         itemBuilder:
@@ -339,13 +294,10 @@ class _RentorListScreenState extends State<RentorListScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          final result = await Navigator.push(
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const AddEditRentorScreen()),
           );
-          if (result == true) {
-            _loadRentors();
-          }
         },
         child: const Icon(Icons.add),
       ),

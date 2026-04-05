@@ -14,7 +14,7 @@ class Rentor {
   final String? phone;
   final double defaultPercentage;
   final Map<BillType, double> billPercentages; // e.g., {'Electric': 0.1, 'Gas': 0.2}
-  double? amountPaid;
+  final List<BillType> excludedBillTypes;
   String? lastPaymentDate;
 
   Rentor({
@@ -25,9 +25,23 @@ class Rentor {
     this.phone,
     required this.defaultPercentage,
     required this.billPercentages,
-    this.amountPaid,
+    List<BillType>? excludedBillTypes,
     this.lastPaymentDate,
-  }) : rentorId = rentorId ?? Uuid().v4();
+  })  : rentorId = rentorId ?? Uuid().v4(),
+        excludedBillTypes = excludedBillTypes ?? const [];
+
+  static List<BillType> _parseExcludedBillTypes(dynamic raw) {
+    List<dynamic> list;
+    if (raw is String && raw.isNotEmpty) {
+      final decoded = jsonDecode(raw);
+      list = decoded is List ? decoded : [];
+    } else if (raw is List) {
+      list = raw;
+    } else {
+      return [];
+    }
+    return list.map((e) => BillTypeExtension.fromString(e.toString())).toList();
+  }
 
   factory Rentor.fromJson(Map<String, dynamic> json) {
     final rawBillPercentages = json['billPercentages'];
@@ -59,6 +73,7 @@ class Rentor {
       phone: json['phone'],
       defaultPercentage: (json['defaultPercentage'] ?? 0).toDouble(),
       billPercentages: parsedMap,
+      excludedBillTypes: _parseExcludedBillTypes(json['excludedBillTypes']),
       lastPaymentDate: json['lastPaymentDate'],
     );
   }
@@ -93,6 +108,7 @@ class Rentor {
       phone: map['r_phone'],
       defaultPercentage: (map['r_defaultPercentage'] ?? 0).toDouble(),
       billPercentages: parsedMap,
+      excludedBillTypes: _parseExcludedBillTypes(map['r_excludedBillTypes']),
       lastPaymentDate: map['r_lastPaymentDate'],
     );
   }
@@ -110,6 +126,7 @@ class Rentor {
       'phone': phone,
       'defaultPercentage': defaultPercentage,
       'billPercentages': encodedMap,
+      'excludedBillTypes': excludedBillTypes.map((t) => t.name.toLowerCase()).toList(),
       'lastPaymentDate': lastPaymentDate,
     };
   }
@@ -117,6 +134,7 @@ class Rentor {
   Map<String, dynamic> toDbJson() {
     final payload = Map<String, dynamic>.from(toJson());
     payload['billPercentages'] = jsonEncode(payload['billPercentages']);
+    payload['excludedBillTypes'] = jsonEncode(payload['excludedBillTypes']);
     return payload;
   }
 

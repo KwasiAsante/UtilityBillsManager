@@ -185,8 +185,24 @@ class BillsHelper {
     if (bills != null) {
       double remainingAmount = payment.amountPaid;
       for (var bill in bills) {
+        final dbHelper = this.dbHelper;
+        if (dbHelper != null) {
+          final appliedAmount = await dbHelper.getPaymentBillAppliedAmount(payment.paymentId!, bill.billId);
+          if (appliedAmount == null || appliedAmount <= 0) continue;
+
+          remainingAmount -= appliedAmount;
+        }
+      }
+
+      for (var bill in bills) {
+        final previousRemaining = remainingAmount;
         double amount = await updateLastPaymentStatus(remainingAmount, bill: bill, rentor: rentor);
         remainingAmount = amount;
+
+        if (payment.paymentId != null) {
+          final appliedAmount = previousRemaining - remainingAmount;
+          await _markPaymentBillApplied(payment.paymentId!, bill.billId, appliedAmount);
+        }
       }
     }
     else {
@@ -194,6 +210,61 @@ class BillsHelper {
         print("No bills found for payment status update");
       }
       return;
+    }
+  }
+
+  Future<void> _markPaymentBillApplied(String paymentId, String billId, double appliedAmount) async {
+    final dbHelper = this.dbHelper;
+    if (dbHelper != null) {
+      await dbHelper.markPaymentBillApplied(paymentId, billId, appliedAmount);
+    }
+  }
+
+  Future<void> reversePaymentStatusForBills(Payment payment, List<String> billIds) async {
+    if (payment.paymentId == null || billIds.isEmpty) return;
+
+    final dbHelper = this.dbHelper;
+    if (dbHelper == null) return;
+
+    for (final billId in billIds) {
+      final appliedAmount = await dbHelper.getPaymentBillAppliedAmount(payment.paymentId!, billId);
+      if (appliedAmount == null || appliedAmount <= 0) continue;
+
+      final billResult = await readBill(billId);
+      if (!billResult.isSuccess || billResult.data == null) continue;
+
+      final bill = billResult.data!;
+      double newAmountPaid = (bill.amountPaid ?? 0.0) - appliedAmount;
+      if (newAmountPaid < 0) newAmountPaid = 0.0;
+      bill.amountPaid = newAmountPaid;
+
+      final amountOwed = bill.amount - newAmountPaid;
+      final amountLeft =  (bill.amount * (bill.type == BillType.internet ? 0.5 : 0.3));
+      if (amountOwed <= 0 || amountOwed.toInt() <= amountLeft.toInt()) {
+        if (kDebugMode) {
+          print("Bill ${bill.billId} is now fully paid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
+        }
+        bill.status = PaymentStatus.paid;
+      } else if (newAmountPaid > 0) {
+        if (kDebugMode) {
+          print("Bill ${bill.billId} is now partially paid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
+        }
+        bill.status = PaymentStatus.partial;
+      } else {
+        if (kDebugMode) {
+          print("Bill ${bill.billId} is now unpaid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
+        }
+        bill.status = PaymentStatus.unpaid;
+      }
+
+      final result = await updateBill(bill);
+      if (kDebugMode) {
+        if (result.isError) {
+          print("Error reversing payment for bill ${bill.billId}: ${result.errorMessage}");
+        } else {
+          print("Reversed payment ${payment.paymentId} from bill ${bill.billId}: -$appliedAmount, new status: ${bill.status.name}");
+        }
+      }
     }
   }
 
@@ -208,6 +279,7 @@ class BillsHelper {
     final PaymentStatus formerStatus = bill.status;
 
     final billAmount = bill.amount;
+    double billAmountPaid = bill.amountPaid ?? 0.0;
     double amountPaidTowardsBill = amountPaid;
     if (rentor != null) {
       final owedAmount = rentor.owedAmount(bill);
@@ -218,16 +290,29 @@ class BillsHelper {
         return 0.0;
       }
 
-      if (amountPaidTowardsBill > owedAmount) {
+      // if (amountPaidTowardsBill > owedAmount) {
         amountPaidTowardsBill = owedAmount;
-      }
+      // }
     }
-    final amountOwed = billAmount - amountPaidTowardsBill;
-    if (amountOwed <= 0) {
+    billAmountPaid += amountPaidTowardsBill;
+    bill.amountPaid = billAmountPaid;
+
+    final amountOwed = billAmount - billAmountPaid;
+    final amountLeft =  (billAmount * (bill.type == BillType.internet ? 0.5 : 0.3));
+    if (amountOwed <= 0 || amountOwed.toInt() <= amountLeft.toInt()) {
+      if (kDebugMode) {
+        print("Bill ${bill.billId} is now fully paid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
+      }
       bill.status = PaymentStatus.paid;
-    } else if (amountOwed < billAmount) {
+    } else if (billAmountPaid > 0) {
+      if (kDebugMode) {
+        print("Bill ${bill.billId} is now partially paid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
+      }
       bill.status = PaymentStatus.partial;
     } else {
+      if (kDebugMode) {
+        print("Bill ${bill.billId} remains unpaid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
+      }
       bill.status = PaymentStatus.unpaid;
     }
 

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../config/app_config.dart';
 import '../../data/models/payment.dart';
-import '../../data/models/result.dart';
+import '../../data/repositories/payments_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
 import '../../helpers/payments/payments_helper.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
@@ -50,6 +50,7 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
   // ---------------------------------------------------------------------------
 
   final PaymentsHelper _paymentsHelper = PaymentsHelper();
+  final PaymentsRepository _paymentsRepository = PaymentsRepository();
   final EmailDataHelper _emailDataHelper = EmailDataHelper();
   final ScrollController _scrollController = ScrollController();
 
@@ -80,6 +81,7 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
     }
 
     _scrollController.addListener(_checkScrollability);
+    _paymentsRepository.addListener(_onPaymentsUpdated);
   }
 
   @override
@@ -95,9 +97,23 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
   @override
   void dispose() {
     unsubscribeFromSignedInEvents();
+    _paymentsRepository.removeListener(_onPaymentsUpdated);
     _scrollController.removeListener(_checkScrollability);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onPaymentsUpdated() {
+    if (!mounted) return;
+    if (_paymentsRepository.lastError != null) {
+      setState(() {
+        _payments = Future.error(_paymentsRepository.lastError!);
+        _loading = false;
+      });
+    } else {
+      _allPayments = _paymentsRepository.payments;
+      _updateDisplayedPayments();
+    }
   }
   //endregion
 
@@ -134,19 +150,9 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
       );
     }
 
-    final Result<List<Payment>> result = await _paymentsHelper.readAllPayments(include: { 'bill': true, 'rentor': true });
-
     if (!mounted) return;
-
-    if (result.isSuccess) {
-      _allPayments = result.data!;
-      _updateDisplayedPayments();
-    } else {
-      setState(() {
-        _payments = Future.error(result.errorMessage as Object);
-        _loading = false;
-      });
-    }
+    await _paymentsRepository.reload();
+    // _onPaymentsUpdated() handles the rest via listener
   }
   
   Future<void> _deleteAllPayments() async {
@@ -180,16 +186,9 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
         }
         return;
       }
-      else {
-        if (mounted) {
-          setState(() {
-            _payments = Future.value([]);
-            _allPayments = [];
-          });
-        }
-      }
+
+      await _paymentsRepository.reload();
       if (mounted) {
-        _loadPayments();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('All payments deleted.')),
         );
@@ -416,13 +415,12 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
               }
             },
           ),
-          if (!_isListScrollable)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () async {
-                await _syncPayments();
-              },
-            ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              await _syncPayments();
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.delete_sweep),
             tooltip: 'Delete all payments',
@@ -493,7 +491,7 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
                               trailing: PopupMenuButton<String>(
                                 onSelected: (value) async {
                                   if (value == 'edit') {
-                                    final result = await Navigator.push(
+                                    await Navigator.push(
                                       context,
                                       MaterialPageRoute(
                                         builder:
@@ -501,12 +499,8 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
                                             AddEditPaymentScreen(payment: payment),
                                       ),
                                     );
-                                    if (result == true) {
-                                      _loadPayments();
-                                    }
                                   } else if (value == 'delete') {
-                                    await _paymentsHelper.deletePayment(payment.paymentId!);
-                                    _loadPayments();
+                                    await _paymentsRepository.delete(payment.paymentId!);
                                   }
                                 },
                                 itemBuilder:
@@ -534,13 +528,10 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          final result = await Navigator.push(
+          await Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const AddEditPaymentScreen()),
           );
-          if (result == true) {
-            _loadPayments();
-          }
         },
         child: const Icon(Icons.add),
       ),

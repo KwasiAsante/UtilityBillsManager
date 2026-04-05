@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:utility_bills_manager/data/models/bill.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/helpers/bills/bills_helper.dart';
+import 'package:utility_bills_manager/data/repositories/bills_repository.dart';
 
 class AddEditBillScreen extends StatefulWidget {
   final Bill? bill;
@@ -20,8 +20,9 @@ class _AddEditBillScreenState extends State<AddEditBillScreen> {
   final _amountController = TextEditingController();
   final _dueDateController = TextEditingController();
   final _notesController = TextEditingController();
+  final _amountPaidController = TextEditingController();
 
-  final BillsHelper _billsHelper = BillsHelper();
+  final BillsRepository _billsRepository = BillsRepository();
 
   late BillType _selectedType; // Track selected bill type
 
@@ -37,6 +38,9 @@ class _AddEditBillScreenState extends State<AddEditBillScreen> {
       _dueDateController.text = widget.bill!.dueDate;
       _selectedStatus = widget.bill!.status;
       _notesController.text = widget.bill!.notes ?? '';
+      if (widget.bill!.amountPaid != null) {
+        _amountPaidController.text = widget.bill!.amountPaid!.toStringAsFixed(2);
+      }
     } else {
       _selectedType = BillType.other; // Default value
       _selectedStatus = PaymentStatus.unknown; // Default value
@@ -50,18 +54,20 @@ class _AddEditBillScreenState extends State<AddEditBillScreen> {
 
     final bill = Bill(
       id: widget.bill?.id,
+      billId: widget.bill?.billId,
       company: _companyController.text,
       type: _selectedType,
       amount: double.parse(_amountController.text),
       dueDate: _dueDateController.text,
       status: _selectedStatus,
       notes: _notesController.text,
+      amountPaid: widget.bill?.amountPaid,
     );
 
     if (widget.bill == null) {
-      await _billsHelper.createBill(bill);
+      await _billsRepository.create(bill);
     } else {
-      await _billsHelper.updateBill(bill);
+      await _billsRepository.update(bill);
     }
 
     if (mounted) {
@@ -75,6 +81,7 @@ class _AddEditBillScreenState extends State<AddEditBillScreen> {
     _amountController.dispose();
     _dueDateController.dispose();
     _notesController.dispose();
+    _amountPaidController.dispose();
     super.dispose();
   }
 
@@ -153,6 +160,11 @@ class _AddEditBillScreenState extends State<AddEditBillScreen> {
                     }
                   },
                 ),
+              TextFormField(
+                controller: _amountPaidController,
+                enabled: false,
+                decoration: const InputDecoration(labelText: 'Amount Paid \$'),
+              ),
               TextFormField(
                 controller: _notesController,
                 decoration: const InputDecoration(

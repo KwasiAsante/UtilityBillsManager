@@ -10,7 +10,7 @@ class DatabaseHelper {
   //region Initialization
   static const _databaseName = 'utility_manager.db';
 
-  static const _databaseVersion = 11;
+  static const _databaseVersion = 14;
 
   static final DatabaseHelper _instance = DatabaseHelper._internal();
 
@@ -84,7 +84,8 @@ class DatabaseHelper {
           amount REAL NOT NULL,
           dueDate TEXT NOT NULL,
           status TEXT NOT NULL,
-          notes TEXT
+          notes TEXT,
+          amountPaid REAL
         )
       ''');
 
@@ -101,6 +102,7 @@ class DatabaseHelper {
           phone TEXT,
           defaultPercentage REAL NOT NULL,
           billPercentages TEXT,
+          excludedBillTypes TEXT,
           lastPaymentDate TEXT
         )
       ''');
@@ -130,6 +132,8 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         paymentId TEXT NOT NULL,
         billId TEXT NOT NULL,
+        applied INTEGER NOT NULL DEFAULT 0,
+        appliedAmount REAL,
         FOREIGN KEY (paymentId) REFERENCES payments (paymentId) ON DELETE CASCADE,
         FOREIGN KEY (billId) REFERENCES bills (billId) ON DELETE CASCADE,
         UNIQUE (paymentId, billId)
@@ -428,6 +432,8 @@ class DatabaseHelper {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           paymentId TEXT NOT NULL,
           billId TEXT NOT NULL,
+          applied INTEGER NOT NULL DEFAULT 0,
+          appliedAmount REAL,
           FOREIGN KEY (paymentId) REFERENCES payments (paymentId) ON DELETE CASCADE,
           FOREIGN KEY (billId) REFERENCES bills (billId) ON DELETE CASCADE,
           UNIQUE (paymentId, billId)
@@ -515,6 +521,19 @@ class DatabaseHelper {
 
     if (oldVersion < 11) {
       await _ensureColumn(db, 'rentors', 'lastPaymentDate', 'TEXT');
+    }
+
+    if (oldVersion < 12) {
+      await _ensureColumn(db, 'bills', 'amountPaid', 'REAL');
+    }
+
+    if (oldVersion < 13) {
+      await _ensureColumn(db, 'payment_bills', 'applied', 'INTEGER NOT NULL DEFAULT 0');
+      await _ensureColumn(db, 'payment_bills', 'appliedAmount', 'REAL');
+    }
+
+    if (oldVersion < 14) {
+      await _ensureColumn(db, 'rentors', 'excludedBillTypes', 'TEXT');
     }
   }
   //endregion
@@ -756,6 +775,7 @@ class DatabaseHelper {
       'r.phone AS r_phone',
       'r.defaultPercentage AS r_defaultPercentage',
       'r.billPercentages AS r_billPercentages',
+      'r.excludedBillTypes AS r_excludedBillTypes',
       'r.lastPaymentDate AS r_lastPaymentDate',
     ];
 
@@ -890,6 +910,7 @@ class DatabaseHelper {
         'b.dueDate AS b_dueDate',
         'b.status AS b_status',
         'b.notes AS b_notes',
+        'b.amountPaid AS b_amountPaid',
       ]);
       joins.add('LEFT JOIN bills b ON b.billId = e.billId');
     }
@@ -1077,7 +1098,8 @@ class DatabaseHelper {
                b.amount AS b_amount,
                b.dueDate AS b_dueDate,
                b.status AS b_status,
-               b.notes AS b_notes
+               b.notes AS b_notes,
+               b.amountPaid AS b_amountPaid
         FROM payment_bills pb
         JOIN bills b ON b.billId = pb.billId
         WHERE pb.paymentId = ?
@@ -1133,7 +1155,8 @@ class DatabaseHelper {
                  b.amount AS b_amount,
                  b.dueDate AS b_dueDate,
                  b.status AS b_status,
-                 b.notes AS b_notes
+                 b.notes AS b_notes,
+                 b.amountPaid AS b_amountPaid
           FROM payment_bills pb
           JOIN bills b ON b.billId = pb.billId
           WHERE pb.paymentId IN ($placeholders)
@@ -1172,14 +1195,34 @@ class DatabaseHelper {
       whereArgs: [payment.paymentId!],
     );
 
-    // Update junction table: remove old entries and add new ones
-    await db.delete(
+    // Incremental diff on payment_bills: preserve existing rows (and their applied state),
+    // remove only bills that were unassigned, add only newly assigned bills.
+    final existingRows = await db.query(
       'payment_bills',
+      columns: ['billId'],
       where: 'paymentId = ?',
       whereArgs: [payment.paymentId],
     );
+    final existingBillIds = existingRows.map((r) => r['billId'] as String).toSet();
+    final newBillIds = (payment.billIds ?? []).toSet();
 
-    await _insertPaymentBillIds(db, paymentId: payment.paymentId!, billIds: payment.billIds);
+    final toRemove = existingBillIds.difference(newBillIds);
+    for (final billId in toRemove) {
+      await db.delete(
+        'payment_bills',
+        where: 'paymentId = ? AND billId = ?',
+        whereArgs: [payment.paymentId, billId],
+      );
+    }
+
+    final toAdd = newBillIds.difference(existingBillIds);
+    for (final billId in toAdd) {
+      await db.insert(
+        'payment_bills',
+        {'paymentId': payment.paymentId, 'billId': billId, 'applied': 0},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
 
     return result;
   }
@@ -1193,6 +1236,28 @@ class DatabaseHelper {
   Future<int> deleteAllPayments() async {
     final db = await database;
     return await db.delete('payments');
+  }
+
+  Future<void> markPaymentBillApplied(String paymentId, String billId, double appliedAmount) async {
+    final db = await database;
+    await db.update(
+      'payment_bills',
+      {'applied': 1, 'appliedAmount': appliedAmount},
+      where: 'paymentId = ? AND billId = ?',
+      whereArgs: [paymentId, billId],
+    );
+  }
+
+  Future<double?> getPaymentBillAppliedAmount(String paymentId, String billId) async {
+    final db = await database;
+    final result = await db.query(
+      'payment_bills',
+      columns: ['appliedAmount'],
+      where: 'paymentId = ? AND billId = ? AND applied = 1',
+      whereArgs: [paymentId, billId],
+    );
+    if (result.isEmpty) return null;
+    return (result.first['appliedAmount'] as num?)?.toDouble();
   }
   //endregionZ
 

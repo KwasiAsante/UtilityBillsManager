@@ -4,6 +4,9 @@ import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
 import '../../data/models/result.dart';
+import '../../data/repositories/bills_repository.dart';
+import '../../data/repositories/payments_repository.dart';
+import '../../data/repositories/rentors_repository.dart';
 import '../../helpers/bills/bills_helper.dart';
 import '../../helpers/payments/payments_helper.dart';
 import '../../helpers/rentors/rentors_helper.dart';
@@ -23,7 +26,8 @@ class AddEditPaymentScreen extends StatefulWidget {
   }
 }
 
-class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
+class _AddEditPaymentScreenState extends
+State<AddEditPaymentScreen> {
   final _formKey = GlobalKey<FormState>();
   final _amountPaidController = TextEditingController();
   final _paymentDateController = TextEditingController();
@@ -195,6 +199,7 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
         currentSelectedBills: _selectedBills,
         allBills: _allBills,
         billsHelper: _billsHelper,
+        excludedBillTypes: _selectedRentor?.excludedBillTypes,
         initialDueYear: paymentDate?.year,
         initialDueMonth: paymentDate?.month,
         onAdd: (selectedBills, allBills) {
@@ -267,26 +272,26 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
                     const SizedBox(width: 8),
                     IconButton(
                       onPressed: () async {
-                        final result = await Navigator.push(
+                        final _ = await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => AddEditBillScreen(bill: bill),
                           ),
                         );
-                        if (result == true) {
-                          final updatedResult = await _billsHelper.readBill(bill.billId);
-                          if (updatedResult.isSuccess && updatedResult.data != null) {
-                            setState(() {
-                              final idx = _selectedBills.indexWhere((b) => b.billId == bill.billId);
-                              if (idx != -1) {
-                                _selectedBills[idx] = updatedResult.data!;
-                                final updatedBill = _selectedBills[idx];
-                                _billControllers[bill.billId]?.text =
-                                    '${updatedBill.type.name}: ${updatedBill.companyName} - ${updatedBill.dueDate}';
-                              }
-                            });
+                        // BillsRepository.update() was called inside AddEditBillScreen,
+                        // so the repository already has fresh data by the time we return here.
+                        final updatedBill = BillsRepository().bills.firstWhere(
+                          (b) => b.billId == bill.billId,
+                          orElse: () => bill,
+                        );
+                        setState(() {
+                          final idx = _selectedBills.indexWhere((b) => b.billId == bill.billId);
+                          if (idx != -1) {
+                            _selectedBills[idx] = updatedBill;
+                            _billControllers[bill.billId]?.text =
+                                '${updatedBill.type.name}: ${updatedBill.companyName} - ${updatedBill.dueDate}';
                           }
-                        }
+                        });
                       },
                       icon: const Icon(Icons.edit_outlined),
                       tooltip: 'Edit bill',
@@ -323,6 +328,16 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
       bills: _selectedBills
     );
 
+    final oldBillIds = Set<String>.from(widget.payment?.billIds ?? []);
+    final newBillIds = Set<String>.from(_selectedBills.map((b) => b.billId));
+    final addedBillIds = newBillIds.difference(oldBillIds).toList();
+    final removedBillIds = oldBillIds.difference(newBillIds).toList();
+
+    // Reverse removed bills before saving (payment_bills rows must still exist to read appliedAmount)
+    if (removedBillIds.isNotEmpty && widget.payment != null) {
+      await _billsHelper.reversePaymentStatusForBills(widget.payment!, removedBillIds);
+    }
+
     if (widget.payment == null) {
       await _paymentsHelper.createPayment(payment);
     } else {
@@ -332,13 +347,21 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
     _selectedRentor = null;
     _allRentors = [];
 
-    if ((payment.billIds != null && payment.billIds!.isNotEmpty) || (payment.bills != null && payment.bills!.isNotEmpty)) {
-      await _billsHelper.updatePaymentStatuses(payment, bills: payment.bills, billIds: payment.billIds, rentor: payment.rentor, rentorId: payment.rentorId);
+    // Apply only newly added bills
+    if (addedBillIds.isNotEmpty) {
+      final addedBills = _selectedBills.where((b) => addedBillIds.contains(b.billId)).toList();
+      await _billsHelper.updatePaymentStatuses(payment, bills: addedBills, rentor: payment.rentor, rentorId: payment.rentorId);
+      await BillsRepository().reload();
+    } else if (removedBillIds.isNotEmpty) {
+      await BillsRepository().reload();
     }
 
     if (payment.rentorId != null && payment.rentorId!.isNotEmpty || payment.rentor != null) {
       await _rentorsHelper.updateRentorPaymentInfo(payment, rentorId: payment.rentorId, rentor: payment.rentor);
+      await RentorsRepository().reload();
     }
+
+    await PaymentsRepository().reload();
 
     if (mounted) {
       Navigator.pop(context, true);
@@ -387,20 +410,22 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
                         IconButton(
                           tooltip: 'Edit rentor',
                           onPressed: () async {
-                            final result = await Navigator.push(
+                            final _ = await Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => AddEditRentorScreen(rentor: _selectedRentor),
                               ),
                             );
-                            if (result == true && _selectedRentor != null) {
-                              final updated = await _rentorsHelper.readRentor(_selectedRentor!.rentorId);
-                              if (updated.isSuccess) {
-                                setState(() {
-                                  _selectedRentor = updated.data;
-                                  _rentorController.text = _selectedRentor?.name ?? '';
-                                });
-                              }
+                            // RentorsRepository was updated by AddEditRentorScreen
+                            if (_selectedRentor != null) {
+                              final updatedRentor = RentorsRepository().rentors.firstWhere(
+                                (r) => r.rentorId == _selectedRentor!.rentorId,
+                                orElse: () => _selectedRentor!,
+                              );
+                              setState(() {
+                                _selectedRentor = updatedRentor;
+                                _rentorController.text = _selectedRentor?.name ?? '';
+                              });
                             }
                           },
                           icon: const Icon(Icons.edit_outlined),
@@ -631,6 +656,7 @@ class _BillSelectionDialog extends StatefulWidget {
   final List<Bill> currentSelectedBills;
   final List<Bill> allBills;
   final BillsHelper billsHelper;
+  final List<BillType>? excludedBillTypes;
   final int? initialDueYear;
   final int? initialDueMonth;
   final Function(List<Bill> selectedBill, List<Bill> allBills) onAdd;
@@ -639,6 +665,7 @@ class _BillSelectionDialog extends StatefulWidget {
     required this.currentSelectedBills,
     required this.allBills,
     required this.billsHelper,
+    this.excludedBillTypes,
     this.initialDueYear,
     this.initialDueMonth,
     required this.onAdd,
@@ -736,6 +763,8 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
   void _updateDisplayedBills() {
     filteredBills = allBills
         .where((bill) {
+      final excluded = widget.excludedBillTypes?.contains(bill.type) ?? false;
+      if (excluded) return false;
       final matchesSearch = searchQuery.isEmpty ||
           bill.company.toLowerCase().contains(searchQuery.toLowerCase()) ||
           bill.companyName.toLowerCase().contains(searchQuery.toLowerCase());
@@ -926,6 +955,22 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
                 ),
               ],
             ),
+            if (widget.excludedBillTypes != null && widget.excludedBillTypes!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline, size: 16, color: Colors.orange),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Excluded: ${widget.excludedBillTypes!.map((t) => t.name).join(', ')}',
+                        style: const TextStyle(fontSize: 12, color: Colors.orange),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             _loading
                 ? const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: CircularProgressIndicator())
                 : Column(children: filteredBills.map((bill) {

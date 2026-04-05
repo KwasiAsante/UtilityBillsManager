@@ -3,8 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:utility_bills_manager/data/models/bill.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/data/models/rentor.dart';
+import 'package:utility_bills_manager/data/repositories/rentors_repository.dart';
 import 'package:utility_bills_manager/helpers/bills/bills_helper.dart';
-import 'package:utility_bills_manager/helpers/rentors/rentors_helper.dart';
 
 class AddEditRentorScreen extends StatefulWidget {
   final Rentor? rentor;
@@ -23,15 +23,15 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _percentageController = TextEditingController();
-  final _amountPaidController = TextEditingController();
   final _lastPaymentDateController = TextEditingController();
   final Map<BillType, TextEditingController> _billPercentageControllers = {};
 
-  final RentorsHelper _rentorsHelper = RentorsHelper();
+  final RentorsRepository _rentorsRepository = RentorsRepository();
   final BillsHelper _billsHelper = BillsHelper();
 
   DateTime? _lastPaymentDate;
   late List<BillType> _selectedBillTypes;
+  late List<BillType> _excludedBillTypes;
 
   @override
   void initState() {
@@ -42,9 +42,6 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
       _emailController.text = rentor.email ?? '';
       _phoneController.text = rentor.phone ?? '';
       _percentageController.text = rentor.defaultPercentage.toStringAsFixed(2);
-      if (rentor.amountPaid != null) {
-        _amountPaidController.text = rentor.amountPaid!.toStringAsFixed(2);
-      }
       if (rentor.lastPaymentDate != null) {
         _lastPaymentDateController.text = rentor.lastPaymentDate!;
         _lastPaymentDate = DateFormat('yyyy-MM-dd').parse(rentor.lastPaymentDate!);
@@ -57,8 +54,10 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
           text: rentor.billPercentages[type]!.toStringAsFixed(2),
         );
       }
+      _excludedBillTypes = List<BillType>.from(rentor.excludedBillTypes);
     } else {
       _selectedBillTypes = [];
+      _excludedBillTypes = [];
     }
   }
 
@@ -68,7 +67,6 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     _percentageController.dispose();
-    _amountPaidController.dispose();
     _lastPaymentDateController.dispose();
     for (var controller in _billPercentageControllers.values) {
       controller.dispose();
@@ -100,7 +98,9 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
   if (!result.isSuccess) return 0.0;
 
   final allBills = result.data!;
-  final unpaidBills = allBills.where((bill) => bill.status != PaymentStatus.paid);
+  final unpaidBills = allBills.where((bill) =>
+      bill.status != PaymentStatus.paid &&
+      !widget.rentor!.excludedBillTypes.contains(bill.type));
 
   double totalOwed = 0.0;
 
@@ -215,6 +215,39 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     );
   }
 
+  Widget _buildExclusionListSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 20),
+        const Text('Excluded Bill Types', style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        const Text(
+          'Payments for this rentor cannot be applied to bills of these types.',
+          style: TextStyle(color: Colors.grey, fontSize: 12),
+        ),
+        const SizedBox(height: 8),
+        ...BillType.values.map((type) {
+          final isExcluded = _excludedBillTypes.contains(type);
+          return CheckboxListTile(
+            dense: true,
+            title: Text(type.name),
+            value: isExcluded,
+            onChanged: (value) {
+              setState(() {
+                if (value == true) {
+                  _excludedBillTypes.add(type);
+                } else {
+                  _excludedBillTypes.remove(type);
+                }
+              });
+            },
+          );
+        }),
+      ],
+    );
+  }
+
   Future<void> _saveRentor() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -231,19 +264,20 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
 
     final rentor = Rentor(
       id: widget.rentor?.id,
+      rentorId: widget.rentor?.rentorId,
       name: _nameController.text,
       email: _emailController.text.isNotEmpty ? _emailController.text : null,
       phone: _phoneController.text.isNotEmpty ? _phoneController.text : null,
       defaultPercentage: double.parse(_percentageController.text),
-      amountPaid: double.tryParse(_amountPaidController.text) ?? 0.0,
       lastPaymentDate: _lastPaymentDate != null ? DateFormat('yyyy-MM-dd').format(_lastPaymentDate!) : null,
       billPercentages: billPercentages,
+      excludedBillTypes: _excludedBillTypes,
     );
 
     if (widget.rentor == null) {
-      await _rentorsHelper.createRentor(rentor);
+      await _rentorsRepository.create(rentor);
     } else {
-      await _rentorsHelper.updateRentor(rentor);
+      await _rentorsRepository.update(rentor);
     }
 
     if (mounted) {
@@ -292,6 +326,7 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
                         validator: (value) => value!.isEmpty ? 'Enter percentage' : null,
                       ),
                       _buildBillTypeFields(),
+                      _buildExclusionListSection(),
                       const SizedBox(height: 20),
                       FutureBuilder<double>(
                         future: _calculateAmountOwed(),
@@ -305,11 +340,6 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
                             ),
                           );
                         },
-                      ),
-                      TextFormField(
-                        controller: _amountPaidController,
-                        enabled: false,
-                        decoration: const InputDecoration(labelText: 'Amount Paid \$'),
                       ),
                       GestureDetector(
                         onTap: _pickDate,
