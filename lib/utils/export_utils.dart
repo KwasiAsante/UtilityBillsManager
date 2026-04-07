@@ -1,8 +1,7 @@
-import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
@@ -89,7 +88,6 @@ class ExportUtils {
   ) async {
     final grouped = _groupByMonth(bills);
     final index = _buildIndex(payments);
-    final dir = await getTemporaryDirectory();
     final List<XFile> files = [];
 
     for (final entry in grouped.entries) {
@@ -138,9 +136,11 @@ class ExportUtils {
       buffer.writeln(_csv(_thresholdNote));
 
       final safeName = month.replaceAll(' ', '_');
-      final file = File('${dir.path}/bills_$safeName.csv');
-      await file.writeAsString(buffer.toString());
-      files.add(XFile(file.path, mimeType: 'text/csv'));
+      files.add(XFile.fromData(
+        utf8.encode(buffer.toString()),
+        name: 'bills_$safeName.csv',
+        mimeType: 'text/csv',
+      ));
     }
 
     if (files.isNotEmpty) {
@@ -300,11 +300,8 @@ class ExportUtils {
       );
     }
 
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/bills_export.pdf');
-    await file.writeAsBytes(await doc.save());
     await Share.shareXFiles(
-      [XFile(file.path, mimeType: 'application/pdf')],
+      [XFile.fromData(await doc.save(), name: 'bills_export.pdf', mimeType: 'application/pdf')],
       subject: 'Bills Export',
     );
   }
