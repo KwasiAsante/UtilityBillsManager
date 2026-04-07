@@ -16,11 +16,12 @@ class BillsParser {
         subject.contains('Your Freedom Mobile bill is ready') ||
         subject.contains('Your Bell bill is ready') ||
         subject.contains('Payment received on your credit account') ||
-        subject.contains('Your credit account: Payment due in')) {
+        subject.contains('Your credit account: Payment due in') ||
+        sender.contains('info@neofinancial.com')) {
       return null;
     }
 
-    if (sender.contains('freedom')) {
+    if (sender.contains('neofinancial')) {
       if (kDebugMode) {
         print('breakpoint');
       }

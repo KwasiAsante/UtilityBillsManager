@@ -52,6 +52,7 @@ dependencies:
   pdf: ^3.11.3
   path_provider: ^2.1.5
   pdfrx: ^2.2.24
+  share_plus: ^10.0.0
 
 dev_dependencies:
   flutter_test:

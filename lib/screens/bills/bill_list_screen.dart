@@ -63,7 +63,15 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   @override
   void initState() {
     super.initState();
+
+    _scrollController.addListener(_checkScrollability);
+    _billsRepository.addListener(_onBillsUpdated);
+
     if (kIsWeb) {
+      if (widget.isVisible) {
+        subscribeToSignedInEvents();
+      }
+
       initGoogleSignInForWeb();
     } else {
       _loadBills(
@@ -71,11 +79,6 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
         earliestEmailDate: AppConfig.emailEarliestDate,
       );
     }
-    if (widget.isVisible) {
-      subscribeToSignedInEvents();
-    }
-    _scrollController.addListener(_checkScrollability);
-    _billsRepository.addListener(_onBillsUpdated);
   }
 
   @override
@@ -420,9 +423,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () async {
-              await _syncBills();
-            },
+            onPressed: _loading ? null : _syncBills,
           ),
           IconButton(
             icon: const Icon(Icons.delete_sweep),

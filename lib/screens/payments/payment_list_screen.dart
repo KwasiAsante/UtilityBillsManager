@@ -70,18 +70,22 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
   @override
   void initState() {
     super.initState();
-    if (kIsWeb) {
-      initGoogleSignInForWeb();
-    } else {
-      _loadPayments(syncEmails: true);
-    }
-
-    if (widget.isVisible) {
-      subscribeToSignedInEvents();
-    }
 
     _scrollController.addListener(_checkScrollability);
     _paymentsRepository.addListener(_onPaymentsUpdated);
+
+    if (kIsWeb) {
+      if (widget.isVisible) {
+        subscribeToSignedInEvents();
+      }
+
+      initGoogleSignInForWeb();
+    } else {
+      _loadPayments(
+        syncEmails: true,
+        earliestEmailDate: AppConfig.emailEarliestDate,
+      );
+    }
   }
 
   @override

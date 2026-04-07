@@ -15,7 +15,7 @@ class MainTabScreen extends StatefulWidget {
 }
 
 class _MainTabScreenState extends State<MainTabScreen> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 2;
 
   @override
   void initState() {
@@ -49,7 +49,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
     final screens = <Widget>[
       BillListScreen(isVisible: _selectedIndex == 0),
       const RentorListScreen(),
-      const SummaryScreen(),
+      SummaryScreen(isVisible: _selectedIndex == 2,),
       PaymentListScreen(isVisible: _selectedIndex == 3),
       EmailListScreen(isVisible: _selectedIndex == 4),
     ];
