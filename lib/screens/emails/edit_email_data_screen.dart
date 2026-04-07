@@ -190,7 +190,7 @@ class _EditEmailDataScreenState extends State<EditEmailDataScreen> {
                             children: [
                               Expanded(
                                 child: DropdownButtonFormField<String?>(
-                                  value: _billsRepository.bills.any(
+                                  initialValue: _billsRepository.bills.any(
                                           (b) => b.billId == _selectedBillId)
                                       ? _selectedBillId
                                       : null,
@@ -244,7 +244,7 @@ class _EditEmailDataScreenState extends State<EditEmailDataScreen> {
                             children: [
                               Expanded(
                                 child: DropdownButtonFormField<String?>(
-                                  value: _paymentsRepository.payments.any(
+                                  initialValue: _paymentsRepository.payments.any(
                                           (p) =>
                                               p.paymentId ==
                                               _selectedPaymentId)
@@ -262,7 +262,7 @@ class _EditEmailDataScreenState extends State<EditEmailDataScreen> {
                                       return DropdownMenuItem<String?>(
                                         value: payment.paymentId,
                                         child: Text(
-                                          '${payment.paymentDate ?? "Unknown date"} – \$${payment.amountPaid.toStringAsFixed(2)} (${payment.rentorName})',
+                                          '${payment.paymentDate} – \$${payment.amountPaid.toStringAsFixed(2)} (${payment.rentorName})',
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       );

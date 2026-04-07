@@ -3,6 +3,7 @@
 /// Use [compareNullable] wherever a sort comparator needs to handle `null`
 /// values consistently across the app (e.g. rentor lists sorted by
 /// `lastPaymentDate`).
+library;
 
 class ComparableUtils {
   /// Compares two nullable [Comparable] values, treating `null` as greater than
