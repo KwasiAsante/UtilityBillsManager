@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:utility_bills_manager/data/models/bill.dart';
 import 'package:utility_bills_manager/data/models/rentor.dart';
 import 'package:uuid/uuid.dart';
@@ -8,9 +9,9 @@ class Payment {
   List<String>? billIds;
   String? rentorId;
   final double amountPaid;
-  final String? paymentDate;
+  final DateTime paymentDate;
   List<Bill>? bills;
-  final Rentor? rentor;
+  Rentor? rentor;
 
   Payment({
     this.id,
@@ -48,7 +49,7 @@ class Payment {
     }
   }
 
-  set rentor(Rentor? newRentor) {
+  void addRentor(Rentor? newRentor) {
     if (newRentor != null && ((rentorId == null || rentorId!.isEmpty) || newRentor.rentorId == rentorId)) {
       rentor = newRentor;
       rentorId = newRentor.rentorId;
@@ -57,7 +58,7 @@ class Payment {
 
   String billNames({bool newLine = false}) {
     if (bills != null && bills!.isNotEmpty) {
-      return bills!.map((b) => '${b.type.name}: ${b.companyName} - ${b.dueDate}').join(newLine ? '\n' : ', ');
+      return bills!.map((b) => '${b.type.name}: ${b.companyName} - ${DateFormat('yyyy-MM-dd').format(b.dueDate)}').join(newLine ? '\n' : ', ');
     } else {
       return 'Unknown Bills';
     }
@@ -77,7 +78,7 @@ class Payment {
       'paymentId': paymentId,
       'rentorId': (rentorId == null || rentorId!.trim().isEmpty) ? null : rentorId,
       'amountPaid': amountPaid,
-      'paymentDate': paymentDate,
+      'paymentDate': paymentDate.toIso8601String().split('T').first,
     };
   }
 
@@ -119,7 +120,7 @@ class Payment {
       billIds: billIds.isEmpty ? null : billIds,
       rentorId: rawRentorId?.toString(),
       amountPaid: (map['amountPaid'] as num).toDouble(),
-      paymentDate: map['paymentDate'],
+      paymentDate: DateTime.parse(map['paymentDate']),
       bills: parsedBills.isEmpty ? null : parsedBills,
       rentor: rentor,
     );
@@ -140,20 +141,8 @@ class Payment {
       billIds: billIds,
       rentorId: map['p_rentorId'],
       amountPaid: (map['p_amountPaid'] as num).toDouble(),
-      paymentDate: map['p_paymentDate'],
+      paymentDate: DateTime.parse(map['p_paymentDate']),
     );
-  }
-
-  DateTime? get paymentDateTime {
-    if (paymentDate != null) {
-      try {
-        return DateTime.parse(paymentDate!);
-      } catch (e) {
-        // Handle parsing error if needed
-        return null;
-      }
-    }
-    return null;
   }
 }
 

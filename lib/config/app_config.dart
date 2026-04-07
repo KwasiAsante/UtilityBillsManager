@@ -40,7 +40,7 @@ class AppConfig {
 
   /// Email configuration.
   /// Order of precedence:
-  /// 1. `local_secrets.json` file values (not bundled in builds)
+  /// 1. `local_secrets.json` file values
   /// 2. `--dart-define` values
   /// 3. Safe defaults
   static String get emailAddress =>

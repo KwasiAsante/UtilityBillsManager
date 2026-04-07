@@ -154,7 +154,7 @@ class EmailDataHelper {
   Future<Result<void>> deleteEmailData(String emailDataId) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
-      await dbHelper.deleteEmailDataByEmailDataId(emailDataId);
+      await dbHelper.deleteEmailData(emailDataId);
       return Result.success();
     } else {
       final returnValue = await ApiService.emails().deleteEmailData(emailDataId);

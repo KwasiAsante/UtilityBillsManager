@@ -1,9 +1,11 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:utility_bills_manager/data/repositories/rentors_repository.dart';
 import 'package:utility_bills_manager/screens/rentors/add_edit_rentor_screen.dart';
 import 'package:utility_bills_manager/helpers/rentors/rentors_helper.dart';
+import 'package:utility_bills_manager/utils/comparable_utils.dart';
 
 import '../../data/models/rentor.dart';
 
@@ -23,21 +25,8 @@ class _RentorListScreenState extends State<RentorListScreen> {
   List<Rentor> _allRentors = [];
   bool _loading = true;
   bool _isListScrollable = false;
-  String _selectedStort = 'Percentage';
+  String _selectedSort = 'Percentage';
   String _searchQuery = '';
-
-  int _compareNullable<T extends Comparable<T>>(
-    T? a,
-    T? b, {
-    bool descending = false,
-  }) {
-    if (a == null && b == null) return 0;
-    if (a == null) return 1;
-    if (b == null) return -1;
-
-    final comparison = a.compareTo(b);
-    return descending ? -comparison : comparison;
-  }
 
   @override
   void initState() {
@@ -74,15 +63,15 @@ class _RentorListScreenState extends State<RentorListScreen> {
       rentor.name.toLowerCase().contains(_searchQuery.toLowerCase())
     ).toList();
 
-    switch (_selectedStort) {
+    switch (_selectedSort) {
       case 'Percentage':
         displayed.sort((a, b) => a.defaultPercentage.compareTo(b.defaultPercentage));
         break;
       case 'Last Payment Date (Asc)':
-        displayed.sort((a, b) => _compareNullable(a.lastPaymentDate, b.lastPaymentDate));
+        displayed.sort((a, b) => ComparableUtils.compareNullable(a.lastPaymentDate, b.lastPaymentDate));
         break;
       case 'Last Payment Date (Desc)':
-        displayed.sort((a, b) => _compareNullable(a.lastPaymentDate, b.lastPaymentDate, descending: true));
+        displayed.sort((a, b) => ComparableUtils.compareNullable(a.lastPaymentDate, b.lastPaymentDate, descending: true));
         break;
     }
 
@@ -192,14 +181,11 @@ class _RentorListScreenState extends State<RentorListScreen> {
             onPressed: _deleteAllRentors,
           ),
           const SizedBox(width: 16),
-          const SizedBox(width: 16),
           DropdownButton<String>(
-            value: _selectedStort,
+            value: _selectedSort,
             items:
                 [
                   'Percentage',
-                  'Amount Owed (Lowest)',
-                  'Amount Owed (Highest)',
                   'Last Payment Date (Asc)',
                   'Last Payment Date (Desc)',
                 ].map((String value) {
@@ -211,7 +197,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
             onChanged: (String? newValue) {
               if (newValue != null) {
                 setState(() {
-                  _selectedStort = newValue;
+                  _selectedSort = newValue;
                 });
                 _updateDisplayedRentors();
               }
@@ -236,7 +222,6 @@ class _RentorListScreenState extends State<RentorListScreen> {
           final rentors = snapshot.data!;
           return RefreshIndicator(
             onRefresh: () async {
-              await Future.delayed(Duration(seconds: 2));
               await _rentorsRepository.reload();
             },
             child: ScrollConfiguration(
@@ -266,7 +251,10 @@ class _RentorListScreenState extends State<RentorListScreen> {
                       },
                       title: Text(rentor.name),
                       subtitle: Text(
-                        'Percentage: \$${rentor.defaultPercentage}%\nLast Payment Date: ${rentor.lastPaymentDate != null ? rentor.lastPaymentDate! : "N/A"}',
+                        'Percentage: \$${rentor.defaultPercentage}%\n'
+                            'Last Payment Date: ${rentor.lastPaymentDate != null
+                            ? DateFormat('yyyy-MM-dd').format(rentor.lastPaymentDate!)
+                            : "N/A"}',
                       ),
                       trailing: PopupMenuButton<String>(
                         onSelected: (value) async {

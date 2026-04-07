@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/helpers/database/database_helper.dart';
@@ -290,9 +292,7 @@ class BillsHelper {
         return 0.0;
       }
 
-      // if (amountPaidTowardsBill > owedAmount) {
-        amountPaidTowardsBill = owedAmount;
-      // }
+      amountPaidTowardsBill = min(amountPaidTowardsBill, owedAmount);
     }
     billAmountPaid += amountPaidTowardsBill;
     bill.amountPaid = billAmountPaid;

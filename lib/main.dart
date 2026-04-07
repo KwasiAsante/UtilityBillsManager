@@ -25,7 +25,7 @@ void main() async {
   } else if (defaultTargetPlatform == TargetPlatform.windows ||
       defaultTargetPlatform == TargetPlatform.linux ||
       defaultTargetPlatform == TargetPlatform.macOS) {
-    // Desktop only — mobile must keep sqflite's default native factory
+    // Desktop only — mobile must keep sqlite default native factory
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
@@ -63,8 +63,6 @@ void main() async {
     //     notes: 'February billing cycle',
     //   ),
     // );
-  } else {
-    AppState().localDB = false;
   }
 
   const initializationSettingsAndroid = AndroidInitializationSettings(

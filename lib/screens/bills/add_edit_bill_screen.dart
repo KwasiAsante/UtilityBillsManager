@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:utility_bills_manager/data/models/bill.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/data/repositories/bills_repository.dart';
@@ -35,7 +36,7 @@ class _AddEditBillScreenState extends State<AddEditBillScreen> {
       _selectedType = widget.bill!.type;
       _companyController.text = widget.bill!.company;
       _amountController.text = widget.bill!.amount.toString();
-      _dueDateController.text = widget.bill!.dueDate;
+      _dueDateController.text = DateFormat('yyyy-MM-dd').format(widget.bill!.dueDate);
       _selectedStatus = widget.bill!.status;
       _notesController.text = widget.bill!.notes ?? '';
       if (widget.bill!.amountPaid != null) {
@@ -58,7 +59,7 @@ class _AddEditBillScreenState extends State<AddEditBillScreen> {
       company: _companyController.text,
       type: _selectedType,
       amount: double.parse(_amountController.text),
-      dueDate: _dueDateController.text,
+      dueDate: DateTime.parse(_dueDateController.text),
       status: _selectedStatus,
       notes: _notesController.text,
       amountPaid: widget.bill?.amountPaid,
@@ -91,7 +92,7 @@ class _AddEditBillScreenState extends State<AddEditBillScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing ? 'Add Bill' : 'Edit Bill'),
+        title: Text(isEditing ? 'Edit Bill' : 'Add Bill'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

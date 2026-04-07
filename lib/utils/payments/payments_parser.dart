@@ -27,7 +27,7 @@ class PaymentsParser {
     if (amount != null) {
       return Payment(
         amountPaid: amount,
-        paymentDate: paymentDate,
+        paymentDate: paymentDate != null ? DateTime.parse(paymentDate) : DateTime.now(),
         rentor: rentor,
         rentorId: rentor?.rentorId
       );

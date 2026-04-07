@@ -7,7 +7,6 @@ import '../../config/app_config.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
 import '../../data/repositories/bills_repository.dart';
-import '../../helpers/bills/bills_helper.dart';
 import '../../helpers/email/email_data_helper.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
 import '../../utils/constants.dart';
@@ -44,7 +43,6 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   }
   //endregion
 
-  final BillsHelper _billsHelper = BillsHelper();
   final BillsRepository _billsRepository = BillsRepository();
   final EmailDataHelper _emailDataHelper = EmailDataHelper();
   final ScrollController _scrollController = ScrollController();
@@ -54,7 +52,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   bool _loading = true;
   bool _isListScrollable = false;
   String _selectedFilter = 'All';
-  String _selectedStort = 'Due Date (Latest)';
+  String _selectedSort = 'Due Date (Latest)';
   int? _selectedDueYear;
   int? _selectedDueMonth;
   DateTime? _dateRangeStart;
@@ -175,11 +173,8 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
     );
 
     if (confirmed == true) {
-      for (final bill in _allBills) {
-        await _billsHelper.deleteBill(bill.billId);
-      }
+      await _billsRepository.deleteAll();
 
-      await _billsRepository.reload();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('All bills deleted.'))
@@ -191,7 +186,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   void _updateDisplayedBills() {
     var displayedBills =
         _allBills.where((bill) {
-          final dueDate = _parseDueDate(bill);
+          final dueDate = bill.dueDate;
           final matchesFilter =
               _selectedFilter == 'All' ||
               PaymentStatusExtension.getName(bill.status) == _selectedFilter;
@@ -203,15 +198,13 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
               );
           final matchesYear =
               _selectedDueYear == null ||
-              (dueDate != null && dueDate.year == _selectedDueYear);
+              (dueDate.year == _selectedDueYear);
           final matchesMonth =
               _selectedDueMonth == null ||
-              (dueDate != null && dueDate.month == _selectedDueMonth);
+              (dueDate.month == _selectedDueMonth);
           final matchesDateRange =
               (_dateRangeStart == null && _dateRangeEnd == null) ||
-              (dueDate != null &&
-                  (_dateRangeStart == null ||
-                      !dueDate.isBefore(_dateRangeStart!)) &&
+              ((_dateRangeStart == null || !dueDate.isBefore(_dateRangeStart!)) &&
                   (_dateRangeEnd == null || !dueDate.isAfter(_dateRangeEnd!)));
           return matchesFilter &&
               matchesSearch &&
@@ -220,7 +213,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
               matchesDateRange;
         }).toList();
 
-    switch (_selectedStort) {
+    switch (_selectedSort) {
       case 'Due Date (Earliest)':
         displayedBills.sort((a, b) => a.dueDate.compareTo(b.dueDate));
         break;
@@ -243,17 +236,10 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   //endregion
 
   //region Date Filtering
-  DateTime? _parseDueDate(Bill bill) {
-    return DateTime.tryParse(bill.dueDate);
-  }
-
   List<int> _getAvailableDueYears() {
     final years = <int>{};
     for (final bill in _allBills) {
-      final dueDate = _parseDueDate(bill);
-      if (dueDate != null) {
-        years.add(dueDate.year);
-      }
+      years.add(bill.dueDate.year);
     }
 
     if (years.isEmpty) {
@@ -410,7 +396,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
           ),
           const SizedBox(width: 16),
           DropdownButton<String>(
-            value: _selectedStort,
+            value: _selectedSort,
             items:
                 [
                   'Due Date (Earliest)',
@@ -426,7 +412,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
             onChanged: (String? newValue) {
               if (newValue != null) {
                 setState(() {
-                  _selectedStort = newValue;
+                  _selectedSort = newValue;
                 });
                 _updateDisplayedBills();
               }

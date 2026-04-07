@@ -43,8 +43,8 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
       _phoneController.text = rentor.phone ?? '';
       _percentageController.text = rentor.defaultPercentage.toStringAsFixed(2);
       if (rentor.lastPaymentDate != null) {
-        _lastPaymentDateController.text = rentor.lastPaymentDate!;
-        _lastPaymentDate = DateFormat('yyyy-MM-dd').parse(rentor.lastPaymentDate!);
+        _lastPaymentDateController.text = DateFormat('yyyy-MM-dd').format(widget.rentor!.lastPaymentDate!);
+        _lastPaymentDate = rentor.lastPaymentDate;
       }
 
       // Populate only existing bill-specific percentages
@@ -269,7 +269,7 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
       email: _emailController.text.isNotEmpty ? _emailController.text : null,
       phone: _phoneController.text.isNotEmpty ? _phoneController.text : null,
       defaultPercentage: double.parse(_percentageController.text),
-      lastPaymentDate: _lastPaymentDate != null ? DateFormat('yyyy-MM-dd').format(_lastPaymentDate!) : null,
+      lastPaymentDate: _lastPaymentDate,
       billPercentages: billPercentages,
       excludedBillTypes: _excludedBillTypes,
     );

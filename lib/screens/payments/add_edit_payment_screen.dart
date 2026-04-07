@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
@@ -50,7 +51,7 @@ State<AddEditPaymentScreen> {
     if (widget.payment != null) {
       final payment = widget.payment!;
       _amountPaidController.text = payment.amountPaid.toString();
-      _paymentDateController.text = payment.paymentDate?.toString() ?? '';
+      _paymentDateController.text = DateFormat('yyyy-MM-dd').format(payment.paymentDate);
 
       if (payment.rentor == null && payment.rentorId != null) {
         _rentorsHelper.readRentor(payment.rentorId!).then((result) {
@@ -117,36 +118,31 @@ State<AddEditPaymentScreen> {
   Future<void> _showRentorPickerDialog() async {
     if (_allRentors.isEmpty) {
       final result = await _rentorsHelper.readAllRentors();
+      if (!mounted) return;                // ← correct guard after async gap
       if (result.isSuccess) {
-        setState(() {
-          _allRentors = result.data!;
-        });
+        setState(() => _allRentors = result.data!);
       }
     }
 
-    setState(() {
-      if (context.mounted)  {
-        showDialog(context: context,
-            builder: (context) => _RentorPickerDialog(
-              currentSelectedRentor: _selectedRentor,
-              allRentors: _allRentors,
-              rentorsHelper: _rentorsHelper,
-              onAdd: (Rentor? selectedRentor, List<Rentor> allRentors) {
-                setState(() {
-                  _allRentors = allRentors;
-                  _selectedRentor = selectedRentor;
-                  if (_selectedRentor == null) {
-                    _clearRentorSelection();
-                  }
-                  else {
-                    _rentorController.text = selectedRentor?.name ?? '';
-                  }
-                });
-              },
-            )
-        );
-      }
-    });
+    showDialog(context: context,
+        builder: (context) => _RentorPickerDialog(
+          currentSelectedRentor: _selectedRentor,
+          allRentors: _allRentors,
+          rentorsHelper: _rentorsHelper,
+          onAdd: (Rentor? selectedRentor, List<Rentor> allRentors) {
+            setState(() {
+              _allRentors = allRentors;
+              _selectedRentor = selectedRentor;
+              if (_selectedRentor == null) {
+                _clearRentorSelection();
+              }
+              else {
+                _rentorController.text = selectedRentor?.name ?? '';
+              }
+            });
+          },
+        )
+    );
   }
   //endregion
 
@@ -323,7 +319,7 @@ State<AddEditPaymentScreen> {
       rentorId: _selectedRentor?.rentorId,
       billIds: _selectedBills.map((bill) => bill.billId).toList(),
       amountPaid: double.parse(_amountPaidController.text),
-      paymentDate: _paymentDateController.text,
+      paymentDate: DateTime.parse(_paymentDateController.text),
       rentor: _selectedRentor,
       bills: _selectedBills
     );
@@ -768,17 +764,16 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
       final matchesSearch = searchQuery.isEmpty ||
           bill.company.toLowerCase().contains(searchQuery.toLowerCase()) ||
           bill.companyName.toLowerCase().contains(searchQuery.toLowerCase());
-      final dueDate = _parseDueDate(bill);
+      final dueDate = bill.dueDate;
       final matchesYear =
           _selectedDueYear == null ||
-              (dueDate != null && dueDate.year == _selectedDueYear);
+              (dueDate.year == _selectedDueYear);
       final matchesMonth =
           _selectedDueMonth == null ||
-              (dueDate != null && dueDate.month == _selectedDueMonth);
+              (dueDate.month == _selectedDueMonth);
       final matchesDateRange =
           (_dateRangeStart == null && _dateRangeEnd == null) ||
-              (dueDate != null &&
-                  (_dateRangeStart == null ||
+              ((_dateRangeStart == null ||
                       !dueDate.isBefore(_dateRangeStart!)) &&
                   (_dateRangeEnd == null || !dueDate.isAfter(_dateRangeEnd!)));
       return matchesSearch && matchesYear && matchesMonth && matchesDateRange;
@@ -791,17 +786,10 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
                 (bill) => selectedBills.any((selected) => selected.billId == bill.billId));
   }
 
-  DateTime? _parseDueDate(Bill bill) {
-    return DateTime.tryParse(bill.dueDate);
-  }
-
   List<int> _getAvailableDueYears() {
     final years = <int>{};
     for (final bill in allBills) {
-      final dueDate = _parseDueDate(bill);
-      if (dueDate != null) {
-        years.add(dueDate.year);
-      }
+      years.add(bill.dueDate.year);
     }
 
     if (years.isEmpty) {

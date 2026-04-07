@@ -7,7 +7,7 @@ class Bill {
   final String company;
   final double amount;
   final BillType type;
-  final String dueDate;
+  final DateTime dueDate;
   double? amountPaid;
   PaymentStatus status;
   final String? notes;
@@ -31,7 +31,7 @@ class Bill {
       company: json['company'],
       type: BillTypeExtension.fromString(json['type']),
       amount: (json['amount'] ?? 0).toDouble(),
-      dueDate: json['dueDate'],
+      dueDate: DateTime.parse(json['dueDate']),
       status: PaymentStatusExtension.fromString(json['status']),
       notes: json['notes'],
       amountPaid: (json['amountPaid'] as num?)?.toDouble(),
@@ -55,7 +55,7 @@ class Bill {
       company: map['b_company'],
       type: billType,
       amount: (map['b_amount'] ?? 0).toDouble(),
-      dueDate: map['b_dueDate'],
+      dueDate: DateTime.parse(map['b_dueDate']),
       status: paymentStatus,
       notes: map['b_notes'],
       amountPaid: (map['b_amountPaid'] as num?)?.toDouble(),
@@ -69,7 +69,7 @@ class Bill {
       'company': company,
       'type': type.name.toLowerCase(),
       'amount': amount,
-      'dueDate': dueDate,
+      'dueDate': dueDate.toIso8601String().split('T').first,
       'status': status.name.toLowerCase(),
       'notes': notes,
       'amountPaid': amountPaid,
@@ -103,13 +103,12 @@ class Bill {
         } else if (company.toLowerCase().contains('bmo')) {
           return 'BMO Bank of Montreal';
         }
+        return company;
       case BillType.personallineofcredit:
         return 'Simplii Financial Personal Line of Credit';
       case BillType.other:
         return company; // Use the provided company name for "Other"
     }
-
-    return company; // Fallback to the provided company name if no match is found
   }
 }
 

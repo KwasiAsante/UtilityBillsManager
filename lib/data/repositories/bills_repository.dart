@@ -41,4 +41,10 @@ class BillsRepository extends ChangeNotifier {
     if (result.isSuccess) await reload();
     return result;
   }
+
+  Future<Result<void>> deleteAll() async {
+    final result = await _helper.deleteAllBills();
+    if (result.isSuccess) await reload();
+    return result;
+  }
 }

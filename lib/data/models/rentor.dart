@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:utility_bills_manager/data/models/bill.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/helpers/payments/payments_helper.dart';
+import 'package:utility_bills_manager/utils/comparable_utils.dart';
 import 'package:uuid/uuid.dart';
 
 class Rentor {
@@ -15,7 +16,7 @@ class Rentor {
   final double defaultPercentage;
   final Map<BillType, double> billPercentages; // e.g., {'Electric': 0.1, 'Gas': 0.2}
   final List<BillType> excludedBillTypes;
-  String? lastPaymentDate;
+  DateTime? lastPaymentDate;
 
   Rentor({
     this.id,
@@ -74,7 +75,9 @@ class Rentor {
       defaultPercentage: (json['defaultPercentage'] ?? 0).toDouble(),
       billPercentages: parsedMap,
       excludedBillTypes: _parseExcludedBillTypes(json['excludedBillTypes']),
-      lastPaymentDate: json['lastPaymentDate'],
+      lastPaymentDate: json['lastPaymentDate'] != null
+          ? DateTime.tryParse(json['lastPaymentDate'])
+          : null,
     );
   }
 
@@ -109,7 +112,9 @@ class Rentor {
       defaultPercentage: (map['r_defaultPercentage'] ?? 0).toDouble(),
       billPercentages: parsedMap,
       excludedBillTypes: _parseExcludedBillTypes(map['r_excludedBillTypes']),
-      lastPaymentDate: map['r_lastPaymentDate'],
+      lastPaymentDate: map['r_lastPaymentDate'] != null
+          ? DateTime.tryParse(map['r_lastPaymentDate'])
+          : null,
     );
   }
 
@@ -127,7 +132,7 @@ class Rentor {
       'defaultPercentage': defaultPercentage,
       'billPercentages': encodedMap,
       'excludedBillTypes': excludedBillTypes.map((t) => t.name.toLowerCase()).toList(),
-      'lastPaymentDate': lastPaymentDate,
+      'lastPaymentDate': lastPaymentDate?.toIso8601String().split('T').first,
     };
   }
 
@@ -136,18 +141,6 @@ class Rentor {
     payload['billPercentages'] = jsonEncode(payload['billPercentages']);
     payload['excludedBillTypes'] = jsonEncode(payload['excludedBillTypes']);
     return payload;
-  }
-
-  DateTime? get lastPaymentDateTime {
-    if (lastPaymentDate != null) {
-      try {
-        return DateTime.parse(lastPaymentDate!);
-      } catch (e) {
-        // Handle parsing error if needed
-        return null;
-      }
-    }
-    return null;
   }
 
   static double calculateOwedAmount(Rentor rentor, Bill bill) {
@@ -190,22 +183,9 @@ class Rentor {
       return;
     }
 
-    int compareNullable<T extends Comparable<T>>(
-        T? a,
-        T? b, {
-          bool descending = false,
-        }) {
-      if (a == null && b == null) return 0;
-      if (a == null) return 1;
-      if (b == null) return -1;
+    payments.sort((a, b) => ComparableUtils.compareNullable(a.paymentDate, b.paymentDate, descending: true));
 
-      final comparison = a.compareTo(b);
-      return descending ? -comparison : comparison;
-    }
-
-    payments.sort((a, b) => compareNullable(b.paymentDateTime, a.paymentDateTime, descending: true));
-
-    if (compareNullable(payments.first.paymentDateTime, lastPaymentDateTime, descending: true) >= 0) {
+    if (ComparableUtils.compareNullable(payments.first.paymentDate, lastPaymentDate, descending: true) >= 0) {
       if (kDebugMode) {
         print('No update needed for Rentor $rentorId - existing lastPaymentDate is more recent or equal to latest payment');
       }
@@ -218,9 +198,7 @@ class Rentor {
 
 extension RentorExtensions on Rentor {
   double getAmountOwed(List<Bill> bills) {
-    return bills.fold(0.0, (total, bill) {
-      final percent = billPercentages[bill.type] ?? 0.0;
-      return total + (bill.amount * percent);
-    });
+    return bills.fold(0.0, (total, bill) =>
+      total + Rentor.calculateOwedAmount(this, bill));
   }
 }

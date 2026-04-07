@@ -48,7 +48,7 @@ class BillsParser {
         company: sender,
         type: billType,
         amount: amount,
-        dueDate: dueDate,
+        dueDate: DateTime.parse(dueDate),
         status: amount <= 0 ? PaymentStatus.paid : PaymentStatus.unpaid,
         notes: subject,
       );
@@ -174,12 +174,14 @@ class BillsParser {
     List<String> lines,
   ) {
     int updatedIndex = index + 1;
+    if (updatedIndex >= lines.length) return null;
     var line = lines[updatedIndex];
     var match = pattern.firstMatch(line);
     if (match != null) {
       return double.tryParse(match.group(1)!.replaceAll(',', ''));
     } else {
       updatedIndex++;
+      if (updatedIndex >= lines.length) return null;
       line = lines[updatedIndex];
       match = pattern.firstMatch(line);
       if (match != null) {
@@ -270,8 +272,9 @@ class BillsParser {
     List<String> lines,
   ) {
     int updatedIndex = index + 1;
+    if (updatedIndex >= lines.length) return null;
     var line = lines[updatedIndex];
-    line.replaceAll(RegExp(r','), "");
+    line = line.replaceAll(RegExp(r','), "");
     var match = pattern.firstMatch(line);
     if (match != null) {
       String s = match.group(0)!;
@@ -280,6 +283,7 @@ class BillsParser {
       return d;
     } else {
       updatedIndex++;
+      if (updatedIndex >= lines.length) return null;
       line = lines[updatedIndex];
       match = pattern.firstMatch(line);
       if (match != null) {

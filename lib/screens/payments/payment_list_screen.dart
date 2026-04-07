@@ -9,6 +9,7 @@ import '../../data/repositories/payments_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
 import '../../helpers/payments/payments_helper.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
+import '../../utils/comparable_utils.dart';
 import '../../utils/constants.dart';
 import '../../utils/dialogs/due_date_filter_sheet.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
@@ -58,8 +59,7 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
   List<Payment> _allPayments = [];
   bool _loading = true;
   bool _isListScrollable = false;
-  String _selectedFilter = 'All';
-  String _selectedStort = 'Payment Date (Latest)';
+  String _selectedSort = 'Payment Date (Latest)';
   int? _selectedPaymentYear;
   int? _selectedPaymentMonth;
   DateTime? _dateRangeStart;
@@ -199,41 +199,26 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
   void _updateDisplayedPayments() {
     var displayedPayments =
     _allPayments.where((payment) {
-      final paymentDate = _parsePaymentDate(payment);
+      final paymentDate = payment.paymentDate;
       final matchesYear =
           _selectedPaymentYear == null ||
-              (paymentDate != null && paymentDate.year == _selectedPaymentYear);
+              (paymentDate.year == _selectedPaymentYear);
       final matchesMonth =
           _selectedPaymentMonth == null ||
-              (paymentDate != null && paymentDate.month == _selectedPaymentMonth);
+              (paymentDate.month == _selectedPaymentMonth);
       final matchesDateRange =
           (_dateRangeStart == null && _dateRangeEnd == null) ||
-              (paymentDate != null &&
-                  (_dateRangeStart == null ||
-                      !paymentDate.isBefore(_dateRangeStart!)) &&
+              ((_dateRangeStart == null || !paymentDate.isBefore(_dateRangeStart!)) &&
                   (_dateRangeEnd == null || !paymentDate.isAfter(_dateRangeEnd!)));
       return matchesYear && matchesMonth && matchesDateRange;
     }).toList();
 
-    int compareNullable<T extends Comparable<T>>(
-        T? a,
-        T? b, {
-          bool descending = false,
-        }) {
-      if (a == null && b == null) return 0;
-      if (a == null) return 1;
-      if (b == null) return -1;
-
-      final comparison = a.compareTo(b);
-      return descending ? -comparison : comparison;
-    }
-
-    switch (_selectedStort) {
+    switch (_selectedSort) {
       case 'Payment Date (Earliest)':
-        displayedPayments.sort((a, b) => compareNullable(a.paymentDate, b.paymentDate));
+        displayedPayments.sort((a, b) => ComparableUtils.compareNullable(a.paymentDate, b.paymentDate));
         break;
       case 'Payment Date (Latest)':
-        displayedPayments.sort((a, b) => compareNullable(b.paymentDate, a.paymentDate));
+        displayedPayments.sort((a, b) => ComparableUtils.compareNullable(b.paymentDate, a.paymentDate));
         break;
       case 'Amount Paid (Lowest)':
         displayedPayments.sort((a, b) => a.amountPaid.compareTo(b.amountPaid));
@@ -251,17 +236,10 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
   //endregion
 
   //region Date Filtering
-  DateTime? _parsePaymentDate(Payment payment) {
-    return payment.paymentDate != null ? DateTime.tryParse(payment.paymentDate!) : null;
-  }
-
   List<int> _getAvailablePaymentYears() {
     final years = <int>{};
     for (final payment in _allPayments) {
-      final paymentDate = _parsePaymentDate(payment);
-      if (paymentDate != null) {
-        years.add(paymentDate.year);
-      }
+      years.add(payment.paymentDate.year);
     }
 
     if (years.isEmpty) {
@@ -373,27 +351,9 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
                 _updateDisplayedPayments();
               },
             ),
-          DropdownButton<String>(
-            value: _selectedFilter,
-            items:
-            ['All', 'Paid', 'Unpaid'].map((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value),
-              );
-            }).toList(),
-            onChanged: (String? newValue) {
-              if (newValue != null) {
-                setState(() {
-                  _selectedFilter = newValue;
-                });
-                _updateDisplayedPayments();
-              }
-            },
-          ),
           const SizedBox(width: 16),
           DropdownButton<String>(
-            value: _selectedStort,
+            value: _selectedSort,
             items:
             [
               'Payment Date (Earliest)',
@@ -409,7 +369,7 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
             onChanged: (String? newValue) {
               if (newValue != null) {
                 setState(() {
-                  _selectedStort = newValue;
+                  _selectedSort = newValue;
                 });
                 _updateDisplayedPayments();
               }

@@ -159,7 +159,7 @@ class PaymentsHelper {
       }
 
       if (rentor != null) {
-        payment.rentor = rentor;
+        payment.addRentor(rentor);
         if (dbHelper != null) {
           int id = await dbHelper.updatePayment(payment);
           if (id >= 0) {

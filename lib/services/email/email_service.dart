@@ -183,6 +183,8 @@ class EmailService {
         mimeMessages.add(mime);
       }
 
+      client.close();
+
       return mimeMessages;
     } catch (e) {
       if (kDebugMode) {
@@ -204,11 +206,18 @@ class _AuthClient extends http.BaseClient {
     request.headers.addAll(_headers);
     return _inner.send(request);
   }
+
+  @override
+  void close() {
+    _inner.close();
+    super.close();
+  }
 }
 
 enum EmailType {
   bill,
   payment,
+  unknown,
 }
 
 extension EmailTypeExtension on EmailType {
@@ -218,6 +227,8 @@ extension EmailTypeExtension on EmailType {
         return 'bills';
       case EmailType.payment:
         return 'bills-tenant-bills';
+      default:
+        return 'unknown';
     }
   }
 
@@ -238,7 +249,7 @@ extension EmailTypeExtension on EmailType {
       case 'bill-bill-payments':
         return EmailType.payment;
       default:
-        throw ArgumentError('Unknown email type: $type');
+        return EmailType.unknown;
     }
   }
 }

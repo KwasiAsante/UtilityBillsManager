@@ -55,62 +55,41 @@ class DatabaseHelper {
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    if (version < 2) {
-      await db.execute('''
-        CREATE TABLE bills (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          company TEXT NOT NULL,
-          amount REAL NOT NULL,
-          dueDate TEXT NOT NULL,
-          status TEXT NOT NULL,
-          notes TEXT
-        )
-      ''');
+    await db.execute('''
+      CREATE TABLE bills (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        billId TEXT NOT NULL,
+        company TEXT NOT NULL,
+        type TEXT NOT NULL,
+        amount REAL NOT NULL,
+        dueDate TEXT NOT NULL,
+        status TEXT NOT NULL,
+        notes TEXT,
+        amountPaid REAL
+      )
+    ''');
 
-      await db.execute('''
-        CREATE TABLE rentors (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          percentage REAL NOT NULL
-        )
-      ''');
-    } else {
-      await db.execute('''
-        CREATE TABLE bills (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          billId TEXT NOT NULL,
-          company TEXT NOT NULL,
-          type TEXT NOT NULL,
-          amount REAL NOT NULL,
-          dueDate TEXT NOT NULL,
-          status TEXT NOT NULL,
-          notes TEXT,
-          amountPaid REAL
-        )
-      ''');
+    await db.execute('''
+      CREATE UNIQUE INDEX idx_bills_billId_unique ON bills (billId)
+    ''');
 
-      await db.execute('''
-        CREATE UNIQUE INDEX idx_bills_billId_unique ON bills (billId)
-      ''');
+    await db.execute('''
+      CREATE TABLE rentors (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        rentorId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        email TEXT,
+        phone TEXT,
+        defaultPercentage REAL NOT NULL,
+        billPercentages TEXT,
+        excludedBillTypes TEXT,
+        lastPaymentDate TEXT
+      )
+    ''');
 
-      await db.execute('''
-        CREATE TABLE rentors (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          rentorId TEXT NOT NULL,
-          name TEXT NOT NULL,
-          email TEXT,
-          phone TEXT,
-          defaultPercentage REAL NOT NULL,
-          billPercentages TEXT,
-          excludedBillTypes TEXT,
-          lastPaymentDate TEXT
-        )
-      ''');
-
-      await db.execute('''
-        CREATE UNIQUE INDEX idx_rentors_rentorId_unique ON rentors (rentorId)
-      ''');
-    }
+    await db.execute('''
+      CREATE UNIQUE INDEX idx_rentors_rentorId_unique ON rentors (rentorId)
+    ''');
 
     await db.execute('''
       CREATE TABLE payments (
@@ -1378,21 +1357,15 @@ class DatabaseHelper {
     return await db.update(
       'email_data',
       data,
-      where: 'emailId = ?',
-      whereArgs: [emaildata.emailId!],
+      where: 'emailDataId = ?',
+      whereArgs: [emaildata.emailDataId!],
     );
   }
 
-  // Delete Email Data by emailId
+  // Delete Email Data by emailDataId
   Future<int> deleteEmailData(String id) async {
     final db = await database;
-    return await db.delete('email_data', where: 'emailId = ?', whereArgs: [id]);
-  }
-
-  // Delete Email Data by emailDataId (UUID)
-  Future<int> deleteEmailDataByEmailDataId(String emailDataId) async {
-    final db = await database;
-    return await db.delete('email_data', where: 'emailDataId = ?', whereArgs: [emailDataId]);
+    return await db.delete('email_data', where: 'emailDataId = ?', whereArgs: [id]);
   }
 
   Future<int> deleteAllEmailData() async {

@@ -41,10 +41,14 @@ class _SummaryScreenState extends State<SummaryScreen> with SingleTickerProvider
   Future<void> _loadData() async {
     final billsResult = await _billsHelper.readAllBills();
     final rentorsResult = await _rentorsHelper.readAllRentors();
-    
+
     if (billsResult.isSuccess && rentorsResult.isSuccess) {
       final bills = billsResult.data!;
       final rentors = rentorsResult.data!;
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _bills = bills;
         _rentors = rentors;
@@ -52,9 +56,11 @@ class _SummaryScreenState extends State<SummaryScreen> with SingleTickerProvider
       });
     }
     else {
-      if (mounted) {
-        setState(() => _loading = false);
+      if (!mounted) {
+        return;
       }
+
+      setState(() => _loading = false);
     }
   }
 
@@ -64,8 +70,7 @@ class _SummaryScreenState extends State<SummaryScreen> with SingleTickerProvider
       builder: (ctx) => AlertDialog(
         title: const Text('Delete All Data'),
         content: const Text(
-          'This will permanently delete all emails, bills, and payments from the database.\n\n'
-          'This action cannot be undone. Are you sure you want to continue?',
+          'This will permanently delete all emails, bills, and payments from the database.\n\nThis action cannot be undone. Are you sure you want to continue?',
         ),
         actions: [
           TextButton(
@@ -135,7 +140,7 @@ class _SummaryScreenState extends State<SummaryScreen> with SingleTickerProvider
 
   List<Bill> get _filteredBills {
     if (_statusFilter == 'All') return _bills;
-    return _bills.where((bill) => bill.status.name == _statusFilter.toLowerCase()).toList();
+    return _bills.where((bill) => bill.status.name == _statusFilter).toList();
   }
 
   void _exportToCSV() async {
@@ -191,7 +196,7 @@ class _SummaryScreenState extends State<SummaryScreen> with SingleTickerProvider
   Widget _buildMonthlySummary() {
     final Map<String, List<Bill>> grouped = {};
     for (var bill in _filteredBills) {
-      final month = DateFormat.yMMM().format(DateTime.parse(bill.dueDate));
+      final month = DateFormat.yMMM().format(bill.dueDate);
       grouped.putIfAbsent(month, () => []).add(bill);
     }
 
