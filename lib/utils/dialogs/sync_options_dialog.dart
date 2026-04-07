@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+/// Holds the user's selections from [SyncOptionsDialog]: how far back to fetch
+/// emails and the maximum number of emails to retrieve.
 class SyncOptions {
   final DateTime? earliestDate;
   final int maxEmails;
@@ -7,9 +9,15 @@ class SyncOptions {
   const SyncOptions({this.earliestDate, this.maxEmails = 50});
 }
 
+/// Static-only utility that shows a dialog for configuring email sync options.
+///
+/// The user can either pick an earliest date (date-picker) or tick "Fetch last
+/// 50 emails" to ignore the date filter entirely.
 class SyncOptionsDialog {
   SyncOptionsDialog._();
 
+  /// Shows the sync-options [AlertDialog] and returns the user's [SyncOptions],
+  /// or `null` if the dialog was cancelled.
   static Future<SyncOptions?> show(BuildContext context) {
     DateTime? selectedDate;
     bool fetchLast50 = false;

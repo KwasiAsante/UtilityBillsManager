@@ -5,7 +5,20 @@ import 'package:utility_bills_manager/data/models/bill.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/utils/email/email_parser.dart';
 
+/// Utility class that converts a raw [MimeMessage] into a [Bill].
+///
+/// The parser performs three steps:
+/// 1. **Filter** — reject known irrelevant senders / subjects (e.g. bank
+///    statements, credit-card payment confirmations) to avoid false positives.
+/// 2. **Extract** — pull a dollar amount and due date from the email body
+///    (or PDF attachment text).
+/// 3. **Infer** — guess the [BillType] from keywords in the combined
+///    sender + subject + body text.
+///
+/// All methods are static; no instance state is needed.
 class BillsParser {
+  /// Parses [message] into a [Bill], or returns `null` if the message is
+  /// irrelevant or no dollar amount could be extracted.
   static Future<Bill?> parseEmailToBill(MimeMessage message) async {
     final subject = message.decodeSubject() ?? '';
     final sender = message.from?.firstOrNull?.email ?? '';
@@ -58,6 +71,8 @@ class BillsParser {
     return null; // Couldn't extract a valid bill
   }
 
+  /// Infers a [BillType] by checking the combined [sender] + [subject] + [body]
+  /// text for keywords associated with each utility category.
   static BillType _inferBillType(String sender, String subject, String body) {
     final text = '$sender $subject $body'.toLowerCase();
 
@@ -100,6 +115,8 @@ class BillsParser {
     return BillType.other;
   }
 
+  /// Simple dollar-amount extractor.  Prefers explicit `$`-prefixed amounts;
+  /// falls back to bare numeric strings if none are found.
   static double? extractAmount(String text) {
     // Look for explicit dollar amounts first, e.g. $123.45
     final dollarPattern = RegExp(r'\$\s?(\d+[.,]?\d{0,2})');
@@ -120,6 +137,15 @@ class BillsParser {
     return null;
   }
 
+  /// Context-aware dollar-amount extractor.
+  ///
+  /// Strategy:
+  /// 1. Split the normalised text into lines and look for a line that contains
+  ///    one of the [prioritizedKeywords] (e.g. "total due", "amount due").
+  ///    If found, try to parse a number from the same line, or from the
+  ///    following 1–2 lines via [getAmountFromNextIndex].
+  /// 2. Fall back to the last `$`-prefixed amount in the entire text if no
+  ///    keyword match produced a result.
   static double? extractSmartAmount(String text) {
     final prioritizedKeywords = [
       'total due',
@@ -169,6 +195,8 @@ class BillsParser {
     return null;
   }
 
+  /// Looks for a [pattern] match in the 1–2 lines immediately after [index] in
+  /// [lines].  Returns the parsed double, or `null` if nothing matches.
   static double? getAmountFromNextIndex(
     RegExp pattern,
     int index,
@@ -195,6 +223,12 @@ class BillsParser {
     }
   }
 
+  /// Extracts a due date from [text] using keyword-anchored line scanning.
+  ///
+  /// Strategy mirrors [extractSmartAmount]:
+  /// 1. Scan lines for a keyword (e.g. "due date", "payment due") and parse a
+  ///    date from that line or the following 1–2 lines.
+  /// 2. Fall back to the last recognisable date anywhere in the text.
   static DateTime? extractDueDate(String text) {
     final prioritizedKeywords = [
       'payment due date',
@@ -267,6 +301,9 @@ class BillsParser {
     return null;
   }
 
+  /// Looks for a [pattern] date match in the 1–2 lines immediately after
+  /// [index] in [lines].  Returns the parsed [DateTime], or `null` if nothing
+  /// matches.
   static DateTime? getDateFromNextIndex(
     RegExp pattern,
     int index,
@@ -302,6 +339,11 @@ class BillsParser {
     }
   }
 
+  /// Parses human-friendly date strings such as "April 24th, 2025" or
+  /// "Apr 24 2025" that [DateTime.tryParse] cannot handle natively.
+  ///
+  /// Strips ordinal suffixes (st, nd, rd, th) and tries a series of
+  /// [DateFormat] patterns until one succeeds.
   static DateTime? parseFancyDate(String text) {
     // Remove ordinal suffixes (st, nd, rd, th)
     final cleaned = text.replaceAllMapped(

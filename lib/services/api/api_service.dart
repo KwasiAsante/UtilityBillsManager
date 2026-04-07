@@ -7,31 +7,42 @@ import 'package:utility_bills_manager/data/models/email_data.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/data/models/rentor.dart';
 
+/// Central HTTP client facade for the local shelf server (client mode).
+///
+/// Defaults to `http://127.0.0.1:8080`.  Call [configure] to override (e.g.
+/// when connecting to a remote host).  Use the static factory methods
+/// ([bills], [rentors], [payments], [emails]) to obtain the type-specific
+/// service singletons — they all share the same [baseUrl].
 class ApiService {
   static String baseUrl = 'http://127.0.0.1:8080';
 
+  /// Overrides the base URL for all API service singletons.
   static void configure({required String baseUrl}) {
     ApiService.baseUrl = baseUrl;
   }
 
+  /// Returns the [BillsApiService] singleton configured with the current [baseUrl].
   static BillsApiService bills() {
     final billApiService = BillsApiService._instance;
     billApiService.baseUrl = baseUrl;
     return billApiService;
   }
 
+  /// Returns the [RentorsApiService] singleton configured with the current [baseUrl].
   static RentorsApiService rentors() {
     final rentorApiService = RentorsApiService._instance;
     rentorApiService.baseUrl = baseUrl;
     return rentorApiService;
   }
 
+  /// Returns the [PaymentsApiService] singleton configured with the current [baseUrl].
   static PaymentsApiService payments() {
     final paymentApiService = PaymentsApiService._instance;
     paymentApiService.baseUrl = baseUrl;
     return paymentApiService;
   }
 
+  /// Returns the [EmailDataApiService] singleton configured with the current [baseUrl].
   static EmailDataApiService emails() {
     final emailDataApiService = EmailDataApiService._instance;
     emailDataApiService.baseUrl = baseUrl;
@@ -39,6 +50,10 @@ class ApiService {
   }
 }
 
+/// HTTP client for bill endpoints (`/bill`, `/bill/list`).
+///
+/// All methods return `"OK"` on success or an error string on failure so that
+/// callers can map the result into a [Result] without parsing the body.
 class BillsApiService {
   static final BillsApiService _instance = BillsApiService._internal();
 
@@ -229,6 +244,7 @@ class BillsApiService {
   // #endregion
 }
 
+/// HTTP client for rentor endpoints (`/rentor`, `/rentor/list`).
 class RentorsApiService {
   static final RentorsApiService _instance = RentorsApiService._internal();
 
@@ -390,6 +406,7 @@ class RentorsApiService {
   // #endregion
 }
 
+/// HTTP client for payment endpoints (`/payment`, `/payment/list`).
 class PaymentsApiService {
   static final PaymentsApiService _instance = PaymentsApiService._internal();
 
@@ -570,6 +587,7 @@ class PaymentsApiService {
   // #endregion
 }
 
+/// HTTP client for email data endpoints (`/email`, `/email/list`, etc.).
 class EmailDataApiService {
   static final EmailDataApiService _instance = EmailDataApiService._internal();
 

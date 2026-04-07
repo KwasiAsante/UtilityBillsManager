@@ -41,6 +41,7 @@ class DueDateFilterSheet {
       '${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';
 
+  /// Returns the earliest allowed date given the selected [year] and/or [month].
   static DateTime _constrainedFirst(int? year, int? month) {
     if (year != null && month != null) return DateTime(year, month, 1);
     if (year != null) return DateTime(year, 1, 1);
@@ -48,6 +49,7 @@ class DueDateFilterSheet {
     return DateTime(2000);
   }
 
+  /// Returns the latest allowed date given the selected [year] and/or [month].
   static DateTime _constrainedLast(int? year, int? month) {
     if (year != null && month != null) return DateTime(year, month + 1, 0);
     if (year != null) return DateTime(year, 12, 31);
@@ -120,6 +122,8 @@ class _DueDateFilterSheetContentState
     _tempEnd = widget.current.dateRangeEnd;
   }
 
+  /// Clears [_tempStart] / [_tempEnd] if they fall outside the date range
+  /// implied by the currently selected year and/or month.
   void _clampRangeToBounds() {
     final first = widget.constrainedFirst(_tempYear, _tempMonth);
     final last = widget.constrainedLast(_tempYear, _tempMonth);

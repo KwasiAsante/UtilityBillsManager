@@ -8,6 +8,13 @@ import 'package:intl/intl.dart';
 import 'package:utility_bills_manager/services/email/google_account_service.dart';
 
 
+/// Cross-platform email fetcher.
+///
+/// On **web** it delegates to [_fetchRecentEmailsFromGmailWeb], which uses the
+/// Gmail REST API via a signed-in [GoogleAccountService] session.
+///
+/// On **mobile / desktop** it connects directly to the IMAP server specified
+/// by [imapServer] / [imapPort] using the `enough_mail` library.
 class EmailService {
   final String email;
   final String password;
@@ -23,6 +30,12 @@ class EmailService {
     this.isImapSecure = true,
   });
 
+  /// Fetches up to [maxEmails] messages from the mailbox folder corresponding
+  /// to [type].
+  ///
+  /// When [earliestEmailDate] is provided only messages on or after that date
+  /// are returned (IMAP SEARCH with `SINCE` / `BEFORE` on mobile; Gmail `after:`
+  /// query operator on web).
   Future<List<MimeMessage>> fetchRecentEmails(EmailType type, {int maxEmails = 50, DateTime? earliestEmailDate}) async {
     if (kIsWeb) {
       return _fetchRecentEmailsFromGmailWeb(type, maxEmails: maxEmails, earliestEmailDate: earliestEmailDate);
@@ -110,6 +123,11 @@ class EmailService {
     }
   }
 
+  /// Web-only implementation that fetches messages via the Gmail REST API.
+  ///
+  /// Requires the user to be signed in and authorised via [GoogleAccountService].
+  /// Each message is fetched in `raw` format and parsed into a [MimeMessage] so
+  /// that the same parsing logic can be reused regardless of platform.
   Future<List<MimeMessage>> _fetchRecentEmailsFromGmailWeb(EmailType type, {int maxEmails = 50, DateTime? earliestEmailDate}) async {
     try {
       if (!GoogleAccountService().isInitialized ||
@@ -195,6 +213,8 @@ class EmailService {
   }
 }
 
+/// Internal [http.BaseClient] that injects OAuth2 authorisation headers into
+/// every outgoing request so the Gmail API calls are authenticated.
 class _AuthClient extends http.BaseClient {
   final Map<String, String> _headers;
   final http.Client _inner = http.Client();
@@ -214,13 +234,20 @@ class _AuthClient extends http.BaseClient {
   }
 }
 
+/// Distinguishes the two kinds of emails the app imports.
 enum EmailType {
   bill,
   payment,
   unknown,
 }
 
+/// Provides [name] (IMAP mailbox / Gmail label) and [fromString] factory for
+/// [EmailType].
 extension EmailTypeExtension on EmailType {
+  /// Returns the mailbox / label name used to fetch emails of this type.
+  ///
+  /// - `bill` → `"bills"` mailbox
+  /// - `payment` → `"bills-tenant-bills"` label/mailbox
   String get name {
     switch (this) {
       case EmailType.bill:
@@ -232,6 +259,8 @@ extension EmailTypeExtension on EmailType {
     }
   }
 
+  /// Parses a string representation into an [EmailType], accepting several
+  /// common synonyms (e.g. `"bill payment"`, `"bill_payments"`).
   static EmailType fromString(String type) {
     switch (type.toLowerCase()) {
       case 'bill':

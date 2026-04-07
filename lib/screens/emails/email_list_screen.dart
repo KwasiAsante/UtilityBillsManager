@@ -11,9 +11,15 @@ import '../../screens/base/google_sign_in_screen_state.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import 'edit_email_data_screen.dart';
 
+/// Screen that displays the list of imported email records.
+///
+/// Supports filtering by processed/unprocessed state, sorting, and search.
+/// On web it syncs emails via Gmail; on mobile / desktop it uses IMAP.
+/// Tapping an email navigates to [EditEmailDataScreen].
 class EmailListScreen extends StatefulWidget {
   const EmailListScreen({super.key, required this.isVisible});
 
+  /// Controls visibility — passed from the [IndexedStack] in [MainTabScreen].
   final bool isVisible;
 
   @override

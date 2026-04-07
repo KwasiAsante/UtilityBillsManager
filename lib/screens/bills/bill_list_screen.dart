@@ -15,9 +15,17 @@ import '../../utils/dialogs/sync_options_dialog.dart';
 
 import 'add_edit_bill_screen.dart';
 
+/// Screen that displays the list of utility bills.
+///
+/// Supports status filtering, due-date filtering (year / month / custom range),
+/// full-text search, and sorting.  On web it extends
+/// [GoogleSignInScreenState] to gate email sync behind a Gmail sign-in,
+/// and on mobile / desktop it triggers an IMAP fetch directly.
 class BillListScreen extends StatefulWidget {
   const BillListScreen({super.key, required this.isVisible});
 
+  /// Controls visibility — passed from the [IndexedStack] in [MainTabScreen]
+  /// to avoid unnecessary background work when the tab is not active.
   final bool isVisible;
 
   @override

@@ -1,3 +1,7 @@
+/// Immutable value object holding aggregated financial figures for a summary row
+/// (e.g. one bill type or one calendar month).
+///
+/// Used by the export utilities to build CSV / PDF reports.
 class SummaryItem {
   final String title;
   final double totalAmount;

@@ -10,6 +10,13 @@ import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/data/models/rentor.dart';
 import 'package:utility_bills_manager/data/models/summary_item.dart';
 
+/// Utility class for exporting bill data to CSV or PDF files.
+///
+/// Both [exportBillsToCSV] and [exportBillsToPDF] group bills by calendar
+/// month, compute totals / paid / unpaid breakdowns, include per-rentor
+/// payment contributions, and share the resulting files via [Share.shareXFiles].
+///
+/// All methods are static; no instance state is needed.
 class ExportUtils {
   static final _dateFmt = DateFormat('yyyy-MM-dd');
   static final _monthFmt = DateFormat('MMMM yyyy');
@@ -21,6 +28,7 @@ class ExportUtils {
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
+  /// Returns the actual amount paid toward [bill] based on its [PaymentStatus].
   static double _paidAmount(Bill bill) {
     if (bill.status == PaymentStatus.paid) {
       return bill.amountPaid ?? bill.amount;
@@ -30,6 +38,8 @@ class ExportUtils {
     return 0.0;
   }
 
+  /// Groups [bills] by "MMMM yyyy" month label and sorts the resulting map
+  /// with the most recent month first.
   static Map<String, List<Bill>> _groupByMonth(List<Bill> bills) {
     final Map<String, List<Bill>> grouped = {};
     for (var bill in bills) {
@@ -72,6 +82,8 @@ class ExportUtils {
     return index;
   }
 
+  /// Wraps [value] in double-quotes if it contains commas, quotes, or newlines
+  /// (RFC 4180 CSV escaping).
   static String _csv(String value) {
     if (value.contains(',') || value.contains('"') || value.contains('\n')) {
       return '"${value.replaceAll('"', '""')}"';
@@ -81,6 +93,9 @@ class ExportUtils {
 
   // ── CSV Export ───────────────────────────────────────────────────────────────
 
+  /// Generates one CSV file per calendar month and shares them via the system
+  /// share sheet.  Each file contains a month-summary row, a per-bill table,
+  /// and an optional rentor-contributions section.
   static Future<void> exportBillsToCSV(
     List<Bill> bills,
     List<Rentor> rentors,
@@ -150,6 +165,10 @@ class ExportUtils {
 
   // ── PDF Export ───────────────────────────────────────────────────────────────
 
+  /// Generates a multi-page PDF (one page per calendar month) and shares it via
+  /// the system share sheet.  Each page includes a month-totals summary, a
+  /// styled bill table, optional rentor-contributions table, and a footer note
+  /// explaining the "paid" threshold logic.
   static Future<void> exportBillsToPDF(
     List<Bill> bills,
     List<Rentor> rentors,
@@ -308,6 +327,8 @@ class ExportUtils {
 
   // ── PDF widget helpers ───────────────────────────────────────────────────────
 
+  /// Builds a single table cell widget for the PDF output.  Header cells are
+  /// bold white; body cells use the optional [color] override.
   static pw.Widget _pdfCell(String text, {bool header = false, PdfColor? color}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
@@ -322,6 +343,8 @@ class ExportUtils {
     );
   }
 
+  /// Builds a two-line stat widget (label + formatted dollar amount) for the
+  /// month-summary row at the top of each PDF page.
   static pw.Widget _pdfStat(String label, double amount, PdfColor color) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,

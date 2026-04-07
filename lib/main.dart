@@ -14,6 +14,19 @@ import 'package:utility_bills_manager/services/api/local_server_stub.dart'
 
 final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
+/// Application entry point.
+///
+/// Startup sequence:
+/// 1. Initialise Flutter bindings.
+/// 2. Initialise the `pdfrx` WASM engine (used for PDF email-attachment parsing).
+/// 3. Load optional `local_secrets.json` configuration via [AppConfig.init].
+/// 4. Set up the correct `sqflite` database factory for the current platform
+///    (web → FFI web, desktop → FFI, mobile → default native).
+/// 5. Open the database (runs migrations if needed).
+/// 6. Set [AppState.localDB] and configure [ApiService.baseUrl].
+/// 7. Start the local shelf HTTP server when running in server mode.
+/// 8. Initialise the local-notifications plugin.
+/// 9. Launch the Flutter widget tree.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // PDF text extraction (email attachments) uses pdfrx on web/mobile/desktop
@@ -86,10 +99,11 @@ void main() async {
 
   runApp(const MyApp());
 }
+/// Root [StatelessWidget] that configures the [MaterialApp] and injects
+/// the deep-purple colour scheme.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(

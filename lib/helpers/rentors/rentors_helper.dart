@@ -7,6 +7,12 @@ import 'package:utility_bills_manager/data/models/app_state.dart';
 
 import '../../data/models/payment.dart';
 
+/// Singleton service layer for rentor-related persistence.
+///
+/// Routes every operation to either the local SQLite [DatabaseHelper] (when
+/// `AppState().localDB` is `true`) or the remote HTTP [ApiService].  Also
+/// provides [updateRentorPaymentInfo] for keeping a rentor's
+/// `lastPaymentDate` field in sync after a payment is recorded.
 class RentorsHelper {
   static final RentorsHelper _instance = RentorsHelper._internal();
 
@@ -16,11 +22,13 @@ class RentorsHelper {
 
   RentorsHelper._internal();
 
+  /// Returns the [DatabaseHelper] singleton when in local-DB mode, or `null`
+  /// when API mode is active.
   DatabaseHelper? get dbHelper => AppState().localDB ? DatabaseHelper() : null;
 
   // #region CRUD Operations
   // #region Rentor
-  // Create a Rentor
+  /// Persists [rentor] to the data source.
   Future<Result<Rentor>> createRentor(Rentor rentor) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -43,7 +51,7 @@ class RentorsHelper {
     }
   }
 
-  // Retrieve Rentor
+  /// Fetches a single rentor by [rentorId].
   Future<Result<Rentor?>> readRentor(String rentorId) async {
     final dbHelper = this.dbHelper;
     try {
@@ -59,7 +67,7 @@ class RentorsHelper {
     }
   }
 
-  // Retrieve all Rentors
+  /// Returns all rentors from the data source.
   Future<Result<List<Rentor>>> readAllRentors() async {
     final dbHelper = this.dbHelper;
     try {
@@ -75,7 +83,7 @@ class RentorsHelper {
     }
   }
 
-  // Update a Rentor
+  /// Updates [rentor] in the data source.
   Future<Result<Rentor>> updateRentor(Rentor rentor) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -98,6 +106,7 @@ class RentorsHelper {
     }
   }
 
+  /// Deletes the rentor identified by [id] from the data source.
   Future<Result<Rentor>> deleteRentor(String id) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -120,6 +129,10 @@ class RentorsHelper {
     }
   }
 
+  /// Refreshes the rentor's `lastPaymentDate` after [payment] is recorded.
+  ///
+  /// Resolves the rentor from [rentorId] if [rentor] is not provided directly,
+  /// then calls [Rentor.updateLastPaymentDate] and persists the change.
   Future<void> updateRentorPaymentInfo(Payment payment, {Rentor? rentor, String? rentorId}) async {
     if (rentor == null && rentorId == null) {
       return;

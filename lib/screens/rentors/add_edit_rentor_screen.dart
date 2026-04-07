@@ -6,7 +6,14 @@ import 'package:utility_bills_manager/data/models/rentor.dart';
 import 'package:utility_bills_manager/data/repositories/rentors_repository.dart';
 import 'package:utility_bills_manager/helpers/bills/bills_helper.dart';
 
+/// Form screen for creating a new rentor or editing an existing one.
+///
+/// Pass a [rentor] to pre-populate the form fields; omit it to create a new
+/// rentor.  On save the screen delegates to [RentorsRepository].  Supports
+/// configuring a default split percentage, per-[BillType] overrides, and
+/// bill types to exclude from the rentor's calculation.
 class AddEditRentorScreen extends StatefulWidget {
+  /// The rentor to edit, or `null` when creating a new one.
   final Rentor? rentor;
 
   const AddEditRentorScreen({super.key, this.rentor});

@@ -10,6 +10,9 @@ import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/data/models/rentor.dart';
 import 'package:utility_bills_manager/helpers/database/database_helper.dart';
 
+/// Parses the `bill` and `payment` query-string flags from a request's query
+/// parameters, accepting several common key spellings (`bill`, `includeBill`,
+/// `include_bill`).  Used by email endpoints that support eager-loading.
 Map<String, bool> _parseEmailInclude(Map<String, String> query) {
   final includeBill =
       (query['bill'] ?? query['includeBill'] ?? query['include_bill'] ?? '')
@@ -22,7 +25,19 @@ Map<String, bool> _parseEmailInclude(Map<String, String> query) {
   };
 }
 
-// Define the main function to start the server
+/// Starts the local `shelf` HTTP server on `0.0.0.0:8080`.
+///
+/// This server is launched in **server mode** (`APP_MODE=server`) and exposes
+/// a REST API that mirrors the [DatabaseHelper] CRUD interface.  Client-mode
+/// builds communicate with it via [ApiService].
+///
+/// Routes follow a consistent pattern:
+/// - `GET  /<resource>/<id>`   → read one
+/// - `GET  /<resource>/list`   → read all
+/// - `POST /<resource>`        → create
+/// - `PUT  /<resource>`        → update
+/// - `DELETE /<resource>/<id>` → delete one
+/// - `DELETE /<resource>/list` → delete all
 Future<void> startServer() async {
   final router = Router();
 

@@ -9,6 +9,11 @@ import 'package:utility_bills_manager/utils/comparable_utils.dart';
 
 import '../../data/models/rentor.dart';
 
+/// Screen that displays the list of rentors (tenants).
+///
+/// Subscribes to [RentorsRepository] for reactive list updates.
+/// Supports sorting by percentage, name, and last-payment date, as well as
+/// full-text search.
 class RentorListScreen extends StatefulWidget {
   const RentorListScreen({super.key});
 

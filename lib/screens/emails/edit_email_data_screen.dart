@@ -9,7 +9,14 @@ import '../../data/repositories/payments_repository.dart';
 import '../bills/add_edit_bill_screen.dart';
 import '../payments/add_edit_payment_screen.dart';
 
+/// Screen for reviewing and editing an [EmailData] record.
+///
+/// Displays the raw email subject and (optionally) the full body, lets the
+/// user link or re-link the email to a [Bill] or [Payment] from dropdowns,
+/// and allows toggling the `processed` flag.  Changes are persisted via
+/// [EmailDataRepository].
 class EditEmailDataScreen extends StatefulWidget {
+  /// The email record to display and optionally edit.
   final EmailData emailData;
 
   const EditEmailDataScreen({super.key, required this.emailData});

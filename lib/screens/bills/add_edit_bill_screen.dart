@@ -4,7 +4,13 @@ import 'package:utility_bills_manager/data/models/bill.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/data/repositories/bills_repository.dart';
 
+/// Form screen for creating a new bill or editing an existing one.
+///
+/// Pass a [bill] to pre-populate the form fields for editing; omit it to
+/// create a new bill.  On save the screen delegates to [BillsRepository]
+/// and pops with the saved [Bill].
 class AddEditBillScreen extends StatefulWidget {
+  /// The bill to edit, or `null` when creating a new one.
   final Bill? bill;
 
   const AddEditBillScreen({super.key, this.bill});

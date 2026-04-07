@@ -4,7 +4,19 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:pdfrx/pdfrx.dart';
 import 'package:utility_bills_manager/data/models/email_data.dart';
 
+/// Utility class for extracting structured content from [MimeMessage] objects.
+///
+/// Covers three extraction paths:
+/// - Plain-text / HTML body extraction ([extractEmailBody])
+/// - PDF attachment text extraction ([extractEmailAttachment], [extractTextFromPdf])
+/// - High-level email → [EmailData] conversion ([parseEmailToEmailData])
+///
+/// All methods are static; no instance state is needed.
 class EmailParser {
+  /// Returns the decoded body of [message] as plain text.
+  ///
+  /// Prefers the plain-text part; falls back to stripping the HTML part.
+  /// Returns an empty string if neither part is present.
   static String extractEmailBody(MimeMessage message) {
     if (kDebugMode) {
       print('Extracting email body');
@@ -33,6 +45,7 @@ class EmailParser {
     return '';
   }
 
+  /// Returns `true` if [message] has a non-empty plain-text part.
   static bool isBodyPlainText(MimeMessage message) {
     final plainBody = message.decodeTextPlainPart();
     if (plainBody != null && plainBody.trim().isNotEmpty) {
@@ -42,6 +55,7 @@ class EmailParser {
     return false;
   }
 
+  /// Returns `true` if [message] has a non-empty HTML part.
   static bool isBodyHTML(MimeMessage message) {
     final htmlBody = message.decodeTextHtmlPart();
     if (htmlBody != null && htmlBody.trim().isNotEmpty) {
@@ -53,6 +67,7 @@ class EmailParser {
     return false;
   }
 
+  /// Returns `true` if [message] contains an application attachment (e.g. PDF).
   static bool hasAttachment(MimeMessage message) {
     if (message.parts != null) {
       for (final part in message.parts!) {
@@ -67,6 +82,10 @@ class EmailParser {
     return false;
   }
 
+  /// Extracts the text content of the first application attachment in [message].
+  ///
+  /// Currently handles PDF files by delegating to [extractTextFromPdf].
+  /// Returns an empty string if no suitable attachment is found.
   static Future<String> extractEmailAttachment(MimeMessage message) async {
     if (kDebugMode) {
       print('Extracting email attachment');
@@ -144,6 +163,12 @@ class EmailParser {
     }
   }
 
+  /// Converts a [MimeMessage] into an [EmailData] record, or returns `null` for
+  /// known irrelevant email subjects.
+  ///
+  /// The stable numeric [EmailData.emailId] is derived from a hash of the
+  /// message date, sender, and subject so that the same email is never
+  /// imported twice.
   static Future<EmailData?> parseEmailToEmailData(MimeMessage message) async {
     final subject = message.decodeSubject() ?? '';
     if (kDebugMode) {

@@ -16,9 +16,14 @@ import '../../utils/dialogs/sync_options_dialog.dart';
 
 import 'add_edit_payment_screen.dart';
 
+/// Screen that displays the list of payments.
+///
+/// Supports due-date range filtering, full-text search, and sorting.
+/// On web it syncs payment emails via Gmail; on mobile / desktop it uses IMAP.
 class PaymentListScreen extends StatefulWidget {
   const PaymentListScreen({super.key, required this.isVisible});
 
+  /// Controls visibility — passed from the [IndexedStack] in [MainTabScreen].
   final bool isVisible;
 
   @override

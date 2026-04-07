@@ -3,6 +3,17 @@ import 'package:utility_bills_manager/data/models/bill.dart';
 import 'package:utility_bills_manager/data/models/rentor.dart';
 import 'package:uuid/uuid.dart';
 
+/// Represents a single payment made by a rentor (or the household itself)
+/// toward one or more [Bill]s.
+///
+/// Each [Payment] carries:
+/// - [amountPaid] — the monetary amount of this transaction.
+/// - [paymentDate] — when the payment was made.
+/// - [billIds] / [bills] — the bills this payment contributes to.
+/// - [rentorId] / [rentor] — the rentor who made the payment, if applicable.
+///
+/// The many-to-many relationship with bills is stored in the `payment_bills`
+/// junction table; [billIds] is the in-memory projection of those rows.
 class Payment {
   final int? id;
   final String? paymentId;
@@ -24,6 +35,8 @@ class Payment {
     this.rentor
   }): paymentId = paymentId ?? Uuid().v4();
 
+  /// Attaches [newBill] to this payment by adding its ID to [billIds] and the
+  /// object to [bills].  Duplicate bills (same [billId]) are silently ignored.
   void addBill(Bill newBill) {
     if (newBill.billId.isNotEmpty) {
       billIds ??= [];
@@ -39,6 +52,7 @@ class Payment {
     }
   }
 
+  /// Removes the bill with [billId] from both [bills] and [billIds].
   void removeBill(String billId) {
     if (bills != null) {
       bills!.removeWhere((bill) => bill.billId == billId);
@@ -49,6 +63,9 @@ class Payment {
     }
   }
 
+  /// Assigns [newRentor] to this payment.  The assignment is skipped if:
+  /// - [newRentor] is null, or
+  /// - the payment already has a different rentor ID assigned.
   void addRentor(Rentor? newRentor) {
     if (newRentor != null && ((rentorId == null || rentorId!.isEmpty) || newRentor.rentorId == rentorId)) {
       rentor = newRentor;
@@ -56,6 +73,11 @@ class Payment {
     }
   }
 
+  /// Returns a formatted string listing all linked bill names.
+  ///
+  /// Each entry is formatted as `"<Type>: <CompanyName> - <yyyy-MM-dd>"`.
+  /// When [newLine] is `true` entries are separated by `\n`; otherwise by `, `.
+  /// Falls back to `"Unknown Bills"` if [bills] is empty.
   String billNames({bool newLine = false}) {
     if (bills != null && bills!.isNotEmpty) {
       return bills!.map((b) => '${b.type.name}: ${b.companyName} - ${DateFormat('yyyy-MM-dd').format(b.dueDate)}').join(newLine ? '\n' : ', ');
@@ -64,6 +86,8 @@ class Payment {
     }
   }
 
+  /// Returns the rentor's display name, or `"Unknown Rentor"` if no rentor is
+  /// associated with this payment.
   String get rentorName {
     if (rentor != null) {
       return rentor!.name;
@@ -72,6 +96,9 @@ class Payment {
     }
   }
 
+  /// Serializes this payment to a flat JSON map for the REST API or SQLite.
+  /// Note: [bills] and [rentor] objects are **not** included — only their IDs.
+  /// The [paymentDate] is encoded as `yyyy-MM-dd`.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -82,6 +109,13 @@ class Payment {
     };
   }
 
+  /// Deserializes a [Payment] from a flat JSON map (API response or SQLite row).
+  ///
+  /// Optionally accepts [billRows] — a list of `b_`-prefixed JOIN rows used to
+  /// hydrate the [bills] list in a single pass, avoiding a second query.
+  /// If [billRows] is omitted but the map itself contains `b_id`, a single
+  /// bill is parsed from the map directly (backward-compatible path).
+  /// A linked [Rentor] is parsed when `r_id` is present in the map.
   factory Payment.fromJson(Map<String, dynamic> map, {List<Map<String, dynamic>>? billRows}) {
     final dynamic rawPaymentId = map['paymentId'];
     final dynamic rawRentorId = map['rentorId'];
@@ -126,6 +160,12 @@ class Payment {
     );
   }
 
+  /// Deserializes a [Payment] from a `p_`-prefixed JOIN query row.
+  ///
+  /// Used when payments are returned as part of a larger JOIN result (e.g.
+  /// inside an [EmailData] query) where payment columns are aliased with
+  /// the `p_` prefix.  Bill IDs are stored as a comma-separated string in
+  /// `p_billIds` and split here.
   factory Payment.paymentFromJson(Map<String, dynamic> map) {
     final dynamic rawPaymentId = map['p_paymentId'];
     final dynamic rawBillIds = map['p_billIds'];
@@ -146,6 +186,7 @@ class Payment {
   }
 }
 
+/// Payment state of a [Bill].
 enum PaymentStatus {
   paid,
   unpaid,
@@ -153,6 +194,8 @@ enum PaymentStatus {
   unknown
 }
 
+/// Extension that adds display-name helpers and [fromString] parsing to
+/// [PaymentStatus] for use in the UI and database serialization.
 extension PaymentStatusExtension on PaymentStatus {
   String get name {
     switch (this) {

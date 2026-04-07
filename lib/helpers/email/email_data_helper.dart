@@ -18,6 +18,17 @@ import '../../utils/payments/payments_parser.dart';
 import '../payments/payments_helper.dart';
 import '../rentors/rentors_helper.dart';
 
+/// Singleton service that handles email data persistence **and** the full
+/// email-import pipeline (fetch → parse → persist bill/payment).
+///
+/// CRUD operations are routed to [DatabaseHelper] (local-DB mode) or
+/// [ApiService] (server mode) exactly like the other helpers.
+///
+/// The import pipeline ([fetchBillEmails] / [fetchPaymentEmails]) fetches raw
+/// [MimeMessage]s from the IMAP account configured in [AppConfig], converts
+/// them to [EmailData] records, and then attempts to parse a [Bill] or
+/// [Payment] out of each message body.  Existing records are detected by
+/// `emailId` and skipped to avoid duplicates.
 class EmailDataHelper {
   static final EmailDataHelper _instance = EmailDataHelper._internal();
 
@@ -27,8 +38,11 @@ class EmailDataHelper {
 
   EmailDataHelper._internal();
 
+  /// Returns the [DatabaseHelper] singleton when in local-DB mode, or `null`
+  /// when API mode is active.
   DatabaseHelper? get dbHelper => AppState().localDB ? DatabaseHelper() : null;
 
+  /// IMAP client configured from [AppConfig] credentials and server settings.
   late final EmailService emailService = EmailService(
     email: AppConfig.emailAddress,
     password: AppConfig.emailPassword,
@@ -43,7 +57,7 @@ class EmailDataHelper {
 
   // region CRUD Operations
   // region Email Data
-  // Create Email Data
+  /// Persists [emailData] to the data source.
   Future<Result<EmailData>> createEmailData(EmailData emailData) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -65,7 +79,7 @@ class EmailDataHelper {
     }
   }
 
-  // Retrieve Email Data
+  /// Retrieves a single email record by [id], with optional join of bill/payment.
   Future<Result<EmailData?>> readEmail(String id, {Map<String, bool>? include}) async {
     final dbHelper = this.dbHelper;
     try {
@@ -81,7 +95,7 @@ class EmailDataHelper {
     }
   }
 
-  // Retrieve Email Data list
+  /// Returns all email records, with optional join of bill/payment.
   Future<Result<List<EmailData>>> readEmails({Map<String, bool>? include}) async {
     final dbHelper = this.dbHelper;
     try {
@@ -97,7 +111,7 @@ class EmailDataHelper {
     }
   }
 
-  // Retrieve unprocessed Email Data
+  /// Returns only email records that have not yet been processed (`processed = false`).
   Future<Result<List<EmailData>>> readUnprocessedEmails({Map<String, bool>? include}) async {
     final dbHelper = this.dbHelper;
     try {
@@ -113,7 +127,7 @@ class EmailDataHelper {
     }
   }
 
-  // Retrieve processed Email Data
+  /// Returns only email records that have been processed (`processed = true`).
   Future<Result<List<EmailData>>> readProcessedEmails({Map<String, bool>? include}) async {
     final dbHelper = this.dbHelper;
     try {
@@ -129,6 +143,7 @@ class EmailDataHelper {
     }
   }
 
+  /// Updates [emailData] in the data source.
   Future<Result<EmailData>> updateEmailData(EmailData emailData) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -150,7 +165,7 @@ class EmailDataHelper {
     }
   }
 
-  // Delete Email Data by emailDataId
+  /// Deletes the email record identified by [emailDataId].
   Future<Result<void>> deleteEmailData(String emailDataId) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -165,7 +180,7 @@ class EmailDataHelper {
     }
   }
 
-  // Delete all Email Data
+  /// Deletes all email records from the data source.
   Future<Result<void>> deleteAllEmails() async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -183,6 +198,12 @@ class EmailDataHelper {
   // endregion
 
   // region Email
+  /// Fetches recent emails of [type] from the IMAP server, converts each
+  /// [MimeMessage] to an [EmailData] record via [EmailParser], and persists any
+  /// new records (skipping ones already stored by `emailId`).
+  ///
+  /// Returns a map of [MimeMessage] → [EmailData] for all messages that were
+  /// successfully parsed, whether freshly inserted or already existing in the DB.
   Future<Map<MimeMessage, EmailData>> fetchEmails(EmailType type, {int maxEmails = 50, DateTime? earliestEmailDate}) async {
     Map<MimeMessage, EmailData> finalMessages = {};
     final messages = await emailService.fetchRecentEmails(type, maxEmails: maxEmails, earliestEmailDate: earliestEmailDate);
@@ -217,6 +238,10 @@ class EmailDataHelper {
     return finalMessages;
   }
 
+  /// Fetches bill emails, parses each one into a [Bill] via [BillsParser], and
+  /// persists both the bill and an updated [EmailData] record (marked
+  /// `processed = true`).  If a bill is already stored (by `billId`), the
+  /// email record is simply linked to the existing bill.
   Future<void> fetchBillEmails({int maxEmails = 50, DateTime? earliestEmailDate}) async {
     final messages = await fetchEmails(EmailType.bill, maxEmails: maxEmails, earliestEmailDate: earliestEmailDate);
     if (messages.isNotEmpty) {
@@ -299,6 +324,10 @@ class EmailDataHelper {
     }
   }
 
+  /// Fetches payment emails, parses each one into a [Payment] via
+  /// [PaymentsParser] (using the full rentor list to match names), and persists
+  /// both the payment and the updated [EmailData].  If a payment is already
+  /// stored (by `paymentId`), the email is simply linked to the existing record.
   Future<void> fetchPaymentEmails({int maxEmails = 50, DateTime? earliestEmailDate}) async {
     final messages = await fetchEmails(EmailType.payment, maxEmails: maxEmails, earliestEmailDate: earliestEmailDate);
     if (messages.isNotEmpty) {

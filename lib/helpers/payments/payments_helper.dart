@@ -8,6 +8,12 @@ import '../../data/models/bill.dart';
 import '../../data/models/rentor.dart';
 import '../bills/bills_helper.dart';
 
+/// Singleton service layer for payment-related persistence.
+///
+/// Routes every operation to either the local SQLite [DatabaseHelper] (when
+/// `AppState().localDB` is `true`) or the remote HTTP [ApiService] (server
+/// mode).  On delete it also delegates to [BillsHelper] to reverse any
+/// payment-status side-effects that were applied when the payment was created.
 class PaymentsHelper {
   static final PaymentsHelper _instance = PaymentsHelper._internal();
 
@@ -17,10 +23,12 @@ class PaymentsHelper {
 
   PaymentsHelper._internal();
 
+  /// Returns the [DatabaseHelper] singleton when in local-DB mode, or `null`
+  /// when API mode is active.
   DatabaseHelper? get dbHelper => AppState().localDB ? DatabaseHelper() : null;
 
   // #region CRUD Operations
-  // Create a Payment
+  /// Persists [payment] (and its bill links) to the data source.
   Future<Result<Payment>> createPayment(Payment payment) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -43,7 +51,8 @@ class PaymentsHelper {
     }
   }
 
-  // Retrieve Payment
+  /// Retrieves a single payment by [id], optionally joining related bills and
+  /// rentor via [include] flags.
   Future<Result<Payment?>> readPayment(String id, {Map<String, bool>? include}) async {
     final dbHelper = this.dbHelper;
     try {
@@ -59,7 +68,8 @@ class PaymentsHelper {
     }
   }
 
-  // Retrieve all Payments
+  /// Returns all payments, optionally filtered to [paymentIds] and with
+  /// related records eager-loaded via [include] flags.
   Future<Result<List<Payment>>> readAllPayments({Map<String, bool>? include, List<String>? paymentIds}) async {
     final dbHelper = this.dbHelper;
     try {
@@ -75,7 +85,7 @@ class PaymentsHelper {
     }
   }
 
-  // Update a Payment
+  /// Updates [payment] in the data source (including incremental bill-link diff).
   Future<Result<Payment>> updatePayment(Payment payment) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -97,6 +107,8 @@ class PaymentsHelper {
     }
   }
 
+  /// Attaches a bill to [payment] (by resolved [bill] object or [billId]) and
+  /// persists the updated payment.
   Future<Result<Payment>> updatePaymentBillReference(Payment payment, {String? billId, Bill? bill}) async {
     final dbHelper = this.dbHelper;
     try {
@@ -141,6 +153,8 @@ class PaymentsHelper {
     }
   }
 
+  /// Attaches a rentor to [payment] (by resolved [rentor] object or [rentorId])
+  /// and persists the updated payment.
   Future<Result<Payment>> updatePaymentRentorReference(Payment payment, {String? rentorId, Rentor? rentor}) async {
     final dbHelper = this.dbHelper;
     try {
@@ -185,7 +199,11 @@ class PaymentsHelper {
     }
   }
 
-  // Delete Payment
+  /// Deletes the payment identified by [id].
+  ///
+  /// Before deleting, the payment is fetched (with bill data) so that
+  /// [BillsHelper.reversePaymentStatusForBills] can undo the bill-status
+  /// side-effects that were applied when this payment was first created.
   Future<Result<void>> deletePayment(String id) async {
     final dbHelper = this.dbHelper;
 
@@ -216,7 +234,11 @@ class PaymentsHelper {
     }
   }
 
-  // Delete all Payments
+  /// Deletes all payments and reverses their bill-status side-effects.
+  ///
+  /// All payments are fetched first so each bill's `amountPaid` and status can
+  /// be rolled back.  In API mode falls back to per-payment deletes if the
+  /// server does not implement a bulk-delete endpoint.
   Future<Result<void>> deleteAllPayments() async {
     final dbHelper = this.dbHelper;
 

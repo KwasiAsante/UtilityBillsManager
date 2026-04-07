@@ -4,6 +4,12 @@ import 'package:utility_bills_manager/data/models/bill.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:uuid/uuid.dart';
 
+/// Stores the raw content of an email fetched from the mailbox, along with
+/// references to any [Bill] or [Payment] that was parsed from it.
+///
+/// The [processed] flag indicates whether the email has been analysed and its
+/// bill/payment data saved to the database.  An [emailId] is derived from the
+/// email's metadata (sender + date + subject hash) to avoid duplicate imports.
 class EmailData {
   final int? id;
   final String? emailDataId;
@@ -29,6 +35,9 @@ class EmailData {
     this.payment
   }): emailDataId = emailDataId ?? Uuid().v4();
 
+  /// Serializes this [EmailData] to a flat JSON map for SQLite / REST API.
+  /// [processed] is stored as an integer (1 = true, 0 = false) because SQLite
+  /// has no native boolean type.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -42,6 +51,11 @@ class EmailData {
     };
   }
 
+  /// Deserializes an [EmailData] from a flat JSON map.
+  ///
+  /// If the map contains `b_id` (bill JOIN columns) or `p_id` (payment JOIN
+  /// columns) they are hydrated into the [bill] / [payment] fields
+  /// automatically using [Bill.billFromJson] and [Payment.paymentFromJson].
   factory EmailData.fromJson(Map<String, dynamic> map) {
     final dynamic rawEmailDataId = map['emailDataId'];
     final dynamic rawBillId = map['billId'];
@@ -62,6 +76,9 @@ class EmailData {
     );
   }
 
+  /// Generates a pseudo-unique numeric email ID by combining the current Unix
+  /// timestamp (seconds) with a random 4-digit suffix.  Used as a fallback
+  /// when the email has no server-assigned ID.
   static int _generateEmailId() {
     final random = Random();
     // Get current timestamp in seconds
@@ -72,6 +89,8 @@ class EmailData {
     return int.parse('$timestamp$randomPart');
   }
 
+  /// Returns [emailId] as a string, lazily generating one via [_generateEmailId]
+  /// if the field is not yet set.
   String getEmailId() {
     emailId ??= _generateEmailId();
     return emailId.toString();

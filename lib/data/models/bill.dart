@@ -1,6 +1,13 @@
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:uuid/uuid.dart';
 
+/// Represents a single utility bill (electricity, gas, water, etc.) owed by
+/// the household.
+///
+/// A [Bill] tracks the billing company, type, total amount, due date, payment
+/// status, and how much has already been paid ([amountPaid]).  The [billId] is
+/// a UUID assigned on creation and used as the stable foreign key across
+/// payments and email records.
 class Bill {
   final int? id;
   String billId;
@@ -24,6 +31,8 @@ class Bill {
     this.amountPaid,
   }) : billId = billId ?? Uuid().v4();
 
+  /// Deserializes a [Bill] from a flat JSON map, as returned by the REST API
+  /// or stored in the SQLite `bills` table (standard column names).
   factory Bill.fromJson(Map<String, dynamic> json) {
     return Bill(
       id: json['id'],
@@ -38,6 +47,12 @@ class Bill {
     );
   }
 
+  /// Deserializes a [Bill] from a row returned by a JOIN query in which bill
+  /// columns are prefixed with `b_` (e.g. `b_id`, `b_billId`, `b_company`).
+  ///
+  /// Also tolerates pre-hydrated [BillType] / [PaymentStatus] enum values that
+  /// may already be present when rows are assembled in Dart before JSON round-
+  /// tripping.
   factory Bill.billFromJson(Map<String, dynamic> map) {
     final rawType = map['b_type'];
     final rawStatus = map['b_status'];
@@ -62,6 +77,8 @@ class Bill {
     );
   }
 
+  /// Serializes this bill to a flat JSON map suitable for the REST API body
+  /// or direct SQLite insertion.  The [dueDate] is encoded as `yyyy-MM-dd`.
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -76,6 +93,9 @@ class Bill {
     };
   }
 
+  /// Returns the canonical display name for the billing company derived from
+  /// the [type] and [company] fields.  Falls back to the raw [company] string
+  /// for [BillType.creditcard] variants and [BillType.other].
   String get companyName {
     switch (type) {
       case BillType.electric:
@@ -112,6 +132,7 @@ class Bill {
   }
 }
 
+/// Categories of utility bills tracked by the app.
 enum BillType {
   electric,
   gas,
@@ -124,6 +145,9 @@ enum BillType {
   other,
 }
 
+/// Extension that adds a human-readable [name] getter and a [fromString]
+/// factory to [BillType], enabling round-trip serialization with the database
+/// and REST API.
 extension BillTypeExtension on BillType {
   String get name {
     switch (this) {

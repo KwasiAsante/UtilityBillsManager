@@ -6,10 +6,23 @@ import 'package:utility_bills_manager/data/models/email_data.dart';
 import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:utility_bills_manager/data/models/rentor.dart';
 
+/// Singleton low-level SQLite helper built on top of `sqflite`.
+///
+/// Owns the full database schema (currently version 14) and exposes raw CRUD
+/// methods for all four tables: `bills`, `rentors`, `payments`, and
+/// `email_data`.  Higher-level helpers (`BillsHelper`, `PaymentsHelper`, etc.)
+/// delegate here for all local-DB operations.
+///
+/// **Platform bootstrapping** (must happen in `main` before any DB access):
+/// - Web   → `databaseFactory = databaseFactoryFfiWeb`
+/// - Desktop → `sqfliteFfiInit(); databaseFactory = databaseFactoryFfi`
+/// - Mobile  → nothing (default factory is fine)
 class DatabaseHelper {
   //region Initialization
   static const _databaseName = 'utility_manager.db';
 
+  /// Current schema version.  Bump this and add a corresponding
+  /// `if (oldVersion < N)` block in [_onUpgrade] for every schema change.
   static const _databaseVersion = 14;
 
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -20,6 +33,7 @@ class DatabaseHelper {
 
   DatabaseHelper._internal();
 
+  /// Lazily initialises and caches the database connection.
   Future<Database> get database async {
     if (_database != null) return _database!;
 
@@ -54,6 +68,8 @@ class DatabaseHelper {
     );
   }
 
+  /// Called once when the database file is first created.  Builds the full
+  /// schema in a single pass (equivalent to the latest migration state).
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
       CREATE TABLE bills (
@@ -151,6 +167,9 @@ class DatabaseHelper {
     ''');
   }
 
+  /// Applies incremental migrations for every schema version between
+  /// [oldVersion] and [newVersion].  Each guard (`if (oldVersion < N)`) is
+  /// idempotent so that interrupted upgrades can be safely replayed.
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute('ALTER TABLE bills ADD COLUMN type TEXT NOT NULL');
@@ -518,11 +537,16 @@ class DatabaseHelper {
   //endregion
 
   //region Migration Helpers
+  /// Returns `true` if [column] already exists in [table] (checked via
+  /// `PRAGMA table_info`).  Used by [_ensureColumn] to avoid duplicate-column
+  /// errors on re-run.
   Future<bool> _hasColumn(Database db, String table, String column) async {
     final columns = await db.rawQuery('PRAGMA table_info($table)');
     return columns.any((entry) => entry['name'] == column);
   }
 
+  /// Adds [column] to [table] only if it does not already exist, preventing
+  /// `ALTER TABLE … ADD COLUMN` failures on repeated upgrade runs.
   Future<void> _ensureColumn(
     Database db,
     String table,
@@ -534,6 +558,10 @@ class DatabaseHelper {
     }
   }
 
+  /// Fills NULL / blank [column] values using [fillExpression], then
+  /// disambiguates any remaining duplicates by appending `-<rowid>` to all
+  /// non-minimum duplicate rows.  This makes UUID columns safe to index as
+  /// `UNIQUE` after the fact.
   Future<void> _backfillAndDeduplicateId(
     Database db, {
     required String table,
@@ -624,6 +652,11 @@ class DatabaseHelper {
   //   }
   // }
 
+  /// Reconstructs the `payments` table with a new schema by creating a
+  /// `payments_new` table, copying data with the provided SQL expression
+  /// fragments, and then renaming it back.  Used across several migration
+  /// versions where `ALTER TABLE` is insufficient (e.g. changing FK targets or
+  /// column nullability).
   Future<void> _rebuildPaymentsTable(
     Database db, {
     required String paymentIdSelectExpression,
@@ -663,6 +696,9 @@ class DatabaseHelper {
     await db.execute('ALTER TABLE payments_new RENAME TO payments');
   }
 
+  /// Rebuilds the `email_data` table to add a `paymentId` FK column while
+  /// preserving all existing data and silently nullifying any references that
+  /// no longer resolve to a valid `payments` row.
   Future<void> _rebuildEmailDataWithPaymentForeignKey(Database db) async {
     await db.execute('DROP TABLE IF EXISTS email_data_new');
     await _ensureColumn(db, 'email_data', 'paymentId', 'TEXT');
@@ -916,13 +952,13 @@ class DatabaseHelper {
 
   //region CRUD Operations
   //region Bill
-  // Insert a Bill
+  /// Inserts [bill] into the `bills` table and returns the new row id.
   Future<int> createBill(Bill bill) async {
     final db = await database;
     return await db.insert('bills', bill.toJson());
   }
 
-  // Retrieve Bills
+  /// Returns the [Bill] identified by [billId], or `null` if not found.
   Future<Bill?> readBill(String billId) async {
     final db = await database;
     final result = await db.query(
@@ -938,14 +974,15 @@ class DatabaseHelper {
     return Bill.fromJson(result.first);
   }
 
-  // Retrieve all Bills
+  /// Returns all bills in the `bills` table.
   Future<List<Bill>> readAllBills() async {
     final db = await database;
     final result = await db.query('bills');
     return result.map((map) => Bill.fromJson(map)).toList();
   }
 
-  // Retrieve all Bills
+  /// Returns bills matching [status] (case-insensitive).  Pass [ids] to further
+  /// restrict results to a specific set of `billId` values.
   Future<List<Bill>> readBillsByStatus(String status, {List<String>? ids}) async {
     final db = await database;
     String placeholders = ids != null && ids.isNotEmpty ? ids.map((_) => '?').join(', ') : '';
@@ -958,7 +995,7 @@ class DatabaseHelper {
     return result.map((map) => Bill.fromJson(map)).toList();
   }
 
-  // Update a Bill
+  /// Updates the row matching `bill.billId` and returns the number of affected rows.
   Future<int> updateBill(Bill bill) async {
     final db = await database;
     return await db.update(
@@ -969,7 +1006,7 @@ class DatabaseHelper {
     );
   }
 
-  // Delete a Bill
+  /// Deletes the bill identified by [id] and returns the number of deleted rows.
   Future<int> deleteBill(String id) async {
     final db = await database;
     return await db.delete('bills', where: 'billId = ?', whereArgs: [id]);
@@ -982,13 +1019,13 @@ class DatabaseHelper {
   //endregion
 
   //region Rentor
-  // Insert a Rentor
+  /// Inserts [rentor] into the `rentors` table and returns the new row id.
   Future<int> createRentor(Rentor rentor) async {
     final db = await database;
     return await db.insert('rentors', rentor.toDbJson());
   }
 
-  // Retrieve a Rentor by id
+  /// Returns the [Rentor] identified by [id] (`rentorId`), or `null` if not found.
   Future<Rentor?> readRentor(String id) async {
     final db = await database;
     final result = await db.query(
@@ -1004,14 +1041,14 @@ class DatabaseHelper {
     return Rentor.fromJson(result.first);
   }
 
-  // Retrieve all Rentors
+  /// Returns all rentors in the `rentors` table.
   Future<List<Rentor>> readAllRentors() async {
     final db = await database;
     final result = await db.query('rentors');
     return result.map((map) => Rentor.fromJson(map)).toList();
   }
 
-  // Update a Rentor
+  /// Updates the rentor matching `rentor.rentorId` and returns affected row count.
   Future<int> updateRentor(Rentor rentor) async {
     final db = await database;
     return await db.update(
@@ -1022,7 +1059,7 @@ class DatabaseHelper {
     );
   }
 
-  // Delete a Rentor
+  /// Deletes the rentor identified by [id] (`rentorId`) and returns deleted row count.
   Future<int> deleteRentor(String id) async {
     final db = await database;
     return await db.delete('rentors', where: 'rentorId = ?', whereArgs: [id]);
@@ -1035,7 +1072,8 @@ class DatabaseHelper {
   //endregion
 
   //region Payment
-  // Insert a Payment
+  /// Inserts [payment] into the `payments` table and writes all associated
+  /// bill links into `payment_bills`.  Returns the new payment row id.
   Future<int> createPayment(Payment payment) async {
     final db = await database;
     final paymentData = payment.toJson();
@@ -1044,7 +1082,10 @@ class DatabaseHelper {
     return result;
   }
 
-  // Retrieve a Payment by paymentId
+  /// Retrieves the payment identified by [paymentId].
+  ///
+  /// Pass `include: {'bill': true}` and/or `include: {'rentor': true}` to
+  /// eagerly join associated records.  Returns `null` if not found.
   Future<Payment?> readPayment(String paymentId, {Map<String, bool>? include}) async {
     final db = await database;
     final includeBill = include?['bill'] == true;
@@ -1096,7 +1137,8 @@ class DatabaseHelper {
     return Payment.fromJson(Map<String, dynamic>.from(result.first), billRows: billsResult);
   }
 
-  // Retrieve all Payments
+  /// Returns all payments, optionally filtered to [ids] and with related
+  /// bills/rentors eagerly loaded based on the [include] flags.
   Future<List<Payment>> readAllPayments({Map<String, bool>? include, List<String>? ids}) async {
     final db = await database;
     final includeBill = include?['bill'] == true;
@@ -1162,7 +1204,10 @@ class DatabaseHelper {
         .toList();
   }
 
-  // Update a Payment
+  /// Updates the `payments` row matching `payment.paymentId` and performs an
+  /// incremental diff on `payment_bills`: rows for removed bills are deleted,
+  /// rows for newly added bills are inserted (preserving `applied` state for
+  /// unchanged links).  Returns the number of updated `payments` rows.
   Future<int> updatePayment(Payment payment) async {
     final db = await database;
     final paymentData = payment.toJson();
@@ -1206,7 +1251,8 @@ class DatabaseHelper {
     return result;
   }
 
-  // Delete a Payment
+  /// Deletes the payment identified by [id] (`paymentId`).  Cascades to
+  /// `payment_bills` via the DB-level ON DELETE CASCADE constraint.
   Future<int> deletePayment(String id) async {
     final db = await database;
     return await db.delete('payments', where: 'paymentId = ?', whereArgs: [id]);
@@ -1217,6 +1263,8 @@ class DatabaseHelper {
     return await db.delete('payments');
   }
 
+  /// Marks the `payment_bills` junction row as applied and records the exact
+  /// [appliedAmount] credited toward [billId] from [paymentId].
   Future<void> markPaymentBillApplied(String paymentId, String billId, double appliedAmount) async {
     final db = await database;
     await db.update(
@@ -1227,6 +1275,9 @@ class DatabaseHelper {
     );
   }
 
+  /// Returns the previously recorded `appliedAmount` for the ([paymentId],
+  /// [billId]) pair if the junction row is marked `applied = 1`, otherwise
+  /// returns `null`.
   Future<double?> getPaymentBillAppliedAmount(String paymentId, String billId) async {
     final db = await database;
     final result = await db.query(
@@ -1241,13 +1292,15 @@ class DatabaseHelper {
   //endregionZ
 
   //region Email
-  // Insert Email Data
+  /// Inserts [emailData] into the `email_data` table and returns the new row id.
   Future<int> createEmailData(EmailData emailData) async {
     final db = await database;
     return await db.insert('email_data', emailData.toJson());
   }
 
-  // Retrieve Email Data by emailId
+  /// Returns the [EmailData] record whose `emailId` matches [emailId], or
+  /// `null` if not found.  Pass [include] flags to join `bill` and/or
+  /// `payment`.
   Future<EmailData?> readEmail(String emailId, {Map<String, bool>? include}) async {
     final db = await database;
     final includeBill = include?['bill'] == true;
@@ -1276,7 +1329,7 @@ class DatabaseHelper {
     return EmailData.fromJson(result.first);
   }
 
-  // Retrieve all Email Data
+  /// Returns all email records, optionally with related bill/payment data joined.
   Future<List<EmailData>> readEmails({Map<String, bool>? include}) async {
     final db = await database;
     final includeBill = include?['bill'] == true;
@@ -1296,7 +1349,7 @@ class DatabaseHelper {
     return result.map((map) => EmailData.fromJson(map)).toList();
   }
 
-  // Retrieve unprocessed Email Data
+  /// Returns only email records where `processed = 0`.
   Future<List<EmailData>> readUnprocessedEmails({Map<String, bool>? include}) async {
     final db = await database;
     final includeBill = include?['bill'] == true;
@@ -1321,7 +1374,7 @@ class DatabaseHelper {
     return result.map((map) => EmailData.fromJson(map)).toList();
   }
 
-  // Retrieve processed Email Data
+  /// Returns only email records where `processed = 1`.
   Future<List<EmailData>> readProcessedEmails({Map<String, bool>? include}) async {
     final db = await database;
     final includeBill = include?['bill'] == true;
@@ -1346,7 +1399,10 @@ class DatabaseHelper {
     return result.map((map) => EmailData.fromJson(map)).toList();
   }
 
-  // Update a Email Data
+  /// Updates the `email_data` row matching `emaildata.emailDataId`.
+  ///
+  /// The `id` field is stripped before the update to avoid overwriting the
+  /// auto-increment primary key.
   Future<int> updateEmailData(EmailData emaildata) async {
     final db = await database;
 
@@ -1362,7 +1418,7 @@ class DatabaseHelper {
     );
   }
 
-  // Delete Email Data by emailDataId
+  /// Deletes the email record identified by [id] (`emailDataId`).
   Future<int> deleteEmailData(String id) async {
     final db = await database;
     return await db.delete('email_data', where: 'emailDataId = ?', whereArgs: [id]);
@@ -1376,7 +1432,8 @@ class DatabaseHelper {
   //endregion
 
   //region Database Lifecycle
-  // Close the database
+  /// Closes the underlying SQLite connection.  The cached [_database] reference
+  /// is **not** cleared, so a subsequent access to [database] will re-open it.
   Future<void> closeDatabase() async {
     final db = await database;
     await db.close();

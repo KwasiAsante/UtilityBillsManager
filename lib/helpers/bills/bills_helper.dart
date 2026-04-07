@@ -11,6 +11,13 @@ import 'package:utility_bills_manager/data/models/app_state.dart';
 import '../../data/models/rentor.dart';
 import '../rentors/rentors_helper.dart';
 
+/// Singleton service layer for bill-related persistence and status logic.
+///
+/// Routes every operation to either the local SQLite [DatabaseHelper] (when
+/// `AppState().localDB` is `true`) or the remote HTTP [ApiService] (server
+/// mode).  Also owns payment-status side-effects: when a [Payment] is created
+/// or deleted the helper credits / reverses the applied amount on each linked
+/// [Bill] and updates its [PaymentStatus].
 class BillsHelper {
   static final BillsHelper _instance = BillsHelper._internal();
 
@@ -20,11 +27,14 @@ class BillsHelper {
 
   BillsHelper._internal();
 
+  /// Returns the [DatabaseHelper] singleton when the app is running in local-DB
+  /// mode, or `null` when API (server) mode is active.
   DatabaseHelper? get dbHelper => AppState().localDB ? DatabaseHelper() : null;
 
   // #region CRUD Operations
   // #region Bill
-  // Create a Bill
+  /// Persists [bill] to the local DB or remote API and returns a [Result]
+  /// containing the created bill on success.
   Future<Result<Bill>> createBill(Bill bill) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -46,7 +56,8 @@ class BillsHelper {
     }
   }
 
-  // Retrieve Bills by ID
+  /// Fetches a single bill by [billId].  Returns `Result.success(data: null)`
+  /// if no matching bill is found.
   Future<Result<Bill?>> readBill(String billId) async {
     final dbHelper = this.dbHelper;
     try {
@@ -62,7 +73,7 @@ class BillsHelper {
     }
   }
 
-  // Retrieve all Bills
+  /// Returns all bills from the data source.
   Future<Result<List<Bill>>> readAllBills() async {
     final dbHelper = this.dbHelper;
     try {
@@ -78,7 +89,11 @@ class BillsHelper {
     }
   }
 
-  // Retrieve all Bills
+  /// Returns bills filtered by payment status.
+  ///
+  /// Accepts either a raw [status] string or a [PaymentStatus] enum value (one
+  /// must be provided).  Optionally restrict results to a specific set of
+  /// [billIds].
   Future<Result<List<Bill>>> readBillsByStatus({String? status, PaymentStatus? paymentStatus, List<String>? billIds}) async {
     final dbHelper = this.dbHelper;
     try {
@@ -98,7 +113,7 @@ class BillsHelper {
     }
   }
 
-  // Update a Bill
+  /// Updates [bill] in the data source and returns a [Result] with the updated bill.
   Future<Result<Bill>> updateBill(Bill bill) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -120,7 +135,7 @@ class BillsHelper {
     }
   }
 
-  // Delete a Bill
+  /// Deletes the bill identified by [id] from the data source.
   Future<Result<Bill>> deleteBill(String id) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -140,7 +155,7 @@ class BillsHelper {
     }
   }
 
-  // Delete all Bills
+  /// Deletes all bills from the data source.
   Future<Result<void>> deleteAllBills() async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -155,6 +170,17 @@ class BillsHelper {
     }
   }
 
+  /// Credits [payment.amountPaid] toward the provided [bills] (or fetches them
+  /// by [billIds]) and updates each bill's [PaymentStatus].
+  ///
+  /// Workflow:
+  /// 1. Resolve missing bills / rentor from the DB if only IDs are provided.
+  /// 2. For each bill, subtract any previously recorded `appliedAmount` from
+  ///    the running balance to avoid double-counting.
+  /// 3. Call [updateLastPaymentStatus] for each bill, which caps the credited
+  ///    amount to what the rentor owes (if any) and persists the new status.
+  /// 4. Record the exact amount applied per (payment, bill) pair via
+  ///    [_markPaymentBillApplied].
   Future<void> updatePaymentStatuses(Payment payment, {List<Bill>? bills, List<String>? billIds, Rentor? rentor, String? rentorId}) async {
     if (bills == null && billIds == null) {
       return;
@@ -215,6 +241,8 @@ class BillsHelper {
     }
   }
 
+  /// Delegates to [DatabaseHelper.markPaymentBillApplied] when in local-DB mode.
+  /// No-op in API mode (server-side is responsible for recording applied amounts).
   Future<void> _markPaymentBillApplied(String paymentId, String billId, double appliedAmount) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
@@ -222,6 +250,14 @@ class BillsHelper {
     }
   }
 
+  /// Reverses the payment-status side-effects of a deleted [payment] for each
+  /// bill in [billIds].
+  ///
+  /// For every bill, the previously recorded `appliedAmount` is subtracted from
+  /// `bill.amountPaid` and the status is recalculated:
+  /// - `paid`    → if the remaining owed amount is within the threshold
+  /// - `partial` → if some amount has still been paid
+  /// - `unpaid`  → if nothing has been paid
   Future<void> reversePaymentStatusForBills(Payment payment, List<String> billIds) async {
     if (payment.paymentId == null || billIds.isEmpty) return;
 
@@ -270,6 +306,13 @@ class BillsHelper {
     }
   }
 
+  /// Applies [amountPaid] toward [bill], respects the rentor's owed share when
+  /// [rentor] is provided, persists the updated bill, and returns the
+  /// **remaining** balance after crediting this bill.
+  ///
+  /// The "paid" threshold is bill-type aware:
+  /// - Internet bills: paid when owed ≤ 50 % of total amount.
+  /// - All other types: paid when owed ≤ 30 % of total amount.
   Future<double> updateLastPaymentStatus(double amountPaid, {Bill? bill, Rentor? rentor}) async {
     if (bill == null) {
       if (kDebugMode) {

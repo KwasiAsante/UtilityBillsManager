@@ -7,6 +7,17 @@ import 'package:utility_bills_manager/helpers/payments/payments_helper.dart';
 import 'package:utility_bills_manager/utils/comparable_utils.dart';
 import 'package:uuid/uuid.dart';
 
+/// Represents a tenant / rentor who contributes toward household utility bills.
+///
+/// Each rentor has:
+/// - A [defaultPercentage] applied to all bills that don't have a specific
+///   override in [billPercentages].
+/// - A per-[BillType] override map ([billPercentages]) for fine-grained splits.
+/// - An [excludedBillTypes] list for bill types the rentor never pays.
+/// - A [lastPaymentDate] that is updated whenever a new [Payment] is recorded.
+///
+/// Amount calculations are available via [owedAmount], [totalOwed], and the
+/// static helpers [calculateOwedAmount] / [calculateTotalOwed].
 class Rentor {
   final int? id;
   final String rentorId;
@@ -31,6 +42,9 @@ class Rentor {
   })  : rentorId = rentorId ?? Uuid().v4(),
         excludedBillTypes = excludedBillTypes ?? const [];
 
+  /// Parses the [excludedBillTypes] field from its stored form — either a
+  /// JSON-encoded string (from SQLite) or a raw Dart [List] (from API JSON).
+  /// Returns an empty list if [raw] is null or cannot be parsed.
   static List<BillType> _parseExcludedBillTypes(dynamic raw) {
     List<dynamic> list;
     if (raw is String && raw.isNotEmpty) {
@@ -44,6 +58,11 @@ class Rentor {
     return list.map((e) => BillTypeExtension.fromString(e.toString())).toList();
   }
 
+  /// Deserializes a [Rentor] from a standard JSON map (API response or SQLite
+  /// row with plain column names).
+  ///
+  /// The [billPercentages] field may arrive as a JSON-encoded string (SQLite)
+  /// or as a nested [Map] (API).  Both forms are handled.
   factory Rentor.fromJson(Map<String, dynamic> json) {
     final rawBillPercentages = json['billPercentages'];
     final Map<String, dynamic> rawMap;
@@ -81,6 +100,8 @@ class Rentor {
     );
   }
 
+  /// Deserializes a [Rentor] from a `r_`-prefixed JOIN query row (e.g. when a
+  /// payment row is joined with its rentor).
   factory Rentor.rentorFromJson(Map<String, dynamic> map) {
     final rawBillPercentages = map['r_billPercentages'];
     final Map<String, dynamic> rawMap;
@@ -118,6 +139,9 @@ class Rentor {
     );
   }
 
+  /// Serializes this rentor to a plain JSON map (suitable for the REST API).
+  /// [billPercentages] keys are lowercased bill-type names; [excludedBillTypes]
+  /// is a list of lowercased type name strings.
   Map<String, dynamic> toJson() {
     final encodedMap = billPercentages.map(
       (key, value) => MapEntry(key.name.toLowerCase(), value),
@@ -136,6 +160,9 @@ class Rentor {
     };
   }
 
+  /// Serializes this rentor to a map suited for direct SQLite insertion.
+  /// Unlike [toJson], the [billPercentages] and [excludedBillTypes] fields are
+  /// JSON-encoded strings because SQLite stores them as TEXT columns.
   Map<String, dynamic> toDbJson() {
     final payload = Map<String, dynamic>.from(toJson());
     payload['billPercentages'] = jsonEncode(payload['billPercentages']);
@@ -143,12 +170,19 @@ class Rentor {
     return payload;
   }
 
+  /// Calculates the amount owed by [rentor] for a single [bill].
+  ///
+  /// Uses the bill-type-specific percentage from [rentor.billPercentages] if
+  /// one exists; otherwise falls back to `0.0` (not the default percentage —
+  /// that would override the user's explicit zero assignment).  The result is
+  /// rounded to the nearest whole dollar.
   static double calculateOwedAmount(Rentor rentor, Bill bill) {
     double? customPercentage = rentor.billPercentages[bill.type];
     double percentage = customPercentage ?? 0.0;
     return (bill.amount * (percentage / 100)).round().toDouble();
   }
 
+  /// Sums [calculateOwedAmount] across all [bills] for [rentor].
   static double calculateTotalOwed(Rentor rentor, List<Bill> bills) {
     double total = 0;
     for (var bill in bills) {
@@ -157,14 +191,22 @@ class Rentor {
     return total;
   }
 
+  /// Convenience instance wrapper for [calculateOwedAmount].
   double owedAmount(Bill bill) {
     return calculateOwedAmount(this, bill);
   }
 
+  /// Convenience instance wrapper for [calculateTotalOwed].
   double totalOwed(List<Bill> bills) {
     return calculateTotalOwed(this, bills);
   }
 
+  /// Updates [lastPaymentDate] to the most recent payment date in [payments].
+  ///
+  /// You can pass either fully hydrated [Payment] objects or just [paymentIds]
+  /// (the method will fetch the corresponding payments from the database).
+  /// The update is skipped when the existing [lastPaymentDate] is already
+  /// more recent than or equal to the latest payment in the list.
   void updateLastPaymentDate({List<Payment>? payments, List<String>? paymentIds}) async {
     if (payments == null && paymentIds == null) {
       return;
@@ -196,7 +238,10 @@ class Rentor {
   }
 }
 
+/// Additional computed helpers for [Rentor] that rely on bill fold operations.
 extension RentorExtensions on Rentor {
+  /// Returns the total amount owed by this rentor across all [bills], computed
+  /// by summing [Rentor.calculateOwedAmount] for each bill via a fold.
   double getAmountOwed(List<Bill> bills) {
     return bills.fold(0.0, (total, bill) =>
       total + Rentor.calculateOwedAmount(this, bill));

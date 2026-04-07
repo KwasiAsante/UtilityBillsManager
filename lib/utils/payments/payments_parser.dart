@@ -5,7 +5,19 @@ import 'package:utility_bills_manager/utils/email/email_parser.dart';
 
 import '../../data/models/rentor.dart';
 
+/// Utility class that converts a raw [MimeMessage] into a [Payment].
+///
+/// Works symmetrically to [BillsParser]: it extracts a dollar amount and
+/// payment date from the email body (or PDF attachment), and optionally
+/// matches the sender / subject / body against known [Rentor] names to
+/// associate the payment with a tenant.
+///
+/// All methods are static; no instance state is needed.
 class PaymentsParser {
+  /// Parses [message] into a [Payment], or returns `null` if no dollar amount
+  /// could be extracted.
+  ///
+  /// Pass [rentors] to enable automatic rentor matching via [extractRentor].
   static Future<Payment?> parseEmailToPayment(MimeMessage message, {List<Rentor>? rentors}) async {
     final subject = message.decodeSubject() ?? '';
     final sender = message.from?.firstOrNull?.email ?? '';
@@ -36,6 +48,7 @@ class PaymentsParser {
     return null; // Couldn't extract a valid payment
   }
 
+  /// Simple dollar-amount extractor (mirrors [BillsParser.extractAmount]).
   static double? extractAmount(String text) {
     // Look for explicit dollar amounts first, e.g. $123.45
     final dollarPattern = RegExp(r'\$\s?(\d+[.,]?\d{0,2})');
@@ -56,6 +69,7 @@ class PaymentsParser {
     return null;
   }
 
+  /// Context-aware amount extractor (mirrors [BillsParser.extractSmartAmount]).
   static double? extractSmartAmount(String text) {
     final prioritizedKeywords = [
       'total due',
@@ -105,6 +119,7 @@ class PaymentsParser {
     return null;
   }
 
+  /// Looks for a [pattern] match in the 1–2 lines immediately after [index].
   static double? getAmountFromNextIndex(RegExp pattern, int index, List<String> lines) {
     int updatedIndex = index + 1;
     var line = lines[updatedIndex];
@@ -125,6 +140,9 @@ class PaymentsParser {
     }
   }
 
+  /// Finds the first [Rentor] in [rentors] whose name appears (case-insensitive)
+  /// in the email [sender], [subject], or [body].  Returns `null` if no match
+  /// is found or [rentors] is empty.
   static Rentor? extractRentor(List<Rentor>? rentors, {String? sender, String? subject, String? body}) {
     if (rentors == null || rentors.isEmpty) {
       return null;

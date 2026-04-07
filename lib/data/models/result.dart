@@ -1,3 +1,16 @@
+/// A generic wrapper that represents the outcome of an async operation.
+///
+/// Every CRUD call in the helper / repository layer returns a [Result<T>] so
+/// that callers can inspect success or failure without catching exceptions:
+///
+/// ```dart
+/// final result = await billsHelper.readAllBills();
+/// if (result.isSuccess) {
+///   final bills = result.data!;
+/// } else {
+///   print(result.errorMessage);
+/// }
+/// ```
 class Result<T> {
   final ResultStatus status;
   final T? data;
@@ -11,7 +24,8 @@ class Result<T> {
     this.errorMessage,
   });
 
-  // Convenience constructor for success responses
+  /// Creates a successful result, optionally carrying [data] and an
+  /// informational [message].
   factory Result.success({T? data, String? message}) {
     return Result(
       status: ResultStatus.success,
@@ -20,7 +34,7 @@ class Result<T> {
     );
   }
 
-  // Convenience constructor for error responses
+  /// Creates a failed result with a human-readable [errorMessage].
   factory Result.error({String? errorMessage}) {
     return Result(
       status: ResultStatus.error,
@@ -28,7 +42,8 @@ class Result<T> {
     );
   }
 
-  // Convenience constructor for error responses
+  /// Creates a failed result from a caught [Exception], converting it to a
+  /// string error message via [exception.toString()].
   factory Result.exception({Exception? exception}) {
     return Result(
       status: ResultStatus.error,
@@ -36,10 +51,10 @@ class Result<T> {
     );
   }
 
-  // Check if the result is successful
+  /// `true` when [status] is [ResultStatus.success].
   bool get isSuccess => status == ResultStatus.success;
 
-  // Check if the result has an error
+  /// `true` when [status] is [ResultStatus.error].
   bool get isError => status == ResultStatus.error;
 }
 

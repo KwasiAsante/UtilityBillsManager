@@ -15,9 +15,21 @@ import 'package:utility_bills_manager/screens/base/google_sign_in_screen_state.d
 import 'package:utility_bills_manager/utils/dialogs/sync_options_dialog.dart';
 import 'package:utility_bills_manager/utils/export_utils.dart';
 
+/// Screen that provides a financial overview across all bills, payments, and
+/// rentors.
+///
+/// Presents data in two tabs (Bills and Rentors) and supports:
+/// - Email sync (bill + payment emails) with a configurable date range.
+/// - CSV and PDF export via [ExportUtils].
+/// - Month / status breakdowns showing total, paid, and unpaid amounts.
+/// - Per-rentor contribution summaries.
+///
+/// On web, extends [GoogleSignInScreenState] to gate email sync behind Gmail
+/// authentication.
 class SummaryScreen extends StatefulWidget {
   const SummaryScreen({super.key, required this.isVisible});
 
+  /// Controls visibility — passed from the [IndexedStack] in [MainTabScreen].
   final bool isVisible;
 
   @override

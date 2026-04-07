@@ -4,6 +4,20 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_web/google_sign_in_web.dart';
 import 'package:google_sign_in_web/web_only.dart' as web;
 
+/// Singleton wrapper around the `google_sign_in` plugin for **web-only** Gmail
+/// access.
+///
+/// Manages the full Google OAuth 2.0 lifecycle:
+/// - [initialize] — sets up the `GoogleSignIn` instance and listens to
+///   authentication events.
+/// - [signIn] — initiates the sign-in flow (no-op on web; must be triggered
+///   from a button).
+/// - [authorize] — requests the `gmail.readonly` OAuth scope and caches the
+///   resulting [authorizationHeaders] (used by [_AuthClient]).
+/// - [signOut] / [disconnect] — clears credentials.
+///
+/// Screens that require a signed-in state subscribe via [onSignedIn] and
+/// unsubscribe via [offSignedIn].
 class GoogleAccountService {
   static final GoogleAccountService _instance =
       GoogleAccountService._internal();
@@ -15,13 +29,19 @@ class GoogleAccountService {
   GoogleAccountService._internal();
 
   GoogleSignIn get googleSignIn => GoogleSignIn.instance;
+
+  /// The currently signed-in Google account, or `null` if not signed in.
   GoogleSignInAccount? signedInAccount;
 
+  /// OAuth 2.0 scopes requested — read-only Gmail access.
   static const List<String> scopes = <String>[
     'https://www.googleapis.com/auth/gmail.readonly',
   ];
 
   Map<String, String>? _authorizationHeaders;
+
+  /// Bearer-token headers to inject into Gmail API requests, or `null` if not
+  /// yet authorised.
   Map<String, String>? get authorizationHeaders => _authorizationHeaders;
 
   bool _isInitialized = false;
@@ -32,6 +52,9 @@ class GoogleAccountService {
 
   bool _isSignedIn = false;
   bool get isSignedIn => _isSignedIn;
+
+  /// Manually overrides the signed-in state (used by the sign-in screen
+  /// after a successful authentication event).
   void setSignedIn(bool value) {
     _isSignedIn = value;
   }
@@ -39,6 +62,8 @@ class GoogleAccountService {
   bool _isAuthorized = false;
   bool get isAuthorized => _isAuthorized;
 
+  /// Listeners keyed by the subscribing class name so each class registers at
+  /// most once.
   final Map<String, Function()> _onSignedInListeners = {};
 
   /// Subscribe to sign-in events
@@ -51,6 +76,7 @@ class GoogleAccountService {
     _onSignedInListeners.remove(className);
   }
 
+  /// Returns `true` if [className] is currently subscribed to sign-in events.
   bool isSubscribedToSignIn(String className) {
     return _onSignedInListeners.containsKey(className);
   }
@@ -62,6 +88,9 @@ class GoogleAccountService {
     }
   }
 
+  /// Initialises the Google Sign-In SDK once and starts listening to
+  /// [GoogleSignInAuthenticationEventSignIn] events so that [authorize] and the
+  /// registered [onSignedIn] callbacks are called automatically on sign-in.
   Future<void> initialize() async {
     if (!_isInitialized) {
       await googleSignIn
@@ -96,6 +125,10 @@ class GoogleAccountService {
     }
   }
 
+  /// Attempts a lightweight (cached) sign-in on mobile / desktop.
+  ///
+  /// On web the sign-in flow must be initiated from the UI (the Google Identity
+  /// Services button), so this method is a no-op there.
   Future<GoogleSignInAccount?> signIn() async {
     if (!_isInitialized) {
       await initialize();
@@ -118,6 +151,9 @@ class GoogleAccountService {
     return signedInAccount;
   }
 
+  /// Requests the [scopes] from the signed-in account and caches the resulting
+  /// [authorizationHeaders].  Sets [isAuthorized] to `false` if the user is
+  /// not signed in or declines the request.
   Future<void> authorize() async {
     if (!_isSignedIn) {
       _isAuthorized = false;
@@ -142,6 +178,7 @@ class GoogleAccountService {
     };
   }
 
+  /// Signs out the current user without revoking app access.
   Future<void> signOut() async {
     await googleSignIn.signOut();
     signedInAccount = null;
@@ -149,6 +186,7 @@ class GoogleAccountService {
     _isAuthorized = false;
   }
 
+  /// Revokes app access and clears all cached state.
   Future<void> disconnect() async {
     await googleSignIn.disconnect();
     signedInAccount = null;
@@ -158,6 +196,11 @@ class GoogleAccountService {
     _isInitialized = false;
   }
 
+  /// Builds the appropriate Google sign-in / authorize widget for the app bar.
+  ///
+  /// - Fully authorized → a read-only indicator icon.
+  /// - Signed in but not authorized → an "Authorize Gmail" button.
+  /// - Not signed in → the native Google Identity Services sign-in button.
   Widget buildWebGoogleAction(Function() onPressed) {
     if (isSignedIn) {
       if (isAuthorized) {
@@ -197,6 +240,8 @@ class GoogleAccountService {
     );
   }
 
+  /// Returns a [MaterialBanner] reminding the user to sign in or authorize
+  /// Gmail on the web, or `null` if already fully authorized (or not on web).
   Widget? buildWebWarningBanner() {
     if (!kIsWeb) return null;
 
@@ -228,6 +273,8 @@ class GoogleAccountService {
     );
   }
 
+  /// Shows a [SnackBar] prompting the user to authorize Gmail access before
+  /// attempting a sync.
   void showAuthorizationRequiredMessage(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(

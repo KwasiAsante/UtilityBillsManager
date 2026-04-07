@@ -2,8 +2,17 @@ import 'dart:convert';
 
 import 'package:flutter/services.dart';
 
+/// Indicates whether the app should host its own SQLite server (`server`) or
+/// connect to a remote one (`client`).  Controlled via the `APP_MODE`
+/// dart-define.
 enum AppMode { server, client }
 
+/// Static configuration resolved from three sources (highest priority first):
+/// 1. `assets/config/local_secrets.json` (loaded at startup via [init])
+/// 2. `--dart-define` compile-time constants
+/// 3. Hard-coded defaults
+///
+/// Provides [mode], [apiBaseUrl], and all email credential getters.
 class AppConfig {
   /// Loads optional local secrets from a bundled asset.
   ///
@@ -18,6 +27,8 @@ class AppConfig {
     defaultValue: 'server',
   );
 
+  /// Parses the `APP_MODE` dart-define string into an [AppMode] enum value,
+  /// defaulting to [AppMode.server] for any unrecognised value.
   static AppMode get mode {
     final normalized = _modeRaw.trim().toLowerCase();
     if (normalized == 'client') return AppMode.client;
@@ -78,6 +89,8 @@ class AppConfig {
         defaultValue: true,
       );
 
+  /// Fallback oldest email date used when no `EMAIL_EARLIEST_DATE` is configured
+  /// (60 days ago from today).
   static DateTime get defaultEarliestDateTime => DateTime.now().subtract(const Duration(days: 60));
   static String get earliestEmailDateEnv =>
       const String.fromEnvironment('EMAIL_EARLIEST_DATE', defaultValue: '');
