@@ -389,7 +389,6 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
         : email.emailBody;
 
     return Card(
-      margin: const EdgeInsets.all(8.0),
       child: ListTile(
         title: Text(
           email.emailSubject,

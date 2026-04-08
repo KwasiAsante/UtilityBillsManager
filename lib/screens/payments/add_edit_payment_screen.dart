@@ -383,12 +383,17 @@ State<AddEditPaymentScreen> {
           key: _formKey,
           child: Column(
             children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
               TextFormField(
                 controller: _amountPaidController,
                 decoration: const InputDecoration(labelText: 'Amount '),
                 keyboardType: TextInputType.number,
                 validator: (value) => value!.isEmpty ? 'Enter amount' : null,
               ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _paymentDateController,
                 decoration: const InputDecoration(
@@ -449,8 +454,12 @@ State<AddEditPaymentScreen> {
                 ),
               ),
               _buildBillFields(),
-              const SizedBox(height: 20),
-              ElevatedButton(
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
                 onPressed: _savePayment,
                 child: const Text('Save Payment'),
               ),

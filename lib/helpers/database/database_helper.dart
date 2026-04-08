@@ -1,10 +1,11 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/email_data.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/data/models/rentor.dart';
+
+import '../../data/models/bill.dart';
+import '../../data/models/email_data.dart';
+import '../../data/models/payment.dart';
+import '../../data/models/rentor.dart';
 
 /// Singleton low-level SQLite helper built on top of `sqflite`.
 ///

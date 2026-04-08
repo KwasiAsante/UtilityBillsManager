@@ -3,17 +3,17 @@ import 'package:flutter/material.dart';
 
 import 'package:intl/intl.dart';
 
-import 'package:utility_bills_manager/config/app_config.dart';
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/data/models/rentor.dart';
-import 'package:utility_bills_manager/data/repositories/bills_repository.dart';
-import 'package:utility_bills_manager/data/repositories/payments_repository.dart';
-import 'package:utility_bills_manager/data/repositories/rentors_repository.dart';
-import 'package:utility_bills_manager/helpers/email/email_data_helper.dart';
-import 'package:utility_bills_manager/screens/base/google_sign_in_screen_state.dart';
-import 'package:utility_bills_manager/utils/dialogs/sync_options_dialog.dart';
-import 'package:utility_bills_manager/utils/export_utils.dart';
+import '../base/google_sign_in_screen_state.dart';
+import '../../config/app_config.dart';
+import '../../data/models/bill.dart';
+import '../../data/models/payment.dart';
+import '../../data/models/rentor.dart';
+import '../../data/repositories/bills_repository.dart';
+import '../../data/repositories/payments_repository.dart';
+import '../../data/repositories/rentors_repository.dart';
+import '../../helpers/email/email_data_helper.dart';
+import '../../utils/dialogs/sync_options_dialog.dart';
+import '../../utils/export_utils.dart';
 
 /// Screen that provides a financial overview across all bills, payments, and
 /// rentors.

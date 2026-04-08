@@ -33,27 +33,27 @@ dependencies:
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
+  cross_file: ^0.3.5+2
   cupertino_icons: ^1.0.8
+  enough_mail: ^2.1.6
+  flutter_local_notifications: ^21.0.0
+  google_sign_in: ^7.2.0
+  google_sign_in_web: 1.1.3
+  googleapis: ^16.0.0
+  html: ^0.15.5+1
+  http: ^1.3.0
+  intl: ^0.20.2
+  path: ^1.9.1 # For handling file path
+  path_provider: ^2.1.5
+  pdf: ^3.11.3
+  pdfrx: ^2.2.24
+  share_plus: ^12.0.2
+  shelf: ^1.4.0
+  shelf_router: ^1.1.3
   sqflite: ^2.4.2
   sqflite_common_ffi: ^2.3.6
   sqflite_common_ffi_web: ^1.0.0
-  path: ^1.9.1 # For handling file path
-  flutter_local_notifications: ^21.0.0
   uuid: ^4.5.1
-  shelf: ^1.4.0
-  shelf_router: ^1.1.3
-  http: ^1.3.0
-  intl: ^0.20.2
-  enough_mail: ^2.1.6
-  google_sign_in: ^7.2.0
-  googleapis: ^16.0.0
-  google_sign_in_web: 1.1.2
-  html: ^0.15.5+1
-  pdf: ^3.11.3
-  path_provider: ^2.1.5
-  pdfrx: ^2.2.24
-  share_plus: ^10.0.0
-  cross_file: ^0.3.5+2
 
 dev_dependencies:
   flutter_test:

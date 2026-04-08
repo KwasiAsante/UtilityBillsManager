@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../config/app_config.dart';
 import '../../data/models/payment.dart';
@@ -446,9 +447,11 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
                         itemCount: payments.length,
                         itemBuilder: (context, index) {
                           final payment = payments[index];
+                          final hasBills = payment.bills != null && payment.bills!.isNotEmpty;
                           return Card(
-                            margin: const EdgeInsets.all(8.0),
                             child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              isThreeLine: hasBills && payment.rentorName != "Unknown Rentor",
                               onTap: () async {
                                 await Navigator.push(
                                   context,
@@ -458,14 +461,44 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
                                   ),
                                 );
                               },
-                              title: Text(payment.bills == null || payment.bills!.isEmpty
-                                  ? "${payment.rentorName} - Payment Date: ${payment.paymentDate}"
-                                  : payment.billNames(newLine: true)),
-                              subtitle:Text(payment.bills != null && payment.bills!.isNotEmpty
-                                  ? 'Paid By: ${payment.rentorName}\n'
-                                  'Amount Paid: \$${payment.amountPaid.toStringAsFixed(2)}\n'
-                                  'Payment Date: ${payment.paymentDate}'
-                                  : 'Amount Paid: \$${payment.amountPaid.toStringAsFixed(2)}'),
+                              title: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      hasBills
+                                          ? payment.billNames(newLine: false)
+                                          : payment.rentorName != "Unknown Rentor" ? payment.rentorName : 'Payment',
+                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '\$${payment.amountPaid.toStringAsFixed(2)}',
+                                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.green[700]),
+                                  ),
+                                ],
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Paid: ${DateFormat('MMM d, yyyy').format(payment.paymentDate)}',
+                                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                    ),
+                                    if (hasBills && payment.rentorName != "Unknown Rentor")
+                                      Text(
+                                        'By: ${payment.rentorName}',
+                                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                      ),
+                                  ],
+                                ),
+                              ),
                               trailing: PopupMenuButton<String>(
                                 onSelected: (value) async {
                                   if (value == 'edit') {

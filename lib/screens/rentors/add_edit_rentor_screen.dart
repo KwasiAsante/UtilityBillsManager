@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/data/models/rentor.dart';
-import 'package:utility_bills_manager/data/repositories/rentors_repository.dart';
-import 'package:utility_bills_manager/helpers/bills/bills_helper.dart';
+
+import '../../data/models/bill.dart';
+import '../../data/models/payment.dart';
+import '../../data/models/rentor.dart';
+import '../../data/repositories/rentors_repository.dart';
+import '../../helpers/bills/bills_helper.dart';
 
 /// Form screen for creating a new rentor or editing an existing one.
 ///
@@ -363,7 +364,7 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
                 ),
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
+              FilledButton(
                 onPressed: _saveRentor,
                 child: const Text('Save Rentor'),
               ),

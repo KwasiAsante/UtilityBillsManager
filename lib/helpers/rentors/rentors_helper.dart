@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
-import 'package:utility_bills_manager/helpers/database/database_helper.dart';
-import 'package:utility_bills_manager/data/models/rentor.dart';
-import 'package:utility_bills_manager/data/models/result.dart';
-import 'package:utility_bills_manager/services/api/api_service.dart';
-import 'package:utility_bills_manager/data/models/app_state.dart';
 
+import '../database/database_helper.dart';
+import '../../data/models/app_state.dart';
 import '../../data/models/payment.dart';
+import '../../data/models/rentor.dart';
+import '../../data/models/result.dart';
+import '../../services/api/api_service.dart';
 
 /// Singleton service layer for rentor-related persistence.
 ///

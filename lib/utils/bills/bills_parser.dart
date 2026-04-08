@@ -1,9 +1,11 @@
 import 'package:enough_mail/enough_mail.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/utils/email/email_parser.dart';
+
+import '../constants.dart';
+import '../email/email_parser.dart';
+import '../../data/models/bill.dart';
+import '../../data/models/payment.dart';
 
 /// Utility class that converts a raw [MimeMessage] into a [Bill].
 ///
@@ -23,21 +25,12 @@ class BillsParser {
     final subject = message.decodeSubject() ?? '';
     final sender = message.from?.firstOrNull?.email ?? '';
 
-    if (subject.contains('Your RBC Royal Bank eStatement is ready') ||
-        subject.contains('eStatement Alert for your Simplii Credit Card') ||
-        subject.contains('Enbridge - Your Payment is Due') ||
-        subject.contains('Your Freedom Mobile bill is ready') ||
-        subject.contains('Your Bell bill is ready') ||
-        subject.contains('Payment received on your credit account') ||
-        subject.contains('Your credit account: Payment due in') ||
-        sender.contains('info@neofinancial.com')) {
-      return null;
-    }
-
-    if (sender.contains('neofinancial')) {
+    if (AppConstants.invalidEmailSubjects.contains(subject) ||
+        AppConstants.invalidEmailSenders.contains(sender)) {
       if (kDebugMode) {
-        print('breakpoint');
+        print('Email subject or sender is in the invalid list, skipping email');
       }
+      return null;
     }
 
     final hasAttachment = EmailParser.hasAttachment(message);

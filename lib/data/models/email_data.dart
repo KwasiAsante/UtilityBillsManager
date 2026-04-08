@@ -1,8 +1,9 @@
 import 'dart:math';
 
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:uuid/uuid.dart';
+
+import './bill.dart';
+import './payment.dart';
 
 /// Stores the raw content of an email fetched from the mailbox, along with
 /// references to any [Bill] or [Payment] that was parsed from it.

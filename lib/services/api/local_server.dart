@@ -1,14 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/email_data.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/data/models/rentor.dart';
-import 'package:utility_bills_manager/helpers/database/database_helper.dart';
+
+import '../../data/models/bill.dart';
+import '../../data/models/email_data.dart';
+import '../../data/models/payment.dart';
+import '../../data/models/rentor.dart';
+import '../../helpers/database/database_helper.dart';
 
 /// Parses the `bill` and `payment` query-string flags from a request's query
 /// parameters, accepting several common key spellings (`bill`, `includeBill`,

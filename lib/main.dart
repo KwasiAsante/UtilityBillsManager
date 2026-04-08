@@ -1,16 +1,17 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:pdfrx/pdfrx.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // Desktop
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart'; // Web
-import 'package:utility_bills_manager/config/app_config.dart';
-import 'package:utility_bills_manager/screens/main_tab_screen.dart';
-import 'package:utility_bills_manager/data/models/app_state.dart';
-import 'package:utility_bills_manager/helpers/database/database_helper.dart';
-import 'package:utility_bills_manager/services/api/api_service.dart';
-import 'package:utility_bills_manager/services/api/local_server_stub.dart'
-    if (dart.library.io) 'package:utility_bills_manager/services/api/local_server.dart';
+import 'package:pdfrx/pdfrx.dart';
+
+import '../config/app_config.dart';
+import '../screens/main_tab_screen.dart';
+import '../data/models/app_state.dart';
+import '../helpers/database/database_helper.dart';
+import '../services/api/api_service.dart';
+import '../services/api/local_server_stub.dart'
+    if (dart.library.io) '../services/api/local_server.dart';
 
 final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
@@ -109,22 +110,25 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Utility Bill Manager',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        cardTheme: CardThemeData(
+          elevation: 1,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.grey.shade50,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(double.infinity, 48),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
       ),
       home: const MainTabScreen(),
     );

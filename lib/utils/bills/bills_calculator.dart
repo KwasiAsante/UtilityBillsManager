@@ -1,5 +1,5 @@
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/rentor.dart';
+import '../../data/models/bill.dart';
+import '../../data/models/rentor.dart';
 
 /// Stateless helper that computes how much a [Rentor] owes for a bill or a
 /// list of bills based on their configured split percentages.

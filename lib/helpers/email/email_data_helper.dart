@@ -1,22 +1,22 @@
 import 'package:enough_mail/enough_mail.dart';
 import 'package:flutter/foundation.dart';
-import 'package:utility_bills_manager/config/app_config.dart';
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/helpers/bills/bills_helper.dart';
-import 'package:utility_bills_manager/helpers/database/database_helper.dart';
-import 'package:utility_bills_manager/data/models/email_data.dart';
-import 'package:utility_bills_manager/data/models/result.dart';
-import 'package:utility_bills_manager/services/api/api_service.dart';
-import 'package:utility_bills_manager/data/models/app_state.dart';
-import 'package:utility_bills_manager/services/email/email_service.dart';
-import 'package:utility_bills_manager/utils/bills/bills_parser.dart';
-import 'package:utility_bills_manager/utils/email/email_parser.dart';
 
-import '../../data/models/payment.dart';
-import '../../data/models/rentor.dart';
-import '../../utils/payments/payments_parser.dart';
+import '../bills/bills_helper.dart';
+import '../database/database_helper.dart';
 import '../payments/payments_helper.dart';
 import '../rentors/rentors_helper.dart';
+import '../../config/app_config.dart';
+import '../../data/models/app_state.dart';
+import '../../data/models/bill.dart';
+import '../../data/models/email_data.dart';
+import '../../data/models/payment.dart';
+import '../../data/models/result.dart';
+import '../../data/models/rentor.dart';
+import '../../services/api/api_service.dart';
+import '../../services/email/email_service.dart';
+import '../../utils/bills/bills_parser.dart';
+import '../../utils/email/email_parser.dart';
+import '../../utils/payments/payments_parser.dart';
 
 /// Singleton service that handles email data persistence **and** the full
 /// email-import pipeline (fetch → parse → persist bill/payment).

@@ -5,7 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:googleapis/gmail/v1.dart' as gmail;
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'package:utility_bills_manager/services/email/google_account_service.dart';
+
+import '../email/google_account_service.dart';
 
 
 /// Cross-platform email fetcher.

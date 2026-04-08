@@ -2,10 +2,11 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/email_data.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/data/models/rentor.dart';
+
+import '../../data/models/bill.dart';
+import '../../data/models/email_data.dart';
+import '../../data/models/payment.dart';
+import '../../data/models/rentor.dart';
 
 /// Central HTTP client facade for the local shelf server (client mode).
 ///

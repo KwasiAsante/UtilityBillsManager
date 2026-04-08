@@ -1,15 +1,15 @@
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/helpers/database/database_helper.dart';
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/result.dart';
-import 'package:utility_bills_manager/services/api/api_service.dart';
-import 'package:utility_bills_manager/data/models/app_state.dart';
 
-import '../../data/models/rentor.dart';
+import '../database/database_helper.dart';
 import '../rentors/rentors_helper.dart';
+import '../../data/models/app_state.dart';
+import '../../data/models/bill.dart';
+import '../../data/models/payment.dart';
+import '../../data/models/rentor.dart';
+import '../../data/models/result.dart';
+import '../../services/api/api_service.dart';
 
 /// Singleton service layer for bill-related persistence and status logic.
 ///
@@ -250,6 +250,40 @@ class BillsHelper {
     }
   }
 
+  /// Returns the maximum unpaid-fraction that still counts as "considered paid"
+  /// for a given bill type, or null if no threshold applies.
+  double? _unpaidThreshold(BillType type) {
+    switch (type) {
+      case BillType.electric:
+      case BillType.gas:
+      case BillType.water:
+        return 0.30; // ≤30% unpaid → considered paid
+      case BillType.internet:
+        return 0.50; // ≤50% unpaid → considered paid
+      default:
+        return null;
+    }
+  }
+
+  bool _isConsideredPaid(Bill bill) {
+    final threshold = _unpaidThreshold(bill.type);
+    if (threshold == null) return false;
+    final actualUnpaid = bill.amount - _paidAmount(bill);
+    if (actualUnpaid <= 0) return true;
+    // Within the percentage threshold, OR within $1.00 of the threshold amount.
+    final thresholdAmount = bill.amount * threshold;
+    return actualUnpaid <= thresholdAmount + 1.0;
+  }
+
+  double _paidAmount(Bill bill) {
+    if (bill.status == PaymentStatus.paid) {
+      return bill.amountPaid ?? bill.amount;
+    } else if (bill.status == PaymentStatus.partial) {
+      return bill.amountPaid ?? 0.0;
+    }
+    return 0.0;
+  }
+
   /// Reverses the payment-status side-effects of a deleted [payment] for each
   /// bill in [billIds].
   ///
@@ -278,7 +312,7 @@ class BillsHelper {
 
       final amountOwed = bill.amount - newAmountPaid;
       final amountLeft =  (bill.amount * (bill.type == BillType.internet ? 0.5 : 0.3));
-      if (amountOwed <= 0 || amountOwed.toInt() <= amountLeft.toInt()) {
+      if (_isConsideredPaid(bill)) {
         if (kDebugMode) {
           print("Bill ${bill.billId} is now fully paid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
         }
@@ -342,7 +376,7 @@ class BillsHelper {
 
     final amountOwed = billAmount - billAmountPaid;
     final amountLeft =  (billAmount * (bill.type == BillType.internet ? 0.5 : 0.3));
-    if (amountOwed <= 0 || amountOwed.toInt() <= amountLeft.toInt()) {
+    if (_isConsideredPaid(bill)) {
       if (kDebugMode) {
         print("Bill ${bill.billId} is now fully paid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
       }

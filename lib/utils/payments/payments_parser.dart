@@ -1,9 +1,10 @@
 import 'package:enough_mail/enough_mail.dart';
 import 'package:intl/intl.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/utils/email/email_parser.dart';
 
+import '../email/email_parser.dart';
 import '../../data/models/rentor.dart';
+import '../../data/models/payment.dart';
+
 
 /// Utility class that converts a raw [MimeMessage] into a [Payment].
 ///

@@ -2,12 +2,12 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:utility_bills_manager/data/repositories/rentors_repository.dart';
-import 'package:utility_bills_manager/screens/rentors/add_edit_rentor_screen.dart';
-import 'package:utility_bills_manager/helpers/rentors/rentors_helper.dart';
-import 'package:utility_bills_manager/utils/comparable_utils.dart';
 
+import '../rentors/add_edit_rentor_screen.dart';
 import '../../data/models/rentor.dart';
+import '../../data/repositories/rentors_repository.dart';
+import '../../helpers/rentors/rentors_helper.dart';
+import '../../utils/comparable_utils.dart';
 
 /// Screen that displays the list of rentors (tenants).
 ///
@@ -243,8 +243,9 @@ class _RentorListScreenState extends State<RentorListScreen> {
                 itemBuilder: (context, index) {
                   final rentor = rentors[index];
                   return Card(
-                    margin: const EdgeInsets.all(8.0),
                     child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      isThreeLine: rentor.email != null || rentor.phone != null,
                       onTap: () async {
                         await Navigator.push(
                           context,
@@ -254,12 +255,46 @@ class _RentorListScreenState extends State<RentorListScreen> {
                           ),
                         );
                       },
-                      title: Text(rentor.name),
-                      subtitle: Text(
-                        'Percentage: \$${rentor.defaultPercentage}%\n'
-                            'Last Payment Date: ${rentor.lastPaymentDate != null
-                            ? DateFormat('yyyy-MM-dd').format(rentor.lastPaymentDate!)
-                            : "N/A"}',
+                      title: Text(
+                        rentor.name,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  '${rentor.defaultPercentage.toStringAsFixed(1)}%',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  rentor.lastPaymentDate != null
+                                      ? 'Last paid: ${DateFormat('MMM d, yyyy').format(rentor.lastPaymentDate!)}'
+                                      : 'No payments yet',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                ),
+                              ],
+                            ),
+                            if (rentor.email != null || rentor.phone != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                [
+                                  if (rentor.email != null) rentor.email!,
+                                  if (rentor.phone != null) rentor.phone!,
+                                ].join('  ·  '),
+                                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                       trailing: PopupMenuButton<String>(
                         onSelected: (value) async {

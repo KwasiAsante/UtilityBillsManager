@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../config/app_config.dart';
 import '../../data/models/bill.dart';
@@ -502,8 +503,9 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                                 itemBuilder: (context, index) {
                                   final bill = bills[index];
                                   return Card(
-                                    margin: const EdgeInsets.all(8.0),
                                     child: ListTile(
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      isThreeLine: true,
                                       onTap: () async {
                                         await Navigator.push(
                                           context,
@@ -513,9 +515,38 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                                           ),
                                         );
                                       },
-                                      title: Text(bill.companyName),
-                                      subtitle: Text(
-                                        'Type: ${bill.type.name}\nAmount: \$${bill.amount.toStringAsFixed(2)}\nDue Date: ${bill.dueDate}\nStatus: ${PaymentStatusExtension.getName(bill.status)}',
+                                      title: Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              bill.companyName,
+                                              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '\$${bill.amount.toStringAsFixed(2)}',
+                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                          ),
+                                        ],
+                                      ),
+                                      subtitle: Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              '${bill.type.name[0].toUpperCase()}${bill.type.name.substring(1)}  ·  Due ${DateFormat('MMM d, yyyy').format(bill.dueDate)}',
+                                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                            ),
+                                            const SizedBox(height: 6),
+                                            _buildStatusBadge(bill.status),
+                                          ],
+                                        ),
                                       ),
                                       trailing: PopupMenuButton<String>(
                                         onSelected: (value) async {
@@ -567,6 +598,35 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
           );
         },
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildStatusBadge(PaymentStatus status) {
+    final Color bgColor;
+    final Color textColor;
+    switch (status) {
+      case PaymentStatus.paid:
+        bgColor = Colors.green.shade100;
+        textColor = Colors.green.shade800;
+        break;
+      case PaymentStatus.partial:
+        bgColor = Colors.orange.shade100;
+        textColor = Colors.orange.shade800;
+        break;
+      default:
+        bgColor = Colors.red.shade100;
+        textColor = Colors.red.shade800;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        PaymentStatusExtension.getName(status),
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textColor),
       ),
     );
   }

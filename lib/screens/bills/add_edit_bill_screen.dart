@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/data/repositories/bills_repository.dart';
+
+import '../../data/models/bill.dart';
+import '../../data/models/payment.dart';
+import '../../data/repositories/bills_repository.dart';
 
 /// Form screen for creating a new bill or editing an existing one.
 ///
@@ -106,80 +107,94 @@ class _AddEditBillScreenState extends State<AddEditBillScreen> {
           key: _formKey,
           child: Column(
             children: [
-              if (!isEditing)
-                DropdownButtonFormField<BillType>(
-                  initialValue: _selectedType,
-                  decoration: const InputDecoration(labelText: 'Bill Type'),
-                  items: BillType.values.map((type) {
-                    return DropdownMenuItem(
-                      value: type,
-                      child: Text(type.name[0].toUpperCase() + type.name.substring(1)),
-                    );
-                  }).toList(),
-                  onChanged: (type) {
-                    if (type != null) {
-                      setState(() {
-                        _selectedType = type;
-                      });
-                    }
-                  },
-                )
-              else
-                TextFormField(
-                  initialValue: _selectedType.name[0].toUpperCase() + _selectedType.name.substring(1),
-                  decoration: const InputDecoration(labelText: 'Bill Type'),
-                  enabled: false,
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      if (!isEditing)
+                        DropdownButtonFormField<BillType>(
+                          initialValue: _selectedType,
+                          decoration: const InputDecoration(labelText: 'Bill Type'),
+                          items: BillType.values.map((type) {
+                            return DropdownMenuItem(
+                              value: type,
+                              child: Text(type.name[0].toUpperCase() + type.name.substring(1)),
+                            );
+                          }).toList(),
+                          onChanged: (type) {
+                            if (type != null) {
+                              setState(() {
+                                _selectedType = type;
+                              });
+                            }
+                          },
+                        )
+                      else
+                        TextFormField(
+                          initialValue: _selectedType.name[0].toUpperCase() + _selectedType.name.substring(1),
+                          decoration: const InputDecoration(labelText: 'Bill Type'),
+                          enabled: false,
+                        ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _companyController,
+                        decoration: const InputDecoration(labelText: 'Company'),
+                        validator:
+                            (value) => value!.isEmpty ? 'Enter company name' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _amountController,
+                        decoration: const InputDecoration(labelText: 'Amount'),
+                        keyboardType: TextInputType.number,
+                        validator: (value) => value!.isEmpty ? 'Enter amount' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _dueDateController,
+                        decoration: const InputDecoration(
+                          labelText: 'Due Date (YYYY-MM-DD)',
+                        ),
+                        keyboardType: TextInputType.datetime,
+                        validator: (value) => value!.isEmpty ? 'Enter due date' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<PaymentStatus>(
+                        initialValue: _selectedStatus,
+                        decoration: const InputDecoration(labelText: 'Payment Status'),
+                        items: PaymentStatus.values.map((status) {
+                          return DropdownMenuItem(
+                            value: status,
+                            child: Text(status.name[0].toUpperCase() + status.name.substring(1)),
+                          );
+                        }).toList(),
+                        onChanged: (status) {
+                          if (status != null) {
+                            setState(() {
+                              _selectedStatus = status;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _amountPaidController,
+                        enabled: false,
+                        decoration: const InputDecoration(labelText: 'Amount Paid \$'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Notes (Optional)',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              TextFormField(
-                controller: _companyController,
-                decoration: const InputDecoration(labelText: 'Company'),
-                validator:
-                    (value) => value!.isEmpty ? 'Enter company name' : null,
               ),
-              TextFormField(
-                controller: _amountController,
-                decoration: const InputDecoration(labelText: 'Amount'),
-                keyboardType: TextInputType.number,
-                validator: (value) => value!.isEmpty ? 'Enter amount' : null,
-              ),
-              TextFormField(
-                controller: _dueDateController,
-                decoration: const InputDecoration(
-                  labelText: 'Due Date (YYYY-MM-DD)',
-                ),
-                keyboardType: TextInputType.datetime,
-                validator: (value) => value!.isEmpty ? 'Enter due date' : null,
-              ),
-              DropdownButtonFormField<PaymentStatus>(
-                  initialValue: _selectedStatus,
-                  decoration: const InputDecoration(labelText: 'Payment Status'),
-                  items: PaymentStatus.values.map((status) {
-                    return DropdownMenuItem(
-                      value: status,
-                      child: Text(status.name[0].toUpperCase() + status.name.substring(1)),
-                    );
-                  }).toList(),
-                  onChanged: (status) {
-                    if (status != null) {
-                      setState(() {
-                        _selectedStatus = status;
-                      });
-                    }
-                  },
-                ),
-              TextFormField(
-                controller: _amountPaidController,
-                enabled: false,
-                decoration: const InputDecoration(labelText: 'Amount Paid \$'),
-              ),
-              TextFormField(
-                controller: _notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes (Optional)',
-                ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
+              const SizedBox(height: 16),
+              FilledButton(
                 onPressed: _saveBill,
                 child: const Text('Save Bill'),
               ),

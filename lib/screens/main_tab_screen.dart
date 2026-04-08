@@ -63,65 +63,37 @@ class _MainTabScreenState extends State<MainTabScreen> {
     ];
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Utility Bills Manager')),
       body: IndexedStack(index: _selectedIndex, children: screens),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(color: Colors.grey.shade300, width: 1.0),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _onItemTapped,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.receipt_outlined),
+            selectedIcon: Icon(Icons.receipt),
+            label: 'Bills',
           ),
-        ),
-        child: Row(
-          children: [
-            _buildNavItem(0, Icons.receipt, 'Bills'),
-            _buildNavItem(1, Icons.people, 'Rentors'),
-            _buildNavItem(2, Icons.summarize, 'Summary', isMain: true),
-            _buildNavItem(3, Icons.payment, 'Payments'),
-            _buildNavItem(4, Icons.email, 'Emails'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(
-    int index,
-    IconData icon,
-    String label, {
-    bool isMain = false,
-  }) {
-    final isSelected = _selectedIndex == index;
-    final theme = Theme.of(context);
-
-    return Expanded(
-      child: Material(
-        color:
-            isMain
-                ? theme.colorScheme.primary.withValues(alpha: 0.1)
-                : Colors.transparent,
-        child: InkWell(
-          onTap: () => _onItemTapped(index),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  color: isSelected ? theme.colorScheme.primary : Colors.grey,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isSelected ? theme.colorScheme.primary : Colors.grey,
-                  ),
-                ),
-              ],
-            ),
+          NavigationDestination(
+            icon: Icon(Icons.people_outline),
+            selectedIcon: Icon(Icons.people),
+            label: 'Rentors',
           ),
-        ),
+          NavigationDestination(
+            icon: Icon(Icons.summarize_outlined),
+            selectedIcon: Icon(Icons.summarize),
+            label: 'Summary',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.payment_outlined),
+            selectedIcon: Icon(Icons.payment),
+            label: 'Payments',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.email_outlined),
+            selectedIcon: Icon(Icons.email),
+            label: 'Emails',
+          ),
+        ],
       ),
     );
   }

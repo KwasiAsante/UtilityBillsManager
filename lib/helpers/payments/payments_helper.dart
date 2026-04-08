@@ -1,12 +1,11 @@
-import 'package:utility_bills_manager/helpers/database/database_helper.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/data/models/result.dart';
-import 'package:utility_bills_manager/services/api/api_service.dart';
-import 'package:utility_bills_manager/data/models/app_state.dart';
-
-import '../../data/models/bill.dart';
-import '../../data/models/rentor.dart';
 import '../bills/bills_helper.dart';
+import '../database/database_helper.dart';
+import '../../data/models/app_state.dart';
+import '../../data/models/bill.dart';
+import '../../data/models/payment.dart';
+import '../../data/models/rentor.dart';
+import '../../data/models/result.dart';
+import '../../services/api/api_service.dart';
 
 /// Singleton service layer for payment-related persistence.
 ///

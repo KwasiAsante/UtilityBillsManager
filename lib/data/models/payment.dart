@@ -1,7 +1,8 @@
 import 'package:intl/intl.dart';
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/rentor.dart';
 import 'package:uuid/uuid.dart';
+
+import './bill.dart';
+import './rentor.dart';
 
 /// Represents a single payment made by a rentor (or the household itself)
 /// toward one or more [Bill]s.

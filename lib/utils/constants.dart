@@ -14,5 +14,18 @@ abstract final class AppConstants {
     'November',
     'December',
   ];
+
+  static const List<String> invalidEmailSubjects = [
+    'Your RBC Royal Bank eStatement is ready',
+    'eStatement Alert for your Simplii Credit Card',
+    'Enbridge - Your Payment is Due',
+    'Your Freedom Mobile bill is ready',
+    'Payment received on your credit account',
+    'Your credit account: Payment due in'
+  ];
+
+  static const List<String> invalidEmailSenders = [
+    'info@neofinancial.com',
+  ];
 }
 

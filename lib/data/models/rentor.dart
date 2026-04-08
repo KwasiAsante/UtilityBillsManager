@@ -1,11 +1,12 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/helpers/payments/payments_helper.dart';
-import 'package:utility_bills_manager/utils/comparable_utils.dart';
 import 'package:uuid/uuid.dart';
+
+import './bill.dart';
+import './payment.dart';
+import '../../helpers/payments/payments_helper.dart';
+import '../../utils/comparable_utils.dart';
 
 /// Represents a tenant / rentor who contributes toward household utility bills.
 ///
@@ -221,7 +222,7 @@ class Rentor {
       }
     }
 
-    if (payments.isEmpty) {
+    if (payments == null || payments.isEmpty) {
       return;
     }
 

@@ -1,5 +1,6 @@
-import 'package:utility_bills_manager/data/models/payment.dart';
 import 'package:uuid/uuid.dart';
+
+import './payment.dart';
 
 /// Represents a single utility bill (electricity, gas, water, etc.) owed by
 /// the household.

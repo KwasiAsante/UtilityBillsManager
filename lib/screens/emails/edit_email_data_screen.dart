@@ -298,12 +298,9 @@ class _EditEmailDataScreenState extends State<EditEmailDataScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _save,
-                      child: const Text('Save'),
-                    ),
+                  FilledButton(
+                    onPressed: _save,
+                    child: const Text('Save'),
                   ),
                 ],
               ),

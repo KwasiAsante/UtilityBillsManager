@@ -5,16 +5,17 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/payment.dart';
-import 'package:utility_bills_manager/data/models/rentor.dart';
-import 'package:utility_bills_manager/data/models/summary_item.dart';
+
+import '../../data/models/bill.dart';
+import '../../data/models/payment.dart';
+import '../../data/models/rentor.dart';
+import '../../data/models/summary_item.dart';
 
 /// Utility class for exporting bill data to CSV or PDF files.
 ///
 /// Both [exportBillsToCSV] and [exportBillsToPDF] group bills by calendar
 /// month, compute totals / paid / unpaid breakdowns, include per-rentor
-/// payment contributions, and share the resulting files via [Share.shareXFiles].
+/// payment contributions, and share the resulting files via [SharePlus.instance.share()].
 ///
 /// All methods are static; no instance state is needed.
 class ExportUtils {
@@ -159,7 +160,7 @@ class ExportUtils {
     }
 
     if (files.isNotEmpty) {
-      await Share.shareXFiles(files, subject: 'Bills Export by Month');
+      await SharePlus.instance.share(ShareParams(files: files, subject: 'Bills Export by Month'));
     }
   }
 
@@ -319,9 +320,9 @@ class ExportUtils {
       );
     }
 
-    await Share.shareXFiles(
-      [XFile.fromData(await doc.save(), name: 'bills_export.pdf', mimeType: 'application/pdf')],
-      subject: 'Bills Export',
+    await SharePlus.instance.share(ShareParams(
+        files: [XFile.fromData(await doc.save(), name: 'bills_export.pdf', mimeType: 'application/pdf')],
+        subject: 'Bills Export'),
     );
   }
 

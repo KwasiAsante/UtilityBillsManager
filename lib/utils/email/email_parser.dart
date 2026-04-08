@@ -2,7 +2,9 @@ import 'package:enough_mail/enough_mail.dart';
 import 'package:flutter/foundation.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:pdfrx/pdfrx.dart';
-import 'package:utility_bills_manager/data/models/email_data.dart';
+
+import '../constants.dart';
+import '../../data/models/email_data.dart';
 
 /// Utility class for extracting structured content from [MimeMessage] objects.
 ///
@@ -171,14 +173,17 @@ class EmailParser {
   /// imported twice.
   static Future<EmailData?> parseEmailToEmailData(MimeMessage message) async {
     final subject = message.decodeSubject() ?? '';
+    final sender = message.from?.firstOrNull?.email ?? '';
+
     if (kDebugMode) {
       print('Subject: $subject');
+      print('Sender: $sender');
     }
-    if (subject.contains('Your RBC Royal Bank eStatement is ready') ||
-        subject.contains('eStatement Alert for your Simplii Credit Card') ||
-        subject.contains('Enbridge - Your Payment is Due')) {
+
+    if (AppConstants.invalidEmailSubjects.contains(subject) ||
+        AppConstants.invalidEmailSenders.contains(sender)) {
       if (kDebugMode) {
-        print('Subject is a known email, skipping');
+        print('Email subject or sender is in the invalid list, skipping email');
       }
       return null;
     }

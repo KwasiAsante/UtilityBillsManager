@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:utility_bills_manager/services/email/google_account_service.dart';
+
+import '../../services/email/google_account_service.dart';
 
 /// Abstract base [State] that encapsulates Google sign-in lifecycle logic.
 ///
