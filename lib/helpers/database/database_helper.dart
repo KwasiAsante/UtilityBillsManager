@@ -1302,7 +1302,7 @@ class DatabaseHelper {
   /// Returns the [EmailData] record whose `emailId` matches [emailId], or
   /// `null` if not found.  Pass [include] flags to join `bill` and/or
   /// `payment`.
-  Future<EmailData?> readEmail(String emailId, {Map<String, bool>? include}) async {
+  Future<EmailData?> readEmail(String emailId, {Map<String, bool>? include, bool queryByEmailId = false}) async {
     final db = await database;
     final includeBill = include?['bill'] == true;
     final includePayment = include?['payment'] == true;
@@ -1311,14 +1311,14 @@ class DatabaseHelper {
     if (!includeBill && !includePayment) {
       result = await db.query(
         'email_data',
-        where: 'emailId = ?',
+        where: queryByEmailId ? 'emailId = ?' : 'emailDataId = ?',
         whereArgs: [emailId],
       );
     } else {
       final query = _buildEmailDataQuery(
         includeBill: includeBill,
         includePayment: includePayment,
-        whereClause: 'WHERE e.emailId = ?',
+        whereClause: 'WHERE ${(queryByEmailId ? 'e.emailId = ?' : 'e.emailDataId = ?')}',
       );
       result = await db.rawQuery(query, [emailId]);
     }

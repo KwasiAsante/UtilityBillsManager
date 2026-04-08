@@ -100,14 +100,30 @@ class Payment {
   /// Serializes this payment to a flat JSON map for the REST API or SQLite.
   /// Note: [bills] and [rentor] objects are **not** included — only their IDs.
   /// The [paymentDate] is encoded as `yyyy-MM-dd`.
-  Map<String, dynamic> toJson() {
-    return {
+  /// When [include] is provided, the presence of `bill` and `rentor` keys with
+  /// `true` values will include the full [bills] and [rentor] data in the output map
+  /// under `billIds` and `rentorId` respectively, if available.
+  Map<String, dynamic> toJson({Map<String, bool>? include}) {
+    final includeBill = include?['bill'] == true;
+    final includeRentor = include?['rentor'] == true;
+
+    var map = {
       'id': id,
       'paymentId': paymentId,
       'rentorId': (rentorId == null || rentorId!.trim().isEmpty) ? null : rentorId,
       'amountPaid': amountPaid,
       'paymentDate': paymentDate.toIso8601String().split('T').first,
     };
+
+    if (includeBill && billIds != null && billIds!.isNotEmpty) {
+      map['billIds'] = billIds;
+    }
+
+    if (includeRentor && rentorId != null && rentorId!.isNotEmpty) {
+      map['rentorId'] = rentorId;
+    }
+
+    return map;
   }
 
   /// Deserializes a [Payment] from a flat JSON map (API response or SQLite row).

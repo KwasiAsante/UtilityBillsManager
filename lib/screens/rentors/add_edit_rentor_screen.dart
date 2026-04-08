@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/models/bill.dart';
-import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
 import '../../data/repositories/rentors_repository.dart';
-import '../../helpers/bills/bills_helper.dart';
 
 /// Form screen for creating a new rentor or editing an existing one.
 ///
@@ -35,7 +33,6 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
   final Map<BillType, TextEditingController> _billPercentageControllers = {};
 
   final RentorsRepository _rentorsRepository = RentorsRepository();
-  final BillsHelper _billsHelper = BillsHelper();
 
   DateTime? _lastPaymentDate;
   late List<BillType> _selectedBillTypes;
@@ -98,27 +95,6 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
       });
     }
   }
-
-  Future<double> _calculateAmountOwed() async {
-  if (widget.rentor == null) return 0.0;
-
-  final result = await _billsHelper.readAllBills();
-  if (!result.isSuccess) return 0.0;
-
-  final allBills = result.data!;
-  final unpaidBills = allBills.where((bill) =>
-      bill.status != PaymentStatus.paid &&
-      !widget.rentor!.excludedBillTypes.contains(bill.type));
-
-  double totalOwed = 0.0;
-
-  for (var bill in unpaidBills) {
-    final percent = widget.rentor!.billPercentages[bill.type] ?? widget.rentor!.defaultPercentage;
-    totalOwed += bill.amount * (percent / 100);
-  }
-
-  return totalOwed;
-}
 
   void _showAddBillPercentageDialog() {
     showDialog(
@@ -335,20 +311,6 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
                       ),
                       _buildBillTypeFields(),
                       _buildExclusionListSection(),
-                      const SizedBox(height: 20),
-                      FutureBuilder<double>(
-                        future: _calculateAmountOwed(),
-                        builder: (context, snapshot) {
-                          final amount = snapshot.data?.toStringAsFixed(2) ?? '...';
-                          return TextFormField(
-                            enabled: false,
-                            decoration: InputDecoration(
-                              labelText: 'Amount Owed \$',
-                              hintText: amount,
-                            ),
-                          );
-                        },
-                      ),
                       GestureDetector(
                         onTap: _pickDate,
                         child: AbsorbPointer(
@@ -363,7 +325,7 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 25),
               FilledButton(
                 onPressed: _saveRentor,
                 child: const Text('Save Rentor'),

@@ -80,14 +80,14 @@ class EmailDataHelper {
   }
 
   /// Retrieves a single email record by [id], with optional join of bill/payment.
-  Future<Result<EmailData?>> readEmail(String id, {Map<String, bool>? include}) async {
+  Future<Result<EmailData?>> readEmail(String id, {Map<String, bool>? include, bool queryByEmailId = false}) async {
     final dbHelper = this.dbHelper;
     try {
       EmailData? emailData;
       if (dbHelper != null) {
-        emailData = await dbHelper.readEmail(id, include: include);
+        emailData = await dbHelper.readEmail(id, include: include, queryByEmailId: queryByEmailId);
       } else {
-        emailData = await ApiService.emails().getEmail(id, include: include);
+        emailData = await ApiService.emails().getEmail(id, include: include, queryByEmailId: queryByEmailId);
       }
       return Result.success(data: emailData);
     } on Exception catch (e) {
@@ -215,7 +215,7 @@ class EmailDataHelper {
       EmailData? emailData = await EmailParser.parseEmailToEmailData(message);
       if (emailData != null) {
         Map<String, bool> include = type == EmailType.bill ? {'bill': true} : {'payment': true};
-        Result<EmailData?> result = await readEmail(emailData.getEmailId(), include: include);
+        Result<EmailData?> result = await readEmail(emailData.getEmailId(), include: include, queryByEmailId: true);
         if (result.isError || result.data == null) {
           Result<EmailData> retVal = await createEmailData(emailData);
           if (retVal.isError) {

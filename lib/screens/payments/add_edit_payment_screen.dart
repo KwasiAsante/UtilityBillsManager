@@ -42,7 +42,7 @@ State<AddEditPaymentScreen> {
   final _rentorController = TextEditingController();
   final Map<String, TextEditingController> _billControllers = {};
 
-  final PaymentsHelper _paymentsHelper = PaymentsHelper();
+  final PaymentsRepository _paymentsRepository = PaymentsRepository();
   final RentorsHelper _rentorsHelper = RentorsHelper();
   final BillsHelper _billsHelper = BillsHelper();
 
@@ -85,7 +85,7 @@ State<AddEditPaymentScreen> {
               _selectedBills = paymentBills;
               for (var bill in _selectedBills) {
                 _billControllers[bill.billId] = TextEditingController(
-                  text: '${bill.type.name}: ${bill.companyName} - ${bill.dueDate}',
+                  text: '${bill.type.name}: ${bill.companyName} - ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}',
                 );
               }
             });
@@ -96,7 +96,7 @@ State<AddEditPaymentScreen> {
         _selectedBills = payment.bills ?? [];
         for (var bill in _selectedBills) {
           _billControllers[bill.billId] = TextEditingController(
-            text: '${bill.type.name}: ${bill.companyName} - ${bill.dueDate}',
+            text: '${bill.type.name}: ${bill.companyName} - ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}',
           );
         }
       }
@@ -159,7 +159,7 @@ State<AddEditPaymentScreen> {
       for (var bill in _selectedBills) {
         if (!_billControllers.containsKey(bill.billId)) {
           _billControllers[bill.billId] = TextEditingController(
-            text: '${bill.type.name}: ${bill.companyName} - ${bill.dueDate}',
+            text: '${bill.type.name}: ${bill.companyName} - ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}',
           );
         }
       }
@@ -254,7 +254,7 @@ State<AddEditPaymentScreen> {
             itemBuilder: (context, index) {
               final bill = _selectedBills[index];
               final controller = _billControllers[bill.billId]!;
-              final displayName = '${bill.type.name}: ${bill.companyName} - ${bill.dueDate}';
+              final displayName = '${bill.type.name}: ${bill.companyName} - ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}';
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12.0),
@@ -292,7 +292,7 @@ State<AddEditPaymentScreen> {
                           if (idx != -1) {
                             _selectedBills[idx] = updatedBill;
                             _billControllers[bill.billId]?.text =
-                                '${updatedBill.type.name}: ${updatedBill.companyName} - ${updatedBill.dueDate}';
+                                '${updatedBill.type.name}: ${updatedBill.companyName} - ${DateFormat('yyyy-MM-dd').format(updatedBill.dueDate)}';
                           }
                         });
                       },
@@ -342,9 +342,9 @@ State<AddEditPaymentScreen> {
     }
 
     if (widget.payment == null) {
-      await _paymentsHelper.createPayment(payment);
+      await _paymentsRepository.create(payment);
     } else {
-      await _paymentsHelper.updatePayment(payment);
+      await _paymentsRepository.update(payment);
     }
 
     _selectedRentor = null;
@@ -363,8 +363,6 @@ State<AddEditPaymentScreen> {
       await _rentorsHelper.updateRentorPaymentInfo(payment, rentorId: payment.rentorId, rentor: payment.rentor);
       await RentorsRepository().reload();
     }
-
-    await PaymentsRepository().reload();
 
     if (mounted) {
       Navigator.pop(context, true);
@@ -981,7 +979,7 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
                   final isSelected = selectedBills.any((selected) => selected.billId == bill.billId);
                   return CheckboxListTile(
                     title: Text(bill.companyName),
-                    subtitle: Text('Type: ${bill.type.name}\nAmount: \$${bill.amount.toStringAsFixed(2)}\nDue Date: ${bill.dueDate}\nStatus: ${PaymentStatusExtension.getName(bill.status)}'),
+                    subtitle: Text('Type: ${bill.type.name}\nAmount: \$${bill.amount.toStringAsFixed(2)}\nDue Date: ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}\nStatus: ${PaymentStatusExtension.getName(bill.status)}'),
                     value: isSelected,
                     onChanged: (value) {
                       setState(() {

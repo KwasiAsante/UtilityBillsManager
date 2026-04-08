@@ -7,8 +7,19 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 ### Changed
-- `app_config.dart`: minor configuration adjustments (staged/uncommitted)
-- `main.dart`: startup sequence adjustments (staged/uncommitted)
+- `AppConfig`: default `APP_MODE` changed from `server` to `client`; fallback in `mode` getter now also returns `AppMode.client`.
+- `AddEditPaymentScreen`: switched from `PaymentsHelper` to `PaymentsRepository` for create/update; fixed bill due-date display to use `DateFormat('yyyy-MM-dd')` instead of raw `DateTime.toString()`.
+- `AddEditRentorScreen`: removed unused `_calculateAmountOwed()` method and its "Amount Owed" UI field; removed unused `BillsHelper` and `Payment` imports.
+- `ApiService` (payments): `createPayment` and `updatePayment` now serialize via `toJson(include: {'bill': true, 'rentor': true})` so bill IDs and rentor ID are sent to the API; `getPayments` now maps `billList` from the response into full `Bill` objects via `Payment.fromJson`.
+- `ApiService` (emails): `getEmail` forwards a `query_by_email_id` query parameter to the API.
+
+### Added
+- `Payment.toJson`: optional `include` map parameter — passing `{'bill': true}` appends `billIds` and `{'rentor': true}` ensures `rentorId` is present in the serialized output.
+- `DatabaseHelper.readEmail` / `EmailDataHelper.readEmail`: new `queryByEmailId` flag to query email records by `emailId` (IMAP message ID) instead of the default `emailDataId` primary key.
+- `SummaryScreen`: `fetchPaymentEmails()` is now called alongside `fetchBillEmails()` during Gmail sync so payment-related emails are also fetched.
+
+### Fixed
+- `SummaryScreen._isConsideredPaid`: bills with `PaymentStatus.paid` are now always treated as paid regardless of threshold calculation.
 
 ---
 

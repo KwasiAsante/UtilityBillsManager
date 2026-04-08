@@ -24,7 +24,7 @@ class AppConfig {
 
   static const String _modeRaw = String.fromEnvironment(
     'APP_MODE',
-    defaultValue: 'server',
+    defaultValue: 'client',
   );
 
   /// Parses the `APP_MODE` dart-define string into an [AppMode] enum value,
@@ -32,7 +32,7 @@ class AppConfig {
   static AppMode get mode {
     final normalized = _modeRaw.trim().toLowerCase();
     if (normalized == 'client') return AppMode.client;
-    return AppMode.server;
+    return AppMode.client;
   }
 
   /// Base URL used by the app when it needs to call the API.

@@ -99,7 +99,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     if (actualUnpaid <= 0) return true;
     // Within the percentage threshold, OR within $1.00 of the threshold amount.
     final thresholdAmount = bill.amount * threshold;
-    return actualUnpaid <= thresholdAmount + 1.0;
+    return actualUnpaid <= thresholdAmount + 1.0 || bill.status == PaymentStatus.paid;
   }
 
   /// The paid amount to display, respecting the toggle and threshold.
@@ -191,6 +191,11 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
 
     if (syncEmails) {
       await _emailDataHelper.fetchBillEmails(
+        earliestEmailDate: earliestEmailDate,
+        maxEmails: maxEmails,
+      );
+
+      await _emailDataHelper.fetchPaymentEmails(
         earliestEmailDate: earliestEmailDate,
         maxEmails: maxEmails,
       );

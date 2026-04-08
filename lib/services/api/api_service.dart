@@ -366,7 +366,7 @@ class PaymentsApiService {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/payment'),
-        body: jsonEncode(payment),
+        body: jsonEncode(payment.toJson(include: {'bill': true, 'rentor': true})),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -428,7 +428,7 @@ class PaymentsApiService {
         final List<dynamic> jsonList = jsonDecode(response.body);
         return jsonList
             .whereType<Map<String, dynamic>>()
-            .map((e) => Payment.fromJson(e))
+            .map((e) => Payment.fromJson(e, billRows: e['billList'] != null && e['billList'] is List ? List<Map<String, dynamic>>.from(e['billList']) : null))
             .toList();
       } else {
         AppLogger().e('Failed to load payments: ${response.statusCode} - $response');
@@ -446,7 +446,7 @@ class PaymentsApiService {
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/payment'),
-        body: jsonEncode(payment),
+        body: jsonEncode(payment.toJson(include: {'bill': true, 'rentor': true})),
         headers: {'Content-Type': 'application/json'},
       );
 
@@ -537,15 +537,17 @@ class EmailDataApiService {
   // #endregion
 
   // #region Read
-  Future<EmailData?> getEmail(String id, {Map<String, bool>? include}) async {
+  Future<EmailData?> getEmail(String id, {Map<String, bool>? include, bool queryByEmailId = false}) async {
     try {
-      final includeParams = <String, String>{
+      final queryParams = <String, String>{
         if (include != null)
           for (final entry in include.entries)
             if (entry.value) entry.key: 'true',
+
+        'query_by_email_id': '$queryByEmailId',
       };
       final uri = Uri.parse('$baseUrl/email/$id').replace(
-        queryParameters: includeParams.isEmpty ? null : includeParams,
+        queryParameters: queryParams.isEmpty ? null : queryParams,
       );
       final response = await http.get(uri);
 
