@@ -1,11 +1,11 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import './bill.dart';
 import './payment.dart';
 import '../../helpers/payments/payments_helper.dart';
+import '../../utils/app_logger.dart';
 import '../../utils/comparable_utils.dart';
 
 /// Represents a tenant / rentor who contributes toward household utility bills.
@@ -222,16 +222,14 @@ class Rentor {
       }
     }
 
-    if (payments == null || payments.isEmpty) {
+    if (payments.isEmpty) {
       return;
     }
 
     payments.sort((a, b) => ComparableUtils.compareNullable(a.paymentDate, b.paymentDate, descending: true));
 
     if (ComparableUtils.compareNullable(payments.first.paymentDate, lastPaymentDate, descending: true) >= 0) {
-      if (kDebugMode) {
-        print('No update needed for Rentor $rentorId - existing lastPaymentDate is more recent or equal to latest payment');
-      }
+      AppLogger().d('No update needed for Rentor $rentorId - existing lastPaymentDate is more recent or equal to latest payment');
       return;
     }
 

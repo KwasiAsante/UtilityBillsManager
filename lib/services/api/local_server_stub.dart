@@ -1,11 +1,9 @@
-import 'package:flutter/foundation.dart';
+import '../../utils/app_logger.dart';
 
 /// Fallback `startServer` implementation for platforms that do not support
 /// running a local HTTP server (e.g. Flutter web).
 Future<void> startServer() async {
-  if (kDebugMode) {
-    // This is intentionally a no-op on unsupported platforms.
-    print('startServer() is not supported on this platform. Skipping.');
-  }
+  // This is intentionally a no-op on unsupported platforms.
+  AppLogger().d('startServer() is not supported on this platform. Skipping.');
 }
 

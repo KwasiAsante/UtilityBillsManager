@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_router/shelf_router.dart';
@@ -11,6 +10,7 @@ import '../../data/models/email_data.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
 import '../../helpers/database/database_helper.dart';
+import '../../utils/app_logger.dart';
 
 /// Parses the `bill` and `payment` query-string flags from a request's query
 /// parameters, accepting several common key spellings (`bill`, `includeBill`,
@@ -108,9 +108,7 @@ Future<void> startServer() async {
   router.post('/bill', (Request request) async {
     try {
       final body = await request.readAsString();
-      if (kDebugMode) {
-        print('Received POST data: $body');
-      }
+      AppLogger().d('Received POST data: $body');
       final bill = Bill.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
       int createdBillId = await dbHelper.createBill(bill);
@@ -134,9 +132,7 @@ Future<void> startServer() async {
   router.put('/bill', (Request request) async {
     try {
       final body = await request.readAsString();
-      if (kDebugMode) {
-        print('Received POST data: $body');
-      }
+      AppLogger().d('Received POST data: $body');
       final bill = Bill.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
       int numberOfChanges = await dbHelper.updateBill(bill);
@@ -227,9 +223,7 @@ Future<void> startServer() async {
   router.post('/rentor', (Request request) async {
     try {
       final body = await request.readAsString();
-      if (kDebugMode) {
-        print('Received POST data: $body');
-      }
+      AppLogger().d('Received POST data: $body');
       final rentor = Rentor.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
       int createdRentorId = await dbHelper.createRentor(rentor);
@@ -253,9 +247,7 @@ Future<void> startServer() async {
   router.put('/rentor', (Request request) async {
     try {
       final body = await request.readAsString();
-      if (kDebugMode) {
-        print('Received POST data: $body');
-      }
+      AppLogger().d('Received POST data: $body');
       final rentor = Rentor.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
       int numberOfChanges = await dbHelper.updateRentor(rentor);
@@ -359,9 +351,7 @@ Future<void> startServer() async {
   router.post('/payment', (Request request) async {
     try {
       final body = await request.readAsString();
-      if (kDebugMode) {
-        print('Received POST data: $body');
-      }
+      AppLogger().d('Received POST data: $body');
       final payment =
           Payment.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
@@ -386,9 +376,7 @@ Future<void> startServer() async {
   router.put('/payment', (Request request) async {
     try {
       final body = await request.readAsString();
-      if (kDebugMode) {
-        print('Received POST data: $body');
-      }
+      AppLogger().d('Received POST data: $body');
       final payment =
           Payment.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
@@ -516,9 +504,7 @@ Future<void> startServer() async {
   router.post('/email', (Request request) async {
     try {
       final body = await request.readAsString();
-      if (kDebugMode) {
-        print('Received POST data: $body');
-      }
+      AppLogger().d('Received POST data: $body');
       final emailData =
           EmailData.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
@@ -543,9 +529,7 @@ Future<void> startServer() async {
   router.put('/email', (Request request) async {
     try {
       final body = await request.readAsString();
-      if (kDebugMode) {
-        print('Received POST data: $body');
-      }
+      AppLogger().d('Received POST data: $body');
       final emailData =
           EmailData.fromJson(jsonDecode(body) as Map<String, dynamic>);
 
@@ -598,7 +582,5 @@ Future<void> startServer() async {
 
   final ip = InternetAddress.anyIPv4; // accessible from local network
   final server = await io.serve(handler, ip, 8080);
-  if (kDebugMode) {
-    print('Server listening on http://${server.address.host}:${server.port}');
-  }
+  AppLogger().i('Server listening on http://${server.address.host}:${server.port}');
 }

@@ -1,7 +1,7 @@
 import 'package:enough_mail/enough_mail.dart';
-import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 
+import '../app_logger.dart';
 import '../constants.dart';
 import '../email/email_parser.dart';
 import '../../data/models/bill.dart';
@@ -25,11 +25,9 @@ class BillsParser {
     final subject = message.decodeSubject() ?? '';
     final sender = message.from?.firstOrNull?.email ?? '';
 
-    if (AppConstants.invalidEmailSubjects.contains(subject) ||
-        AppConstants.invalidEmailSenders.contains(sender)) {
-      if (kDebugMode) {
-        print('Email subject or sender is in the invalid list, skipping email');
-      }
+    if (AppConstants.invalidEmailSubjects.any((sub) => subject.contains(sub)) ||
+        AppConstants.invalidEmailSenders.any((send) => sender.contains(send))) {
+      AppLogger().d('Email subject or sender is in the invalid list, skipping email');
       return null;
     }
 

@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import '../email/google_account_service.dart';
+import '../../utils/app_logger.dart';
 
 
 /// Cross-platform email fetcher.
@@ -95,9 +96,7 @@ class EmailService {
             );
           }
         } catch (e) {
-          if (kDebugMode) {
-            print('SEARCH failed, falling back to fetchRecentMessages: $e');
-          }
+          AppLogger().w('SEARCH failed, falling back to fetchRecentMessages: $e');
         }
       }
       else {
@@ -109,9 +108,7 @@ class EmailService {
 
       return fetchResult?.messages ?? [];
     } catch (e) {
-      if (kDebugMode) {
-        print('Error fetching emails via IMAP: $e');
-      }
+      AppLogger().e('Error fetching emails via IMAP: $e');
       return [];
     } finally {
       if (didLogin) {
@@ -134,16 +131,14 @@ class EmailService {
       if (!GoogleAccountService().isInitialized ||
           !GoogleAccountService().isAuthenticated ||
           !GoogleAccountService().isSignedIn) {
-        if (kDebugMode) {
-          if (!GoogleAccountService().isInitialized) {
-            print('Google account is not initialized');
-          }
-          if (!GoogleAccountService().isAuthenticated) {
-            print('Google account is not authenticated');
-          }
-          if (!GoogleAccountService().isSignedIn) {
-            print('Google account is not signed in');
-          }
+        if (!GoogleAccountService().isInitialized) {
+          AppLogger().w('Google account is not initialized');
+        }
+        if (!GoogleAccountService().isAuthenticated) {
+          AppLogger().w('Google account is not authenticated');
+        }
+        if (!GoogleAccountService().isSignedIn) {
+          AppLogger().w('Google account is not signed in');
         }
         return [];
       } else if (!GoogleAccountService().isAuthenticated &&
@@ -206,9 +201,7 @@ class EmailService {
 
       return mimeMessages;
     } catch (e) {
-      if (kDebugMode) {
-        print('Error fetching emails via Gmail API (web): $e');
-      }
+      AppLogger().e('Error fetching emails via Gmail API (web): $e');
       return [];
     }
   }

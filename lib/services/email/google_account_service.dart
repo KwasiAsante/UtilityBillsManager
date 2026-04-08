@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_sign_in_web/google_sign_in_web.dart';
 import 'package:google_sign_in_web/web_only.dart' as web;
+import '../../utils/app_logger.dart';
 
 /// Singleton wrapper around the `google_sign_in` plugin for **web-only** Gmail
 /// access.
@@ -103,9 +104,7 @@ class GoogleAccountService {
             googleSignIn.authenticationEvents
                 .listen((event) async {
                   if (event is GoogleSignInAuthenticationEventSignIn) {
-                    if (kDebugMode) {
-                      print('Google sign in successful');
-                    }
+                    AppLogger().d('Google sign in successful');
                     _isAuthenticated = true;
                     signedInAccount = event.user;
                     _isSignedIn = true;
@@ -114,9 +113,7 @@ class GoogleAccountService {
                   }
                 })
                 .onError((error, stackTrace) {
-                  if (kDebugMode) {
-                    print('Error initializing Google sign in: $error');
-                  }
+                  AppLogger().e('Error initializing Google sign in: $error');
                   _isAuthenticated = false;
                   _isSignedIn = false;
                   _isInitialized = false;
@@ -138,9 +135,7 @@ class GoogleAccountService {
 
     if (!_isSignedIn) {
       if (kIsWeb) {
-        if (kDebugMode) {
-          print('On the web, sign in must be triggered from the UI.');
-        }
+        AppLogger().d('On the web, sign in must be triggered from the UI.');
         return null;
       }
 

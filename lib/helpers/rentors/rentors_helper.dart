@@ -1,11 +1,10 @@
-import 'package:flutter/foundation.dart';
-
 import '../database/database_helper.dart';
 import '../../data/models/app_state.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
 import '../../data/models/result.dart';
 import '../../services/api/api_service.dart';
+import '../../utils/app_logger.dart';
 
 /// Singleton service layer for rentor-related persistence.
 ///
@@ -150,14 +149,10 @@ class RentorsHelper {
     rentor.updateLastPaymentDate(payments: [payment]);
     final results = await updateRentor(rentor);
     if (!results.isSuccess) {
-      if (kDebugMode) {
-        print("Error updating rentor payment info: ${results.errorMessage}");
-      }
+      AppLogger().e("Error updating rentor payment info: ${results.errorMessage}");
     }
     else {
-      if (kDebugMode) {
-        print("Successfully updated rentor payment info for rentor ${rentor.id}");
-      }
+      AppLogger().d("Successfully updated rentor payment info for rentor ${rentor.id}");
     }
   }
   // #endregion

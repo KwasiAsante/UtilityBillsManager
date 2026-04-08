@@ -1,5 +1,4 @@
 import 'package:enough_mail/enough_mail.dart';
-import 'package:flutter/foundation.dart';
 
 import '../bills/bills_helper.dart';
 import '../database/database_helper.dart';
@@ -13,6 +12,7 @@ import '../../data/models/payment.dart';
 import '../../data/models/result.dart';
 import '../../data/models/rentor.dart';
 import '../../services/api/api_service.dart';
+import '../../utils/app_logger.dart';
 import '../../services/email/email_service.dart';
 import '../../utils/bills/bills_parser.dart';
 import '../../utils/email/email_parser.dart';
@@ -208,15 +208,9 @@ class EmailDataHelper {
     Map<MimeMessage, EmailData> finalMessages = {};
     final messages = await emailService.fetchRecentEmails(type, maxEmails: maxEmails, earliestEmailDate: earliestEmailDate);
     for (MimeMessage message in messages) {
-      if (kDebugMode) {
-        print('From: ${message.from}');
-        print('Subject: ${message.decodeSubject()}');
-        print('Date: ${message.decodeDate()}');
-        print('Text: ${EmailParser.extractEmailBody(message)}');
-        print(
-          '---------------------------------------------------------------------\n\n\n\n\n',
-        );
-      }
+      AppLogger().d(
+        'Email Parsed: {\n\tFrom: ${message.from}\n\tSubject: ${message.decodeSubject()}\n\tDate: ${message.decodeDate()}\n\tText: ${EmailParser.extractEmailBody(message)}\n}',
+      );
 
       EmailData? emailData = await EmailParser.parseEmailToEmailData(message);
       if (emailData != null) {
@@ -225,9 +219,7 @@ class EmailDataHelper {
         if (result.isError || result.data == null) {
           Result<EmailData> retVal = await createEmailData(emailData);
           if (retVal.isError) {
-            if (kDebugMode) {
-              print(retVal.errorMessage);
-            }
+            AppLogger().e(retVal.errorMessage);
           }
           finalMessages[message] = emailData;
         } else {
@@ -256,14 +248,9 @@ class EmailDataHelper {
         if (bill == null) {
           bill = await BillsParser.parseEmailToBill(message);
           if (bill != null) {
-            if (kDebugMode) {
-              print(
-                'Bill Parsed: {\n\tID: ${bill.billId}\n\tCompany: ${bill.company}\n\tAmount: ${bill.amount}\n\tBill Type: ${bill.type}\n\tDue Date: ${bill.dueDate}\n\tPayment Status: ${bill.status.name}\n\tNotes: ${bill.notes}\n}',
-              );
-              print(
-                '---------------------------------------------------------------------\n\n\n\n\n',
-              );
-            }
+            AppLogger().d(
+              'Bill Parsed: {\n\tID: ${bill.billId}\n\tCompany: ${bill.company}\n\tAmount: ${bill.amount}\n\tBill Type: ${bill.type}\n\tDue Date: ${bill.dueDate}\n\tPayment Status: ${bill.status.name}\n\tNotes: ${bill.notes}\n}',
+            );
 
             // Create the bill and get its ID
             Result<Bill> createResult = await _billsHelper.createBill(bill);
@@ -286,22 +273,14 @@ class EmailDataHelper {
               }
             }
           } else {
-            if (kDebugMode) {
-              print('Failed to convert Bill: ${message.decodeSubject()}');
-              print(
-                '---------------------------------------------------------------------\n\n\n\n\n',
-              );
-            }
+            AppLogger().w('Failed to convert Bill: ${message.decodeSubject()}');
+            AppLogger().d('---------------------------------------------------------------------\n\n\n\n\n');
           }
         } else {
-          if (kDebugMode) {
-            print(
-              'Bill Found: {\n\tID: ${bill.id}\n\tCompany: ${bill.company}\n\tAmount: ${bill.amount}\n\tBill Type: ${bill.type}\n\tDue Date: ${bill.dueDate}\n\tPayment Status: ${bill.status.name}\n\tNotes: ${bill.notes}\n}',
-            );
-            print(
-              '---------------------------------------------------------------------\n\n\n\n\n',
-            );
-          }
+          AppLogger().d(
+            'Bill Found: {\n\tID: ${bill.id}\n\tCompany: ${bill.company}\n\tAmount: ${bill.amount}\n\tBill Type: ${bill.type}\n\tDue Date: ${bill.dueDate}\n\tPayment Status: ${bill.status.name}\n\tNotes: ${bill.notes}\n}',
+          );
+          AppLogger().d('---------------------------------------------------------------------\n\n\n\n\n');
 
           var emailData = messages[message];
           if (emailData != null) {
@@ -348,14 +327,10 @@ class EmailDataHelper {
         if (payment == null) {
           payment = await PaymentsParser.parseEmailToPayment(message, rentors: rentors);
           if (payment != null) {
-            if (kDebugMode) {
-              print(
-                'Payment Parsed: {\n\tID: ${payment.paymentId}\n\tPayment Date: ${payment.paymentDate}\n\tAmount Paid: ${payment.amountPaid}\n\tPaid Rentor: ${payment.rentorName}\n\tBill Paid: \n\t\t${payment.billNames(newLine: true)}\n}',
-              );
-              print(
-                '---------------------------------------------------------------------\n\n\n\n\n',
-              );
-            }
+            AppLogger().d(
+              'Payment Parsed: {\n\tID: ${payment.paymentId}\n\tPayment Date: ${payment.paymentDate}\n\tAmount Paid: ${payment.amountPaid}\n\tPaid Rentor: ${payment.rentorName}\n\tBill Paid: \n\t\t${payment.billNames(newLine: true)}\n}',
+            );
+            AppLogger().d('---------------------------------------------------------------------\n\n\n\n\n');
 
             // Create the payment and get its ID
             Result<Payment> createResult = await _paymentsHelper.createPayment(payment);
@@ -378,22 +353,14 @@ class EmailDataHelper {
               }
             }
           } else {
-            if (kDebugMode) {
-              print('Failed to convert Payment: ${message.decodeSubject()}');
-              print(
-                '---------------------------------------------------------------------\n\n\n\n\n',
-              );
-            }
+            AppLogger().w('Failed to convert Payment: ${message.decodeSubject()}');
+            AppLogger().d('---------------------------------------------------------------------\n\n\n\n\n');
           }
         } else {
-          if (kDebugMode) {
-            print(
-              'Payment Found: {\n\tID: ${payment.paymentId}\n\tPayment Date: ${payment.paymentDate}\n\tAmount Paid: ${payment.amountPaid}\n\tPaid Rentor: ${payment.rentorName}\n\tBill Paid: \n\t\t${payment.billNames(newLine: true)}\n}',
-            );
-            print(
-              '---------------------------------------------------------------------\n\n\n\n\n',
-            );
-          }
+          AppLogger().d(
+            'Payment Found: {\n\tID: ${payment.paymentId}\n\tPayment Date: ${payment.paymentDate}\n\tAmount Paid: ${payment.amountPaid}\n\tPaid Rentor: ${payment.rentorName}\n\tBill Paid: \n\t\t${payment.billNames(newLine: true)}\n}',
+          );
+          AppLogger().d('---------------------------------------------------------------------\n\n\n\n\n');
 
           var emailData = messages[message];
           if (emailData != null) {

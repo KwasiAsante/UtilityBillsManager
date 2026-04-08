@@ -1,9 +1,8 @@
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
-
 import '../database/database_helper.dart';
 import '../rentors/rentors_helper.dart';
+import '../../utils/app_logger.dart';
 import '../../data/models/app_state.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
@@ -191,9 +190,7 @@ class BillsHelper {
       if (readResult.isSuccess && readResult.data != null) {
         bills = readResult.data!;
       } else {
-        if (kDebugMode) {
-          print("Error reading bills for payment status update: ${readResult.errorMessage}");
-        }
+        AppLogger().e("Error reading bills for payment status update: ${readResult.errorMessage}");
         return;
       }
     }
@@ -203,9 +200,7 @@ class BillsHelper {
       if (rentorResult.isSuccess && rentorResult.data != null) {
         rentor = rentorResult.data!;
       } else {
-        if (kDebugMode) {
-          print("Error reading rentor for payment status update: ${rentorResult.errorMessage}");
-        }
+        AppLogger().e("Error reading rentor for payment status update: ${rentorResult.errorMessage}");
         return;
       }
     }
@@ -234,9 +229,7 @@ class BillsHelper {
       }
     }
     else {
-      if (kDebugMode) {
-        print("No bills found for payment status update");
-      }
+      AppLogger().w("No bills found for payment status update");
       return;
     }
   }
@@ -313,29 +306,21 @@ class BillsHelper {
       final amountOwed = bill.amount - newAmountPaid;
       final amountLeft =  (bill.amount * (bill.type == BillType.internet ? 0.5 : 0.3));
       if (_isConsideredPaid(bill)) {
-        if (kDebugMode) {
-          print("Bill ${bill.billId} is now fully paid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
-        }
+        AppLogger().d("Bill ${bill.billId} is now fully paid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
         bill.status = PaymentStatus.paid;
       } else if (newAmountPaid > 0) {
-        if (kDebugMode) {
-          print("Bill ${bill.billId} is now partially paid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
-        }
+        AppLogger().d("Bill ${bill.billId} is now partially paid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
         bill.status = PaymentStatus.partial;
       } else {
-        if (kDebugMode) {
-          print("Bill ${bill.billId} is now unpaid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
-        }
+        AppLogger().d("Bill ${bill.billId} is now unpaid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
         bill.status = PaymentStatus.unpaid;
       }
 
       final result = await updateBill(bill);
-      if (kDebugMode) {
-        if (result.isError) {
-          print("Error reversing payment for bill ${bill.billId}: ${result.errorMessage}");
-        } else {
-          print("Reversed payment ${payment.paymentId} from bill ${bill.billId}: -$appliedAmount, new status: ${bill.status.name}");
-        }
+      if (result.isError) {
+        AppLogger().e("Error reversing payment for bill ${bill.billId}: ${result.errorMessage}");
+      } else {
+        AppLogger().d("Reversed payment ${payment.paymentId} from bill ${bill.billId}: -$appliedAmount, new status: ${bill.status.name}");
       }
     }
   }
@@ -349,9 +334,7 @@ class BillsHelper {
   /// - All other types: paid when owed ≤ 30 % of total amount.
   Future<double> updateLastPaymentStatus(double amountPaid, {Bill? bill, Rentor? rentor}) async {
     if (bill == null) {
-      if (kDebugMode) {
-        print("No bill provided for last payment status update");
-      }
+      AppLogger().w("No bill provided for last payment status update");
       return 0.0;
     }
 
@@ -363,9 +346,7 @@ class BillsHelper {
     if (rentor != null) {
       final owedAmount = rentor.owedAmount(bill);
       if (owedAmount <= 0) {
-        if (kDebugMode) {
-          print("Rentor ${rentor.rentorId} has no owed amount for bill ${bill.billId}, skipping payment status update");
-        }
+        AppLogger().d("Rentor ${rentor.rentorId} has no owed amount for bill ${bill.billId}, skipping payment status update");
         return 0.0;
       }
 
@@ -377,32 +358,22 @@ class BillsHelper {
     final amountOwed = billAmount - billAmountPaid;
     final amountLeft =  (billAmount * (bill.type == BillType.internet ? 0.5 : 0.3));
     if (_isConsideredPaid(bill)) {
-      if (kDebugMode) {
-        print("Bill ${bill.billId} is now fully paid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
-      }
+      AppLogger().d("Bill ${bill.billId} is now fully paid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
       bill.status = PaymentStatus.paid;
     } else if (billAmountPaid > 0) {
-      if (kDebugMode) {
-        print("Bill ${bill.billId} is now partially paid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
-      }
+      AppLogger().d("Bill ${bill.billId} is now partially paid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
       bill.status = PaymentStatus.partial;
     } else {
-      if (kDebugMode) {
-        print("Bill ${bill.billId} remains unpaid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
-      }
+      AppLogger().d("Bill ${bill.billId} remains unpaid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
       bill.status = PaymentStatus.unpaid;
     }
 
     final result = await updateBill(bill);
     if (result.isError) {
-      if (kDebugMode) {
-        print("Error updating bill ${bill.billId} status: ${result.errorMessage}");
-      }
+      AppLogger().e("Error updating bill ${bill.billId} status: ${result.errorMessage}");
     }
     else {
-      if (kDebugMode) {
-        print("Successfully updated bill ${bill.billId} status from ${formerStatus.name} to ${bill.status.name}");
-      }
+      AppLogger().d("Successfully updated bill ${bill.billId} status from ${formerStatus.name} to ${bill.status.name}");
     }
 
     amountPaid -= amountPaidTowardsBill;
