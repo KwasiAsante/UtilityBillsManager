@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../services/email/google_account_service.dart';
+
 import 'bills/bill_list_screen.dart';
 import 'rentors/rentor_list_screen.dart';
 import 'payments/payment_list_screen.dart';
 import 'emails/email_list_screen.dart';
 import 'summary/summary_screen.dart';
+
+import '../services/google/google_account_service_native.dart';
 
 /// The root shell of the app containing a bottom navigation bar with five tabs:
 /// Bills (0), Rentors (1), Summary (2), Payments (3), and Emails (4).

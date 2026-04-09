@@ -1,8 +1,5 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart'; // Desktop
-import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart'; // Web
+// import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:pdfrx/pdfrx.dart';
 
 import '../config/app_config.dart';
@@ -12,8 +9,9 @@ import '../helpers/database/database_helper.dart';
 import '../services/api/api_service.dart';
 import '../services/api/local_server_stub.dart'
     if (dart.library.io) '../services/api/local_server.dart';
+import 'database/db_factory.dart';
 
-final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+// final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
 /// Application entry point.
 ///
@@ -34,15 +32,7 @@ void main() async {
   await pdfrxFlutterInitialize(dismissPdfiumWasmWarnings: true);
   await AppConfig.init();
 
-  if (kIsWeb) {
-    databaseFactory = databaseFactoryFfiWeb;
-  } else if (defaultTargetPlatform == TargetPlatform.windows ||
-      defaultTargetPlatform == TargetPlatform.linux ||
-      defaultTargetPlatform == TargetPlatform.macOS) {
-    // Desktop only — mobile must keep sqlite default native factory
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-  }
+  initDb(); // automatically picks the right implementation
 
   // Initialize local database on all platforms (including web with FFI web)
   await DatabaseHelper().database;
@@ -79,24 +69,24 @@ void main() async {
     // );
   }
 
-  const initializationSettingsAndroid = AndroidInitializationSettings(
-    '@mipmap/ic_launcher',
-  );
-  const darwinSettings = DarwinInitializationSettings();
-  const WindowsInitializationSettings windowsSettings =
-      WindowsInitializationSettings(
-        appName: 'Utility Bills Manager',
-        appUserModelId: "com.kwasi.utility_bills_manager",
-        guid: '94e9c1ef-2491-447e-90fe-cc3eddf2b4c6',
-      );
-  const initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-    iOS: darwinSettings,
-    macOS: darwinSettings,
-    windows: windowsSettings,
-  );
-
-  await flutterLocalNotificationsPlugin.initialize(settings: initializationSettings);
+  // const initializationSettingsAndroid = AndroidInitializationSettings(
+  //   '@mipmap/ic_launcher',
+  // );
+  // const darwinSettings = DarwinInitializationSettings();
+  // const WindowsInitializationSettings windowsSettings =
+  //     WindowsInitializationSettings(
+  //       appName: 'Utility Bills Manager',
+  //       appUserModelId: "com.kwasi.utility_bills_manager",
+  //       guid: '94e9c1ef-2491-447e-90fe-cc3eddf2b4c6',
+  //     );
+  // const initializationSettings = InitializationSettings(
+  //   android: initializationSettingsAndroid,
+  //   iOS: darwinSettings,
+  //   macOS: darwinSettings,
+  //   windows: windowsSettings,
+  // );
+  //
+  // await flutterLocalNotificationsPlugin.initialize(settings: initializationSettings);
 
   runApp(const MyApp());
 }

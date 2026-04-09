@@ -15,7 +15,7 @@ import '../../data/models/rentor.dart';
 /// ([bills], [rentors], [payments], [emails]) to obtain the type-specific
 /// service singletons — they all share the same [baseUrl].
 class ApiService {
-  static String baseUrl = 'http://127.0.0.1:8080';
+  static String baseUrl = 'http://127.0.0.1:9090';
 
   /// Overrides the base URL for all API service singletons.
   static void configure({required String baseUrl}) {
