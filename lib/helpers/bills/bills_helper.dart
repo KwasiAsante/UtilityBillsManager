@@ -30,8 +30,7 @@ class BillsHelper {
   /// mode, or `null` when API (server) mode is active.
   DatabaseHelper? get dbHelper => AppState().localDB ? DatabaseHelper() : null;
 
-  // #region CRUD Operations
-  // #region Bill
+  //region CRUD Operations
   /// Persists [bill] to the local DB or remote API and returns a [Result]
   /// containing the created bill on success.
   Future<Result<Bill>> createBill(Bill bill) async {
@@ -93,18 +92,28 @@ class BillsHelper {
   /// Accepts either a raw [status] string or a [PaymentStatus] enum value (one
   /// must be provided).  Optionally restrict results to a specific set of
   /// [billIds].
-  Future<Result<List<Bill>>> readBillsByStatus({String? status, PaymentStatus? paymentStatus, List<String>? billIds}) async {
+  Future<Result<List<Bill>>> readBillsByStatus({
+    String? status,
+    PaymentStatus? paymentStatus,
+    List<String>? billIds,
+  }) async {
     final dbHelper = this.dbHelper;
     try {
       if (status == null && paymentStatus != null) {
         status = paymentStatus.name.toLowerCase();
       } else if (status == null && paymentStatus == null) {
-        return Result.error(errorMessage: "Either status or paymentStatus must be provided");
+        return Result.error(
+          errorMessage: "Either status or paymentStatus must be provided",
+        );
       }
 
-      List<Bill> bills = (dbHelper != null)
-          ? await dbHelper.readBillsByStatus(status!, ids: billIds)
-          : await ApiService.bills().getBillsByStatus(status!, ids: billIds);
+      List<Bill> bills =
+          (dbHelper != null)
+              ? await dbHelper.readBillsByStatus(status!, ids: billIds)
+              : await ApiService.bills().getBillsByStatus(
+                status!,
+                ids: billIds,
+              );
 
       return Result.success(data: bills);
     } on Exception catch (e) {
@@ -168,6 +177,7 @@ class BillsHelper {
       return Result.error(errorMessage: returnValue);
     }
   }
+  //endregion
 
   /// Credits [payment.amountPaid] toward the provided [bills] (or fetches them
   /// by [billIds]) and updates each bill's [PaymentStatus].
@@ -180,17 +190,28 @@ class BillsHelper {
   ///    amount to what the rentor owes (if any) and persists the new status.
   /// 4. Record the exact amount applied per (payment, bill) pair via
   ///    [_markPaymentBillApplied].
-  Future<void> updatePaymentStatuses(Payment payment, {List<Bill>? bills, List<String>? billIds, Rentor? rentor, String? rentorId}) async {
+  Future<void> updatePaymentStatuses(
+      Payment payment, {
+        List<Bill>? bills,
+        List<String>? billIds,
+        Rentor? rentor,
+        String? rentorId,
+      }) async {
     if (bills == null && billIds == null) {
       return;
     }
 
     if (bills == null && billIds != null && billIds.isNotEmpty) {
-      final readResult = await readBillsByStatus(paymentStatus: PaymentStatus.unpaid, billIds: billIds);
+      final readResult = await readBillsByStatus(
+        paymentStatus: PaymentStatus.unpaid,
+        billIds: billIds,
+      );
       if (readResult.isSuccess && readResult.data != null) {
         bills = readResult.data!;
       } else {
-        AppLogger().e("Error reading bills for payment status update: ${readResult.errorMessage}");
+        AppLogger().e(
+          "Error reading bills for payment status update: ${readResult.errorMessage}",
+        );
         return;
       }
     }
@@ -200,7 +221,9 @@ class BillsHelper {
       if (rentorResult.isSuccess && rentorResult.data != null) {
         rentor = rentorResult.data!;
       } else {
-        AppLogger().e("Error reading rentor for payment status update: ${rentorResult.errorMessage}");
+        AppLogger().e(
+          "Error reading rentor for payment status update: ${rentorResult.errorMessage}",
+        );
         return;
       }
     }
@@ -210,7 +233,10 @@ class BillsHelper {
       for (var bill in bills) {
         final dbHelper = this.dbHelper;
         if (dbHelper != null) {
-          final appliedAmount = await dbHelper.getPaymentBillAppliedAmount(payment.paymentId!, bill.billId);
+          final appliedAmount = await dbHelper.getPaymentBillAppliedAmount(
+            payment.paymentId!,
+            bill.billId,
+          );
           if (appliedAmount == null || appliedAmount <= 0) continue;
 
           remainingAmount -= appliedAmount;
@@ -219,16 +245,23 @@ class BillsHelper {
 
       for (var bill in bills) {
         final previousRemaining = remainingAmount;
-        double amount = await updateLastPaymentStatus(remainingAmount, bill: bill, rentor: rentor);
+        double amount = await updateLastPaymentStatus(
+          remainingAmount,
+          bill: bill,
+          rentor: rentor,
+        );
         remainingAmount = amount;
 
         if (payment.paymentId != null) {
           final appliedAmount = previousRemaining - remainingAmount;
-          await _markPaymentBillApplied(payment.paymentId!, bill.billId, appliedAmount);
+          await _markPaymentBillApplied(
+            payment.paymentId!,
+            bill.billId,
+            appliedAmount,
+          );
         }
       }
-    }
-    else {
+    } else {
       AppLogger().w("No bills found for payment status update");
       return;
     }
@@ -236,7 +269,11 @@ class BillsHelper {
 
   /// Delegates to [DatabaseHelper.markPaymentBillApplied] when in local-DB mode.
   /// No-op in API mode (server-side is responsible for recording applied amounts).
-  Future<void> _markPaymentBillApplied(String paymentId, String billId, double appliedAmount) async {
+  Future<void> _markPaymentBillApplied(
+      String paymentId,
+      String billId,
+      double appliedAmount,
+      ) async {
     final dbHelper = this.dbHelper;
     if (dbHelper != null) {
       await dbHelper.markPaymentBillApplied(paymentId, billId, appliedAmount);
@@ -285,14 +322,20 @@ class BillsHelper {
   /// - `paid`    → if the remaining owed amount is within the threshold
   /// - `partial` → if some amount has still been paid
   /// - `unpaid`  → if nothing has been paid
-  Future<void> reversePaymentStatusForBills(Payment payment, List<String> billIds) async {
+  Future<void> reversePaymentStatusForBills(
+      Payment payment,
+      List<String> billIds,
+      ) async {
     if (payment.paymentId == null || billIds.isEmpty) return;
 
     final dbHelper = this.dbHelper;
     if (dbHelper == null) return;
 
     for (final billId in billIds) {
-      final appliedAmount = await dbHelper.getPaymentBillAppliedAmount(payment.paymentId!, billId);
+      final appliedAmount = await dbHelper.getPaymentBillAppliedAmount(
+        payment.paymentId!,
+        billId,
+      );
       if (appliedAmount == null || appliedAmount <= 0) continue;
 
       final billResult = await readBill(billId);
@@ -304,23 +347,34 @@ class BillsHelper {
       bill.amountPaid = newAmountPaid;
 
       final amountOwed = bill.amount - newAmountPaid;
-      final amountLeft =  (bill.amount * (bill.type == BillType.internet ? 0.5 : 0.3));
+      final amountLeft =
+      (bill.amount * (bill.type == BillType.internet ? 0.5 : 0.3));
       if (_isConsideredPaid(bill)) {
-        AppLogger().d("Bill ${bill.billId} is now fully paid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
+        AppLogger().d(
+          "Bill ${bill.billId} is now fully paid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}",
+        );
         bill.status = PaymentStatus.paid;
       } else if (newAmountPaid > 0) {
-        AppLogger().d("Bill ${bill.billId} is now partially paid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
+        AppLogger().d(
+          "Bill ${bill.billId} is now partially paid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}",
+        );
         bill.status = PaymentStatus.partial;
       } else {
-        AppLogger().d("Bill ${bill.billId} is now unpaid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
+        AppLogger().d(
+          "Bill ${bill.billId} is now unpaid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}",
+        );
         bill.status = PaymentStatus.unpaid;
       }
 
       final result = await updateBill(bill);
       if (result.isError) {
-        AppLogger().e("Error reversing payment for bill ${bill.billId}: ${result.errorMessage}");
+        AppLogger().e(
+          "Error reversing payment for bill ${bill.billId}: ${result.errorMessage}",
+        );
       } else {
-        AppLogger().d("Reversed payment ${payment.paymentId} from bill ${bill.billId}: -$appliedAmount, new status: ${bill.status.name}");
+        AppLogger().d(
+          "Reversed payment ${payment.paymentId} from bill ${bill.billId}: -$appliedAmount, new status: ${bill.status.name}",
+        );
       }
     }
   }
@@ -332,7 +386,11 @@ class BillsHelper {
   /// The "paid" threshold is bill-type aware:
   /// - Internet bills: paid when owed ≤ 50 % of total amount.
   /// - All other types: paid when owed ≤ 30 % of total amount.
-  Future<double> updateLastPaymentStatus(double amountPaid, {Bill? bill, Rentor? rentor}) async {
+  Future<double> updateLastPaymentStatus(
+      double amountPaid, {
+        Bill? bill,
+        Rentor? rentor,
+      }) async {
     if (bill == null) {
       AppLogger().w("No bill provided for last payment status update");
       return 0.0;
@@ -346,7 +404,9 @@ class BillsHelper {
     if (rentor != null) {
       final owedAmount = rentor.owedAmount(bill);
       if (owedAmount <= 0) {
-        AppLogger().d("Rentor ${rentor.rentorId} has no owed amount for bill ${bill.billId}, skipping payment status update");
+        AppLogger().d(
+          "Rentor ${rentor.rentorId} has no owed amount for bill ${bill.billId}, skipping payment status update",
+        );
         return 0.0;
       }
 
@@ -356,29 +416,37 @@ class BillsHelper {
     bill.amountPaid = billAmountPaid;
 
     final amountOwed = billAmount - billAmountPaid;
-    final amountLeft =  (billAmount * (bill.type == BillType.internet ? 0.5 : 0.3));
+    final amountLeft =
+    (billAmount * (bill.type == BillType.internet ? 0.5 : 0.3));
     if (_isConsideredPaid(bill)) {
-      AppLogger().d("Bill ${bill.billId} is now fully paid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
+      AppLogger().d(
+        "Bill ${bill.billId} is now fully paid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}",
+      );
       bill.status = PaymentStatus.paid;
     } else if (billAmountPaid > 0) {
-      AppLogger().d("Bill ${bill.billId} is now partially paid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
+      AppLogger().d(
+        "Bill ${bill.billId} is now partially paid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}",
+      );
       bill.status = PaymentStatus.partial;
     } else {
-      AppLogger().d("Bill ${bill.billId} remains unpaid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}");
+      AppLogger().d(
+        "Bill ${bill.billId} remains unpaid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}",
+      );
       bill.status = PaymentStatus.unpaid;
     }
 
     final result = await updateBill(bill);
     if (result.isError) {
-      AppLogger().e("Error updating bill ${bill.billId} status: ${result.errorMessage}");
-    }
-    else {
-      AppLogger().d("Successfully updated bill ${bill.billId} status from ${formerStatus.name} to ${bill.status.name}");
+      AppLogger().e(
+        "Error updating bill ${bill.billId} status: ${result.errorMessage}",
+      );
+    } else {
+      AppLogger().d(
+        "Successfully updated bill ${bill.billId} status from ${formerStatus.name} to ${bill.status.name}",
+      );
     }
 
     amountPaid -= amountPaidTowardsBill;
     return amountPaid;
   }
-  // #endregion
-  // #endregion
 }

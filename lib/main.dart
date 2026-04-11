@@ -1,17 +1,16 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-// import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:pdfrx/pdfrx.dart';
 
-import '../config/app_config.dart';
-import '../screens/main_tab_screen.dart';
-import '../data/models/app_state.dart';
-import '../helpers/database/database_helper.dart';
-import '../services/api/api_service.dart';
-import '../services/api/local_server_stub.dart'
-    if (dart.library.io) '../services/api/local_server.dart';
-import 'database/db_factory.dart';
 
-// final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+import 'firebase_options.dart';
+import 'config/app_config.dart';
+import 'database/db_factory.dart';
+import 'screens/main_tab_screen.dart';
+import 'data/models/app_state.dart';
+import 'helpers/database/database_helper.dart';
+import 'services/api/api_service.dart';
+
 
 /// Application entry point.
 ///
@@ -24,12 +23,17 @@ import 'database/db_factory.dart';
 /// 5. Open the database (runs migrations if needed).
 /// 6. Set [AppState.localDB] and configure [ApiService.baseUrl].
 /// 7. Start the local shelf HTTP server when running in server mode.
-/// 8. Initialise the local-notifications plugin.
-/// 9. Launch the Flutter widget tree.
+/// 8. Launch the Flutter widget tree.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
   // PDF text extraction (email attachments) uses pdfrx on web/mobile/desktop
   await pdfrxFlutterInitialize(dismissPdfiumWasmWarnings: true);
+
   await AppConfig.init();
 
   initDb(); // automatically picks the right implementation
@@ -37,56 +41,8 @@ void main() async {
   // Initialize local database on all platforms (including web with FFI web)
   await DatabaseHelper().database;
 
-  final mode = AppConfig.mode;
-  AppState().localDB = mode == AppMode.server;
+  AppState().localDB = AppConfig.mode == AppMode.server;
   ApiService.configure(baseUrl: AppConfig.apiBaseUrl);
-
-  if (mode == AppMode.server) {
-    await startServer(); // runs local API server
-
-    // final db = DatabaseHelper();
-    // // Sample Data for Testing
-    // await db.createBill(
-    //   Bill(
-    //     company: 'Electricity Co.',
-    //     type: BillType.electric,
-    //     amount: 120.50,
-    //     dueDate: '2025-04-01',
-    //     status: PaymentStatus.unpaid,
-    //     notes: 'March billing cycle',
-    //   ),
-    // );
-
-    // await db.createBill(
-    //   Bill(
-    //     company: 'Water Utility',
-    //     type: BillType.water,
-    //     amount: 45.75,
-    //     dueDate: '2025-03-28',
-    //     status: PaymentStatus.paid,
-    //     notes: 'February billing cycle',
-    //   ),
-    // );
-  }
-
-  // const initializationSettingsAndroid = AndroidInitializationSettings(
-  //   '@mipmap/ic_launcher',
-  // );
-  // const darwinSettings = DarwinInitializationSettings();
-  // const WindowsInitializationSettings windowsSettings =
-  //     WindowsInitializationSettings(
-  //       appName: 'Utility Bills Manager',
-  //       appUserModelId: "com.kwasi.utility_bills_manager",
-  //       guid: '94e9c1ef-2491-447e-90fe-cc3eddf2b4c6',
-  //     );
-  // const initializationSettings = InitializationSettings(
-  //   android: initializationSettingsAndroid,
-  //   iOS: darwinSettings,
-  //   macOS: darwinSettings,
-  //   windows: windowsSettings,
-  // );
-  //
-  // await flutterLocalNotificationsPlugin.initialize(settings: initializationSettings);
 
   runApp(const MyApp());
 }

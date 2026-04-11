@@ -36,7 +36,8 @@ dependencies:
   cross_file: ^0.3.5+2
   cupertino_icons: ^1.0.9
   enough_mail: ^2.1.7
-#  flutter_local_notifications: ^21.0.0
+  firebase_core: ^2.14.0
+  firebase_auth: ^4.4.0
   google_sign_in: ^7.2.0
   googleapis: ^16.0.0
   html: ^0.15.5+1
