@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import '../../widgets/notification_bell_icon.dart';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -76,7 +78,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
     _scrollController.addListener(_checkScrollability);
     _billsRepository.addListener(_onBillsUpdated);
 
-    if (kIsWeb) {
+    if (isGoogleSignInEnabled) {
       if (widget.isVisible) {
         subscribeToSignedInEvents();
       }
@@ -84,7 +86,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
       initGoogleSignInForWeb();
     } else {
       _loadBills(
-        syncEmails: true,
+        syncEmails: !kIsWeb && AppConfig.mode == AppMode.server,
         earliestEmailDate: AppConfig.emailEarliestDate,
       );
     }
@@ -93,10 +95,12 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   @override
   void didUpdateWidget(covariant BillListScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!oldWidget.isVisible && widget.isVisible) {
-      subscribeToSignedInEvents();
-    } else if (oldWidget.isVisible && !widget.isVisible) {
-      unsubscribeFromSignedInEvents();
+    if (isGoogleSignInEnabled) {
+      if (!oldWidget.isVisible && widget.isVisible) {
+        subscribeToSignedInEvents();
+      } else if (oldWidget.isVisible && !widget.isVisible) {
+        unsubscribeFromSignedInEvents();
+      }
     }
   }
 
@@ -125,7 +129,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
 
   //region Bills
   Future<void> _syncBills() async {
-    if (kIsWeb && !googleAccountService.isAuthorized) {
+    if (isGoogleSignInEnabled && !googleAccountService.isAuthorized) {
       googleAccountService.showAuthorizationRequiredMessage(context);
       return;
     }
@@ -147,7 +151,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   }) async {
     setState(() => _loading = true);
 
-    if (syncEmails && (!kIsWeb || googleAccountService.isAuthorized)) {
+    if (syncEmails && (!kIsWeb || (isGoogleSignInEnabled && googleAccountService.isAuthorized))) {
       await _emailDataHelper.fetchBillEmails(
         earliestEmailDate: earliestEmailDate,
         maxEmails: maxEmails,
@@ -353,7 +357,8 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
           ),
         ),
         actions: [
-          if (kIsWeb)
+          const NotificationBellIcon(),
+          if (isGoogleSignInEnabled)
             googleAccountService.buildWebGoogleAction(authorizeGoogleAccount),
           IconButton(
             tooltip: _buildDueDateFilterTooltip(),
@@ -444,7 +449,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
       ),
       body: Column(
         children: [
-          if (googleAccountService.buildWebWarningBanner() != null)
+          if (isGoogleSignInEnabled && googleAccountService.buildWebWarningBanner() != null)
             googleAccountService.buildWebWarningBanner()!,
           Expanded(
             child:
@@ -464,7 +469,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                             );
                           } else if (!snapshot.hasData ||
                               snapshot.data!.isEmpty) {
-                            if (!kIsWeb ||
+                            if (!isGoogleSignInEnabled ||
                                 (googleAccountService.isSignedIn &&
                                     googleAccountService.isAuthorized)) {
                               return const Center(

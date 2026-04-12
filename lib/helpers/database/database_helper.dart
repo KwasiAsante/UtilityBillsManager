@@ -6,6 +6,7 @@ import '../../data/models/bill.dart';
 import '../../data/models/email_data.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
+import '../../data/models/server_config.dart';
 
 /// Singleton low-level SQLite helper built on top of `sqflite`.
 ///
@@ -24,7 +25,7 @@ class DatabaseHelper {
 
   /// Current schema version.  Bump this and add a corresponding
   /// `if (oldVersion < N)` block in [_onUpgrade] for every schema change.
-  static const _databaseVersion = 14;
+  static const _databaseVersion = 15;
 
   static final DatabaseHelper _instance = DatabaseHelper._internal();
 
@@ -165,6 +166,21 @@ class DatabaseHelper {
 
     await db.execute('''
       CREATE INDEX idx_email_data_paymentId ON email_data (paymentId)
+    ''');
+
+    await db.execute('''
+      CREATE TABLE configuration (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        configId TEXT NOT NULL,
+        emailAddress TEXT,
+        emailPassword TEXT,
+        emailImapServer TEXT,
+        emailImapPort INTEGER,
+        emailImapSecure INTEGER,
+        emailEarliestDate TEXT,
+        emailSyncDelayDuration INTEGER,
+        emailSyncInterval INTEGER
+      )
     ''');
   }
 
@@ -534,6 +550,23 @@ class DatabaseHelper {
     if (oldVersion < 14) {
       await _ensureColumn(db, 'rentors', 'excludedBillTypes', 'TEXT');
     }
+
+    if (oldVersion < 15) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS configuration (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          configId TEXT NOT NULL,
+          emailAddress TEXT,
+          emailPassword TEXT,
+          emailImapServer TEXT,
+          emailImapPort INTEGER,
+          emailImapSecure INTEGER,
+          emailEarliestDate TEXT,
+          emailSyncDelayDuration INTEGER,
+          emailSyncInterval INTEGER
+        )
+      ''');
+    }
   }
   //endregion
 
@@ -560,7 +593,7 @@ class DatabaseHelper {
   }
 
   /// Fills NULL / blank [column] values using [fillExpression], then
-  /// disambiguates any remaining duplicates by appending `-<rowid>` to all
+  /// disambiguate any remaining duplicates by appending `-<rowid>` to all
   /// non-minimum duplicate rows.  This makes UUID columns safe to index as
   /// `UNIQUE` after the fact.
   Future<void> _backfillAndDeduplicateId(
@@ -1430,6 +1463,44 @@ class DatabaseHelper {
     return await db.delete('email_data');
   }
   //endregion
+  //endregion
+
+  //region Configuration
+  /// Inserts [config] into the `configuration` table, replacing any existing
+  /// row first (the table holds at most one configuration at a time).
+  /// Returns the new row id.
+  Future<int> createConfiguration(ServerConfig config) async {
+    final db = await database;
+    await db.delete('configuration');
+    return await db.insert('configuration', config.toJson());
+  }
+
+  /// Returns the stored [ServerConfig], or `null` if none exists.
+  Future<ServerConfig?> readConfiguration() async {
+    final db = await database;
+    final result = await db.query('configuration', limit: 1);
+    if (result.isEmpty) return null;
+    return ServerConfig.fromJson(result.first);
+  }
+
+  /// Updates the `configuration` row matching `config.configId`.
+  /// Returns the number of affected rows.
+  Future<int> updateConfiguration(ServerConfig config) async {
+    final db = await database;
+    return await db.update(
+      'configuration',
+      config.toJson(),
+      where: 'configId = ?',
+      whereArgs: [config.configId],
+    );
+  }
+
+  /// Deletes all rows from the `configuration` table.
+  /// Returns the number of deleted rows.
+  Future<int> deleteConfiguration() async {
+    final db = await database;
+    return await db.delete('configuration');
+  }
   //endregion
 
   //region Database Lifecycle

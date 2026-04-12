@@ -1,4 +1,10 @@
 /// App-wide constants shared across screens and utilities.
+///
+/// - [monthNames] — ordered list of month display names.
+/// - [invalidEmailSubjects] / [invalidEmailSenders] — denylist entries used by
+///   [BillsParser] and [EmailParser] to skip non-bill / non-payment emails
+///   (e.g. bank statements, payment-received confirmations) before attempting
+///   to parse amounts or dates.
 abstract final class AppConstants {
   static const List<String> monthNames = [
     'January',
@@ -15,6 +21,8 @@ abstract final class AppConstants {
     'December',
   ];
 
+  /// Email subjects that are known to be irrelevant (statements, receipts, etc.)
+  /// and should be skipped during the import pipeline.
   static const List<String> invalidEmailSubjects = [
     'Your RBC Royal Bank eStatement is ready',
     'eStatement Alert for your Simplii Credit Card',
@@ -24,6 +32,7 @@ abstract final class AppConstants {
     'Your credit account: Payment due in'
   ];
 
+  /// Sender email addresses whose messages should always be skipped.
   static const List<String> invalidEmailSenders = [
     'info@neofinancial.com',
   ];

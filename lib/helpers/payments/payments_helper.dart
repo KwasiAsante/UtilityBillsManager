@@ -1,6 +1,6 @@
 import '../bills/bills_helper.dart';
 import '../database/database_helper.dart';
-import '../../data/models/app_state.dart';
+import '../../config/app_config.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
@@ -10,8 +10,8 @@ import '../../services/api/api_service.dart';
 /// Singleton service layer for payment-related persistence.
 ///
 /// Routes every operation to either the local SQLite [DatabaseHelper] (when
-/// `AppState().localDB` is `true`) or the remote HTTP [ApiService] (server
-/// mode).  On delete it also delegates to [BillsHelper] to reverse any
+/// [AppConfig.mode] == [AppMode.server]) or the remote HTTP [ApiService]
+/// (client mode).  On delete it also delegates to [BillsHelper] to reverse any
 /// payment-status side-effects that were applied when the payment was created.
 class PaymentsHelper {
   static final PaymentsHelper _instance = PaymentsHelper._internal();
@@ -22,15 +22,14 @@ class PaymentsHelper {
 
   PaymentsHelper._internal();
 
-  /// Returns the [DatabaseHelper] singleton when in local-DB mode, or `null`
-  /// when API mode is active.
-  DatabaseHelper? get dbHelper => AppState().localDB ? DatabaseHelper() : null;
+  /// Returns the [DatabaseHelper] singleton. Only use when
+  /// [AppConfig.mode] == [AppMode.server].
+  DatabaseHelper get dbHelper => DatabaseHelper();
 
-  // #region CRUD Operations
+  //region CRUD Operations
   /// Persists [payment] (and its bill links) to the data source.
   Future<Result<Payment>> createPayment(Payment payment) async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       final id = await dbHelper.createPayment(payment);
       if (id >= 0) {
         return Result.success(data: payment);
@@ -53,10 +52,9 @@ class PaymentsHelper {
   /// Retrieves a single payment by [id], optionally joining related bills and
   /// rentor via [include] flags.
   Future<Result<Payment?>> readPayment(String id, {Map<String, bool>? include}) async {
-    final dbHelper = this.dbHelper;
     try {
       Payment? payment;
-      if (dbHelper != null) {
+      if (AppConfig.mode == AppMode.server) {
         payment = await dbHelper.readPayment(id, include: include);
       } else {
         payment = await ApiService.payments().getPayment(id, include: include);
@@ -70,10 +68,9 @@ class PaymentsHelper {
   /// Returns all payments, optionally filtered to [paymentIds] and with
   /// related records eager-loaded via [include] flags.
   Future<Result<List<Payment>>> readAllPayments({Map<String, bool>? include, List<String>? paymentIds}) async {
-    final dbHelper = this.dbHelper;
     try {
       List<Payment> payments;
-      if (dbHelper != null) {
+      if (AppConfig.mode == AppMode.server) {
         payments = await dbHelper.readAllPayments(include: include, ids: paymentIds);
       } else {
         payments = await ApiService.payments().getAllPayments(include: include, ids: paymentIds);
@@ -86,8 +83,7 @@ class PaymentsHelper {
 
   /// Updates [payment] in the data source (including incremental bill-link diff).
   Future<Result<Payment>> updatePayment(Payment payment) async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       final id = await dbHelper.updatePayment(payment);
       if (id >= 0) {
         return Result.success(data: payment);
@@ -109,14 +105,13 @@ class PaymentsHelper {
   /// Attaches a bill to [payment] (by resolved [bill] object or [billId]) and
   /// persists the updated payment.
   Future<Result<Payment>> updatePaymentBillReference(Payment payment, {String? billId, Bill? bill}) async {
-    final dbHelper = this.dbHelper;
     try {
       if (bill == null && billId == null) {
         return Result.error(errorMessage: "Either billId or bill must be provided");
       }
 
       if (bill == null && billId != null) {
-        bill = (dbHelper != null)
+        bill = (AppConfig.mode == AppMode.server)
             ? await dbHelper.readBill(billId)
             : await ApiService.bills().getBill(billId);
 
@@ -127,7 +122,7 @@ class PaymentsHelper {
 
       if (bill != null) {
         payment.addBill(bill);
-        if (dbHelper != null) {
+        if (AppConfig.mode == AppMode.server) {
           int id = await dbHelper.updatePayment(payment);
           if (id >= 0) {
             return Result.success(data: payment);
@@ -155,14 +150,13 @@ class PaymentsHelper {
   /// Attaches a rentor to [payment] (by resolved [rentor] object or [rentorId])
   /// and persists the updated payment.
   Future<Result<Payment>> updatePaymentRentorReference(Payment payment, {String? rentorId, Rentor? rentor}) async {
-    final dbHelper = this.dbHelper;
     try {
       if (rentor == null && rentorId == null) {
         return Result.error(errorMessage: "Either rentorId or rentor must be provided");
       }
 
       if (rentor == null && rentorId != null) {
-        rentor = (dbHelper != null)
+        rentor = (AppConfig.mode == AppMode.server)
             ? await dbHelper.readRentor(rentorId)
             : await ApiService.rentors().getRentor(rentorId);
 
@@ -173,7 +167,7 @@ class PaymentsHelper {
 
       if (rentor != null) {
         payment.addRentor(rentor);
-        if (dbHelper != null) {
+        if (AppConfig.mode == AppMode.server) {
           int id = await dbHelper.updatePayment(payment);
           if (id >= 0) {
             return Result.success(data: payment);
@@ -204,13 +198,12 @@ class PaymentsHelper {
   /// [BillsHelper.reversePaymentStatusForBills] can undo the bill-status
   /// side-effects that were applied when this payment was first created.
   Future<Result<void>> deletePayment(String id) async {
-    final dbHelper = this.dbHelper;
 
     // Fetch the payment before deleting so we can reverse bill statuses.
     final paymentResult = await readPayment(id, include: {'bill': true});
     final payment = paymentResult.isSuccess ? paymentResult.data : null;
 
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       final rowsDeleted = await dbHelper.deletePayment(id);
       if (rowsDeleted > 0) {
         if (payment != null && payment.billIds != null && payment.billIds!.isNotEmpty) {
@@ -239,13 +232,12 @@ class PaymentsHelper {
   /// be rolled back.  In API mode falls back to per-payment deletes if the
   /// server does not implement a bulk-delete endpoint.
   Future<Result<void>> deleteAllPayments() async {
-    final dbHelper = this.dbHelper;
 
     // Fetch all payments before deleting so we can reverse bill statuses.
     final allPaymentsResult = await readAllPayments(include: {'bill': true});
     final allPayments = allPaymentsResult.isSuccess ? (allPaymentsResult.data ?? []) : <Payment>[];
 
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       await dbHelper.deleteAllPayments();
       for (final payment in allPayments) {
         if (payment.billIds != null && payment.billIds!.isNotEmpty) {
@@ -282,5 +274,5 @@ class PaymentsHelper {
     }
   }
 
-  // #endregion
+  //endregion
 }

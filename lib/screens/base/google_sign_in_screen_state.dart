@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import '../../config/app_config.dart';
 import '../../services/google/google_account_service_native.dart';
 
 /// Abstract base [State] that encapsulates Google sign-in lifecycle logic.
@@ -20,6 +21,10 @@ abstract class GoogleSignInScreenState<T extends StatefulWidget>
   // ---------------------------------------------------------------------------
 
   final GoogleAccountService googleAccountService = GoogleAccountService();
+
+  /// `true` only when the app is running as a web server — the only context
+  /// where Google sign-in is needed (Gmail sync is handled server-side otherwise).
+  bool get isGoogleSignInEnabled => kIsWeb && AppConfig.mode == AppMode.server;
 
   // ---------------------------------------------------------------------------
   // Abstract contract
@@ -89,7 +94,7 @@ abstract class GoogleSignInScreenState<T extends StatefulWidget>
   /// Should be called from the subclass [State.initState] when [kIsWeb] is
   /// `true` instead of performing a direct data load.
   Future<void> initGoogleSignInForWeb() async {
-    if (!kIsWeb) return;
+    if (!isGoogleSignInEnabled) return;
 
     if (!googleAccountService.isInitialized) {
       onWebGoogleNotInitialized();

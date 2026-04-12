@@ -1,5 +1,5 @@
 import '../database/database_helper.dart';
-import '../../data/models/app_state.dart';
+import '../../config/app_config.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
 import '../../data/models/result.dart';
@@ -9,7 +9,7 @@ import '../../utils/app_logger.dart';
 /// Singleton service layer for rentor-related persistence.
 ///
 /// Routes every operation to either the local SQLite [DatabaseHelper] (when
-/// `AppState().localDB` is `true`) or the remote HTTP [ApiService].  Also
+/// [AppConfig.mode] == [AppMode.server]) or the remote HTTP [ApiService].  Also
 /// provides [updateRentorPaymentInfo] for keeping a rentor's
 /// `lastPaymentDate` field in sync after a payment is recorded.
 class RentorsHelper {
@@ -21,16 +21,15 @@ class RentorsHelper {
 
   RentorsHelper._internal();
 
-  /// Returns the [DatabaseHelper] singleton when in local-DB mode, or `null`
-  /// when API mode is active.
-  DatabaseHelper? get dbHelper => AppState().localDB ? DatabaseHelper() : null;
+  /// Returns the [DatabaseHelper] singleton. Only use when
+  /// [AppConfig.mode] == [AppMode.server].
+  DatabaseHelper get dbHelper => DatabaseHelper();
 
-  // #region CRUD Operations
-  // #region Rentor
+  //region CRUD Operations
+  //region Rentor
   /// Persists [rentor] to the data source.
   Future<Result<Rentor>> createRentor(Rentor rentor) async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       final id = await dbHelper.createRentor(rentor);
       if (id >= 0) {
         return Result.success();
@@ -52,10 +51,9 @@ class RentorsHelper {
 
   /// Fetches a single rentor by [rentorId].
   Future<Result<Rentor?>> readRentor(String rentorId) async {
-    final dbHelper = this.dbHelper;
     try {
       Rentor? rentor;
-      if (dbHelper != null) {
+      if (AppConfig.mode == AppMode.server) {
         rentor = await dbHelper.readRentor(rentorId);
       } else {
         rentor = await ApiService.rentors().getRentor(rentorId);
@@ -68,10 +66,9 @@ class RentorsHelper {
 
   /// Returns all rentors from the data source.
   Future<Result<List<Rentor>>> readAllRentors() async {
-    final dbHelper = this.dbHelper;
     try {
       List<Rentor> rentors;
-      if (dbHelper != null) {
+      if (AppConfig.mode == AppMode.server) {
         rentors = await dbHelper.readAllRentors();
       } else {
         rentors = await ApiService.rentors().getAllRentors();
@@ -84,8 +81,7 @@ class RentorsHelper {
 
   /// Updates [rentor] in the data source.
   Future<Result<Rentor>> updateRentor(Rentor rentor) async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       final id = await dbHelper.updateRentor(rentor);
       if (id >= 0) {
         return Result.success();
@@ -107,8 +103,7 @@ class RentorsHelper {
 
   /// Deletes the rentor identified by [id] from the data source.
   Future<Result<Rentor>> deleteRentor(String id) async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       final deletedRentors = await dbHelper.deleteRentor(id);
       if (deletedRentors > 0) {
         return Result.success();
@@ -155,6 +150,6 @@ class RentorsHelper {
       AppLogger().d("Successfully updated rentor payment info for rentor ${rentor.id}");
     }
   }
-  // #endregion
-  // #endregion
+  //endregion
+  //endregion
 }

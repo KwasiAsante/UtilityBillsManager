@@ -58,7 +58,7 @@ class Result<T> {
   bool get isError => status == ResultStatus.error;
 }
 
-// Enum to represent the status of the operation
+/// Possible outcomes of a [Result]-returning operation.
 enum ResultStatus {
   success,
   error

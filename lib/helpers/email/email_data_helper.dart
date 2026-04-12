@@ -5,7 +5,6 @@ import '../database/database_helper.dart';
 import '../payments/payments_helper.dart';
 import '../rentors/rentors_helper.dart';
 import '../../config/app_config.dart';
-import '../../data/models/app_state.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/email_data.dart';
 import '../../data/models/payment.dart';
@@ -38,9 +37,9 @@ class EmailDataHelper {
 
   EmailDataHelper._internal();
 
-  /// Returns the [DatabaseHelper] singleton when in local-DB mode, or `null`
-  /// when API mode is active.
-  DatabaseHelper? get dbHelper => AppState().localDB ? DatabaseHelper() : null;
+  /// Returns the [DatabaseHelper] singleton. Only use when
+  /// [AppConfig.mode] == [AppMode.server].
+  DatabaseHelper get dbHelper => DatabaseHelper();
 
   /// IMAP client configured from [AppConfig] credentials and server settings.
   late final EmailService emailService = EmailService(
@@ -59,8 +58,7 @@ class EmailDataHelper {
   // region Email Data
   /// Persists [emailData] to the data source.
   Future<Result<EmailData>> createEmailData(EmailData emailData) async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       final id = await dbHelper.createEmailData(emailData);
       if (id >= 0) {
         return Result.success();
@@ -81,10 +79,9 @@ class EmailDataHelper {
 
   /// Retrieves a single email record by [id], with optional join of bill/payment.
   Future<Result<EmailData?>> readEmail(String id, {Map<String, bool>? include, bool queryByEmailId = false}) async {
-    final dbHelper = this.dbHelper;
     try {
       EmailData? emailData;
-      if (dbHelper != null) {
+      if (AppConfig.mode == AppMode.server) {
         emailData = await dbHelper.readEmail(id, include: include, queryByEmailId: queryByEmailId);
       } else {
         emailData = await ApiService.emails().getEmail(id, include: include, queryByEmailId: queryByEmailId);
@@ -97,10 +94,9 @@ class EmailDataHelper {
 
   /// Returns all email records, with optional join of bill/payment.
   Future<Result<List<EmailData>>> readEmails({Map<String, bool>? include}) async {
-    final dbHelper = this.dbHelper;
     try {
       List<EmailData> emailData;
-      if (dbHelper != null) {
+      if (AppConfig.mode == AppMode.server) {
         emailData = await dbHelper.readEmails(include: include);
       } else {
         emailData = await ApiService.emails().getEmails(include: include);
@@ -113,10 +109,9 @@ class EmailDataHelper {
 
   /// Returns only email records that have not yet been processed (`processed = false`).
   Future<Result<List<EmailData>>> readUnprocessedEmails({Map<String, bool>? include}) async {
-    final dbHelper = this.dbHelper;
     try {
       List<EmailData> emailData;
-      if (dbHelper != null) {
+      if (AppConfig.mode == AppMode.server) {
         emailData = await dbHelper.readUnprocessedEmails(include: include);
       } else {
         emailData = await ApiService.emails().getUnprocessedEmails(include: include);
@@ -129,10 +124,9 @@ class EmailDataHelper {
 
   /// Returns only email records that have been processed (`processed = true`).
   Future<Result<List<EmailData>>> readProcessedEmails({Map<String, bool>? include}) async {
-    final dbHelper = this.dbHelper;
     try {
       List<EmailData> emailData;
-      if (dbHelper != null) {
+      if (AppConfig.mode == AppMode.server) {
         emailData = await dbHelper.readProcessedEmails(include: include);
       } else {
         emailData = await ApiService.emails().getProcessedEmails(include: include);
@@ -145,8 +139,7 @@ class EmailDataHelper {
 
   /// Updates [emailData] in the data source.
   Future<Result<EmailData>> updateEmailData(EmailData emailData) async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       final id = await dbHelper.updateEmailData(emailData);
       if (id >= 0) {
         return Result.success();
@@ -167,8 +160,7 @@ class EmailDataHelper {
 
   /// Deletes the email record identified by [emailDataId].
   Future<Result<void>> deleteEmailData(String emailDataId) async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       await dbHelper.deleteEmailData(emailDataId);
       return Result.success();
     } else {
@@ -182,8 +174,7 @@ class EmailDataHelper {
 
   /// Deletes all email records from the data source.
   Future<Result<void>> deleteAllEmails() async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       await dbHelper.deleteAllEmailData();
       return Result.success();
     } else {

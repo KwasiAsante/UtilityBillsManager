@@ -7,6 +7,7 @@ import 'payments/payment_list_screen.dart';
 import 'emails/email_list_screen.dart';
 import 'summary/summary_screen.dart';
 
+import '../config/app_config.dart';
 import '../services/google/google_account_service_native.dart';
 
 /// The root shell of the app containing a bottom navigation bar with five tabs:
@@ -28,7 +29,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
   @override
   void initState() {
     super.initState();
-    if (kIsWeb) {
+    if (kIsWeb && AppConfig.mode == AppMode.server) {
       _initGoogleSignInForWeb();
     }
   }

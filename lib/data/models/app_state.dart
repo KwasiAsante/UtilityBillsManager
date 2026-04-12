@@ -13,8 +13,14 @@ class AppState {
   
   AppState._internal();
   
-  // Your shared variables
+  /// Display name of the currently signed-in user (empty when not signed in).
   String userName = '';
+
+  /// Whether a user session is currently active.
   bool isLoggedIn = false;
+
+  /// When `true`, all helpers read/write directly through [DatabaseHelper]
+  /// (local SQLite mode).  When `false`, they delegate to [ApiService]
+  /// (HTTP client mode connecting to a remote server).
   bool localDB = false;
 }

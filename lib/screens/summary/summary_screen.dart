@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
+
+import '../../widgets/notification_bell_icon.dart';
 import 'package:flutter/material.dart';
 
 import 'package:intl/intl.dart';
@@ -538,6 +540,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
           ],
         ),
         actions: [
+          const NotificationBellIcon(),
           if (kIsWeb)
             googleAccountService.buildWebGoogleAction(authorizeGoogleAccount),
           IconButton(

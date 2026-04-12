@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import '../../widgets/notification_bell_icon.dart';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -327,6 +329,7 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
       appBar: AppBar(
         title: const Text('Payments'),
         actions: [
+          const NotificationBellIcon(),
           if (kIsWeb) googleAccountService.buildWebGoogleAction(authorizeGoogleAccount),
           IconButton(
             tooltip: _buildPaymentDateFilterTooltip(),

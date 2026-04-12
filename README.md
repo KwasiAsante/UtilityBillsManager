@@ -10,6 +10,7 @@ A cross-platform Flutter application for tracking utility bills, managing rentor
 - **Email Sync (Gmail)** — Sign in with Google to pull bill-related emails from your inbox. Parsed emails are matched to bills and payments automatically.
 - **Summary Screen** — Monthly overview grouped by bill type, with "considered paid" threshold logic (e.g. electric/gas/water ≤ 30% unpaid treated as paid). Toggle visibility of actual unpaid amounts.
 - **Export** — Export summaries as CSV or PDF, including per-bill rentor contributions.
+- **Real-time Notifications** — Server-Sent Events (SSE) connection to the companion server pushes `newBill` / `newPayment` events instantly. Firebase Cloud Messaging (FCM) handles push notifications when the app is backgrounded. In-app notification bell with unread badge and slide-in panel.
 - **Local Notifications** — Bill due-date reminders via `flutter_local_notifications`.
 - **Cross-platform** — Runs on Android, iOS, macOS, Windows, Linux, and Web.
 
@@ -19,17 +20,21 @@ A cross-platform Flutter application for tracking utility bills, managing rentor
 lib/
 ├── config/         # AppConfig (dart-define + local_secrets.json)
 ├── data/
-│   ├── models/     # Bill, Payment, Rentor, EmailData, AppState
-│   └── repositories/ # ChangeNotifier singletons (Bills, Payments, Rentors, EmailData)
-├── helpers/        # Database, Bills, Payments, Rentors, Email helpers
+│   ├── models/     # Bill, Payment, Rentor, EmailData, ServerConfig, AppState
+│   └── repositories/ # ChangeNotifier singletons (Bills, Payments, Rentors, EmailData, ServerConfig)
+├── helpers/        # Database, Bills, Payments, Rentors, Email, Configuration helpers
 ├── screens/        # UI screens per domain (bills, payments, rentors, emails, summary)
 ├── services/
-│   ├── api/        # ApiService + optional local shelf HTTP server
-│   └── email/      # Google account + IMAP email service
+│   ├── api/        # ApiService facade + Bills/Rentors/Payments/EmailData/Config/Notification clients
+│   ├── email/      # Google account + IMAP email service
+│   └── notification/ # NotificationService, SseService, AppNotificationStore
+├── widgets/        # Reusable widgets: NotificationBellIcon, NotificationPanel
 └── utils/          # Parsers, calculators, export, logger, dialogs
 ```
 
-The app uses **SQLite** (`sqflite` / `sqflite_common_ffi` / `sqflite_common_ffi_web`) for local persistence with manual migrations. Repositories are `ChangeNotifier` singletons that screens listen to for reactive updates.
+The app uses **SQLite** (`sqflite` / `sqflite_common_ffi` / `sqflite_common_ffi_web`) for local persistence with manual migrations (currently schema v15). Repositories are `ChangeNotifier` singletons that screens listen to for reactive updates.
+
+In **client mode** the app talks to a companion Dart shelf server (`utility_bills_server`) via `ApiService`. The server exposes REST endpoints for all resources plus `/bill/list/sync`, `/payment/list/sync`, and `/email/list/sync` for on-demand email sync, a `/config` endpoint for managing IMAP credentials remotely, and `POST /device/token` for FCM push notification registration.
 
 ## Getting Started
 
@@ -97,6 +102,8 @@ flutter build web
 | `shelf` / `shelf_router` | Embedded HTTP server (server mode) |
 | `intl` | Date/number formatting |
 | `logger` | Structured logging via `AppLogger` |
+| `firebase_messaging` | FCM push notifications (Android, iOS, macOS, Web) |
+| `uuid` | Unique IDs for `AppNotification` instances |
 
 ## License
 

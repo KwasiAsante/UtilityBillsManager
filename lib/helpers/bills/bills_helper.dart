@@ -3,7 +3,7 @@ import 'dart:math';
 import '../database/database_helper.dart';
 import '../rentors/rentors_helper.dart';
 import '../../utils/app_logger.dart';
-import '../../data/models/app_state.dart';
+import '../../config/app_config.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
@@ -13,8 +13,8 @@ import '../../services/api/api_service.dart';
 /// Singleton service layer for bill-related persistence and status logic.
 ///
 /// Routes every operation to either the local SQLite [DatabaseHelper] (when
-/// `AppState().localDB` is `true`) or the remote HTTP [ApiService] (server
-/// mode).  Also owns payment-status side-effects: when a [Payment] is created
+/// [AppConfig.mode] == [AppMode.server]) or the remote HTTP [ApiService]
+/// (client mode).  Also owns payment-status side-effects: when a [Payment] is created
 /// or deleted the helper credits / reverses the applied amount on each linked
 /// [Bill] and updates its [PaymentStatus].
 class BillsHelper {
@@ -26,16 +26,15 @@ class BillsHelper {
 
   BillsHelper._internal();
 
-  /// Returns the [DatabaseHelper] singleton when the app is running in local-DB
-  /// mode, or `null` when API (server) mode is active.
-  DatabaseHelper? get dbHelper => AppState().localDB ? DatabaseHelper() : null;
+  /// Returns the [DatabaseHelper] singleton. Only use when
+  /// [AppConfig.mode] == [AppMode.server].
+  DatabaseHelper get dbHelper => DatabaseHelper();
 
   //region CRUD Operations
   /// Persists [bill] to the local DB or remote API and returns a [Result]
   /// containing the created bill on success.
   Future<Result<Bill>> createBill(Bill bill) async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       final id = await dbHelper.createBill(bill);
       if (id >= 0) {
         return Result.success(data: bill);
@@ -57,10 +56,9 @@ class BillsHelper {
   /// Fetches a single bill by [billId].  Returns `Result.success(data: null)`
   /// if no matching bill is found.
   Future<Result<Bill?>> readBill(String billId) async {
-    final dbHelper = this.dbHelper;
     try {
       Bill? bill;
-      if (dbHelper != null) {
+      if (AppConfig.mode == AppMode.server) {
         bill = await dbHelper.readBill(billId);
       } else {
         bill = await ApiService.bills().getBill(billId);
@@ -73,10 +71,9 @@ class BillsHelper {
 
   /// Returns all bills from the data source.
   Future<Result<List<Bill>>> readAllBills() async {
-    final dbHelper = this.dbHelper;
     try {
       List<Bill> bills;
-      if (dbHelper != null) {
+      if (AppConfig.mode == AppMode.server) {
         bills = await dbHelper.readAllBills();
       } else {
         bills = await ApiService.bills().getAllBills();
@@ -97,7 +94,6 @@ class BillsHelper {
     PaymentStatus? paymentStatus,
     List<String>? billIds,
   }) async {
-    final dbHelper = this.dbHelper;
     try {
       if (status == null && paymentStatus != null) {
         status = paymentStatus.name.toLowerCase();
@@ -108,7 +104,7 @@ class BillsHelper {
       }
 
       List<Bill> bills =
-          (dbHelper != null)
+          (AppConfig.mode == AppMode.server)
               ? await dbHelper.readBillsByStatus(status!, ids: billIds)
               : await ApiService.bills().getBillsByStatus(
                 status!,
@@ -123,8 +119,7 @@ class BillsHelper {
 
   /// Updates [bill] in the data source and returns a [Result] with the updated bill.
   Future<Result<Bill>> updateBill(Bill bill) async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       final id = await dbHelper.updateBill(bill);
       if (id >= 0) {
         return Result.success(data: bill);
@@ -145,8 +140,7 @@ class BillsHelper {
 
   /// Deletes the bill identified by [id] from the data source.
   Future<Result<Bill>> deleteBill(String id) async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       final billsDeleted = await dbHelper.deleteBill(id);
       if (billsDeleted > 0) {
         return Result.success();
@@ -165,8 +159,7 @@ class BillsHelper {
 
   /// Deletes all bills from the data source.
   Future<Result<void>> deleteAllBills() async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       await dbHelper.deleteAllBills();
       return Result.success();
     } else {
@@ -231,8 +224,7 @@ class BillsHelper {
     if (bills != null) {
       double remainingAmount = payment.amountPaid;
       for (var bill in bills) {
-        final dbHelper = this.dbHelper;
-        if (dbHelper != null) {
+        if (AppConfig.mode == AppMode.server) {
           final appliedAmount = await dbHelper.getPaymentBillAppliedAmount(
             payment.paymentId!,
             bill.billId,
@@ -274,8 +266,7 @@ class BillsHelper {
       String billId,
       double appliedAmount,
       ) async {
-    final dbHelper = this.dbHelper;
-    if (dbHelper != null) {
+    if (AppConfig.mode == AppMode.server) {
       await dbHelper.markPaymentBillApplied(paymentId, billId, appliedAmount);
     }
   }
@@ -295,6 +286,11 @@ class BillsHelper {
     }
   }
 
+  /// Returns `true` when [bill] has been paid enough to be treated as fully
+  /// paid, based on the bill-type threshold from [_unpaidThreshold].
+  ///
+  /// A bill is considered paid when the remaining unpaid amount is within the
+  /// threshold percentage (or within \$1.00 of that threshold amount).
   bool _isConsideredPaid(Bill bill) {
     final threshold = _unpaidThreshold(bill.type);
     if (threshold == null) return false;
@@ -305,6 +301,9 @@ class BillsHelper {
     return actualUnpaid <= thresholdAmount + 1.0;
   }
 
+  /// Returns the total amount already paid toward [bill] based on its current
+  /// [PaymentStatus]: the recorded [Bill.amountPaid] for `paid`/`partial`
+  /// bills, or `0.0` for `unpaid`/`unknown`.
   double _paidAmount(Bill bill) {
     if (bill.status == PaymentStatus.paid) {
       return bill.amountPaid ?? bill.amount;
@@ -328,8 +327,7 @@ class BillsHelper {
       ) async {
     if (payment.paymentId == null || billIds.isEmpty) return;
 
-    final dbHelper = this.dbHelper;
-    if (dbHelper == null) return;
+    if (AppConfig.mode != AppMode.server) return;
 
     for (final billId in billIds) {
       final appliedAmount = await dbHelper.getPaymentBillAppliedAmount(

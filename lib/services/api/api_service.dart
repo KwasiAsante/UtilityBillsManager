@@ -7,6 +7,7 @@ import '../../utils/app_logger.dart';
 import '../../data/models/email_data.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
+import '../../data/models/server_config.dart';
 
 /// Central HTTP client facade for the local shelf server (client mode).
 ///
@@ -49,6 +50,20 @@ class ApiService {
     emailDataApiService.baseUrl = baseUrl;
     return emailDataApiService;
   }
+
+  /// Returns the [ConfigApiService] singleton configured with the current [baseUrl].
+  static ConfigApiService config() {
+    final configApiService = ConfigApiService._instance;
+    configApiService.baseUrl = baseUrl;
+    return configApiService;
+  }
+
+  /// Returns the [NotificationApiService] singleton configured with the current [baseUrl].
+  static NotificationApiService notifications() {
+    final notificationApiService = NotificationApiService._instance;
+    notificationApiService.baseUrl = baseUrl;
+    return notificationApiService;
+  }
 }
 
 /// HTTP client for bill endpoints (`/bill`, `/bill/list`).
@@ -66,9 +81,10 @@ class BillsApiService {
 
   String baseUrl = '';
 
-  // #region CRUD Operations
+  //region CRUD Operations
 
-  // #region Create
+  //region Create
+  /// POST `/bill` — creates a new bill.  Returns `"OK"` or an error string.
   Future<String> createBill(Bill bill) async {
     try {
       final response = await http.post(
@@ -88,9 +104,10 @@ class BillsApiService {
       return e.toString();
     }
   }
-  // #endregion
+  //endregion
 
-  // #region Read
+  //region Read
+  /// GET `/bill/<id>` — returns the bill with [id], or `null` if not found.
   Future<Bill?> getBill(String id) async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/bill/$id'));
@@ -108,6 +125,7 @@ class BillsApiService {
     }
   }
 
+  /// GET `/bill/list` — returns all bills.
   Future<List<Bill>> getAllBills() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/bill/list'));
@@ -128,6 +146,8 @@ class BillsApiService {
     }
   }
 
+  /// GET `/bill/list/<status>` — returns bills filtered by [status].
+  /// Pass [ids] to further restrict results to specific `billId` values.
   Future<List<Bill>> getBillsByStatus(String status, {List<String>? ids}) async {
     try {
       final queryParams = <String, String>{
@@ -152,9 +172,49 @@ class BillsApiService {
       return [];
     }
   }
-  // #endregion
 
-  // #region Update
+  /// GET `/bill/list/sync` — triggers an on-demand bill email sync and returns
+  /// all bills after completion.
+  ///
+  /// Pass [maxEmails] (default 50) and [earliestEmailDate] to control the IMAP
+  /// fetch scope.  Returns `null` when the server responds with HTTP 409
+  /// (sync already in progress).
+  Future<List<Bill>?> getSyncedBills({
+    int maxEmails = 50,
+    DateTime? earliestEmailDate,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'maxEmails': '$maxEmails',
+        if (earliestEmailDate != null)
+          'earliestEmailDate': earliestEmailDate.toIso8601String(),
+      };
+      final uri = Uri.parse('$baseUrl/bill/list/sync')
+          .replace(queryParameters: queryParams);
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList = jsonDecode(response.body);
+        return jsonList
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Bill.fromJson(e))
+            .toList();
+      } else if (response.statusCode == 409) {
+        AppLogger().w('Bill sync is already running');
+        return null;
+      } else {
+        AppLogger().e('Failed to sync bills: ${response.statusCode} - $response');
+        return [];
+      }
+    } catch (e) {
+      AppLogger().e('Error syncing bills: $e');
+      return [];
+    }
+  }
+  //endregion
+
+  //region Update
+  /// PUT `/bill` — updates an existing bill.  Returns `"OK"` or an error string.
   Future<String> updateBill(Bill bill) async {
     try {
       final response = await http.put(
@@ -174,9 +234,10 @@ class BillsApiService {
       return e.toString();
     }
   }
-  // #endregion
+  //endregion
 
-  // #region Delete
+  //region Delete
+  /// DELETE `/bill/<id>` — deletes the bill with [id].
   Future<String> deleteBill(String id) async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/bill/$id'));
@@ -193,6 +254,7 @@ class BillsApiService {
     }
   }
 
+  /// DELETE `/bill/list` — deletes all bills.
   Future<String> deleteAllBills() async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/bill/list'));
@@ -208,9 +270,9 @@ class BillsApiService {
       return e.toString();
     }
   }
-  // #endregion
+  //endregion
 
-  // #endregion
+  //endregion
 }
 
 /// HTTP client for rentor endpoints (`/rentor`, `/rentor/list`).
@@ -225,9 +287,10 @@ class RentorsApiService {
 
   String baseUrl = '';
 
-  // #region CRUD Operations
+  //region CRUD Operations
 
-  // #region Create
+  //region Create
+  /// POST `/rentor` — creates a new rentor.  Returns `"OK"` or an error string.
   Future<String> createRentor(Rentor rentor) async {
     try {
       final response = await http.post(
@@ -247,9 +310,10 @@ class RentorsApiService {
       return e.toString();
     }
   }
-  // #endregion
+  //endregion
 
-  // #region Read
+  //region Read
+  /// GET `/rentor/<id>` — returns the rentor with [id], or `null` if not found.
   Future<Rentor?> getRentor(String id) async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/rentor/$id'));
@@ -267,6 +331,7 @@ class RentorsApiService {
     }
   }
 
+  /// GET `/rentor/list` — returns all rentors.
   Future<List<Rentor>> getAllRentors() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/rentor/list'));
@@ -286,9 +351,10 @@ class RentorsApiService {
       return [];
     }
   }
-  // #endregion
+  //endregion
 
-  // #region Update
+  //region Update
+  /// PUT `/rentor` — updates an existing rentor.  Returns `"OK"` or an error string.
   Future<String> updateRentor(Rentor rentor) async {
     try {
       final response = await http.put(
@@ -308,9 +374,10 @@ class RentorsApiService {
       return e.toString();
     }
   }
-  // #endregion
+  //endregion
 
-  // #region Delete
+  //region Delete
+  /// DELETE `/rentor/<id>` — deletes the rentor with [id].
   Future<String> deleteRentor(String id) async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/rentor/$id'));
@@ -327,6 +394,7 @@ class RentorsApiService {
     }
   }
 
+  /// DELETE `/rentor/list` — deletes all rentors.
   Future<String> deleteAllRentors() async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/rentor/list'));
@@ -342,9 +410,9 @@ class RentorsApiService {
       return e.toString();
     }
   }
-  // #endregion
+  //endregion
 
-  // #endregion
+  //endregion
 }
 
 /// HTTP client for payment endpoints (`/payment`, `/payment/list`).
@@ -359,9 +427,11 @@ class PaymentsApiService {
 
   String baseUrl = '';
 
-  // #region CRUD Operations
+  //region CRUD Operations
 
-  // #region Create
+  //region Create
+  /// POST `/payment` — creates a new payment (with bill IDs and rentor ID).
+  /// Returns `"OK"` or an error string.
   Future<String> createPayment(Payment payment) async {
     try {
       final response = await http.post(
@@ -381,9 +451,11 @@ class PaymentsApiService {
       return e.toString();
     }
   }
-  // #endregion
+  //endregion
 
-  // #region Read
+  //region Read
+  /// GET `/payment/<id>` — returns the payment with [id].
+  /// Pass [include] flags (`bill`, `rentor`) to request eager joins.
   Future<Payment?> getPayment(String id, {Map<String, bool>? include}) async {
     try {
       final includeParams = <String, String>{
@@ -409,6 +481,8 @@ class PaymentsApiService {
     }
   }
 
+  /// GET `/payment/list` — returns all payments, optionally filtered to [ids]
+  /// and with related records eager-loaded via [include] flags.
   Future<List<Payment>> getAllPayments({Map<String, bool>? include, List<String>? ids}) async {
     try {
       final queryParams = <String, String>{
@@ -439,9 +513,56 @@ class PaymentsApiService {
       return [];
     }
   }
-  // #endregiosadn
 
-  // #region Update
+  /// GET `/payment/list/sync` — triggers an on-demand payment email sync and
+  /// returns all payments after completion.
+  ///
+  /// Accepts the same [include] and [ids] filters as [getAllPayments], plus
+  /// [maxEmails] and [earliestEmailDate] for the IMAP fetch scope.
+  /// Returns `null` when the server responds with HTTP 409 (sync already in
+  /// progress).
+  Future<List<Payment>?> getSyncedPayments({
+    Map<String, bool>? include,
+    List<String>? ids,
+    int maxEmails = 50,
+    DateTime? earliestEmailDate,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        if (include != null)
+          for (final entry in include.entries)
+            if (entry.value) entry.key: 'true',
+        if (ids != null) 'payment_ids': ids.join(','),
+        'maxEmails': '$maxEmails',
+        if (earliestEmailDate != null)
+          'earliestEmailDate': earliestEmailDate.toIso8601String(),
+      };
+      final uri = Uri.parse('$baseUrl/payment/list/sync')
+          .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final List<dynamic> jsonList = jsonDecode(response.body);
+        return jsonList
+            .whereType<Map<String, dynamic>>()
+            .map((e) => Payment.fromJson(e, billRows: e['billList'] != null && e['billList'] is List ? List<Map<String, dynamic>>.from(e['billList']) : null))
+            .toList();
+      } else if (response.statusCode == 409) {
+        AppLogger().w('Payment sync is already running');
+        return null;
+      } else {
+        AppLogger().e('Failed to sync payments: ${response.statusCode} - $response');
+        return [];
+      }
+    } catch (e) {
+      AppLogger().e('Error syncing payments: $e');
+      return [];
+    }
+  }
+  //endregion
+
+  //region Update
+  /// PUT `/payment` — updates an existing payment.  Returns `"OK"` or an error string.
   Future<String> updatePayment(Payment payment) async {
     try {
       final response = await http.put(
@@ -461,9 +582,10 @@ class PaymentsApiService {
       return e.toString();
     }
   }
-  // #endregion
+  //endregion
 
-  // #region Delete
+  //region Delete
+  /// DELETE `/payment/<id>` — deletes the payment with [id].
   Future<String> deletePayment(String id) async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/payment/$id'));
@@ -480,6 +602,7 @@ class PaymentsApiService {
     }
   }
 
+  /// DELETE `/payment/list` — deletes all payments.
   Future<String> deleteAllPayments() async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/payment/list'));
@@ -495,9 +618,9 @@ class PaymentsApiService {
       return e.toString();
     }
   }
-  // #endregion
+  //endregion
 
-  // #endregion
+  //endregion
 }
 
 /// HTTP client for email data endpoints (`/email`, `/email/list`, etc.).
@@ -512,9 +635,10 @@ class EmailDataApiService {
 
   String baseUrl = '';
 
-  // #region CRUD Operations
+  //region CRUD Operations
 
-  // #region Create
+  //region Create
+  /// POST `/email` — creates a new email record.  Returns `"OK"` or an error string.
   Future<String> createEmailData(EmailData emailData) async {
     try {
       final response = await http.post(
@@ -534,9 +658,12 @@ class EmailDataApiService {
       return e.toString();
     }
   }
-  // #endregion
+  //endregion
 
-  // #region Read
+  //region Read
+  /// GET `/email/<id>` — returns the email record with [id].
+  /// Set [queryByEmailId] to `true` to match on the numeric `emailId` field
+  /// rather than the UUID `emailDataId`.
   Future<EmailData?> getEmail(String id, {Map<String, bool>? include, bool queryByEmailId = false}) async {
     try {
       final queryParams = <String, String>{
@@ -564,6 +691,7 @@ class EmailDataApiService {
     }
   }
 
+  /// GET `/email/list` — returns all email records.
   Future<List<EmailData>> getEmails({Map<String, bool>? include}) async {
     try {
       final includeParams = <String, String>{
@@ -592,6 +720,7 @@ class EmailDataApiService {
     }
   }
 
+  /// GET `/email/list/unprocessed` — returns only unprocessed email records.
   Future<List<EmailData>> getUnprocessedEmails({Map<String, bool>? include}) async {
     try {
       final includeParams = <String, String>{
@@ -620,6 +749,7 @@ class EmailDataApiService {
     }
   }
 
+  /// GET `/email/list/processed` — returns only processed email records.
   Future<List<EmailData>> getProcessedEmails({Map<String, bool>? include}) async {
     try {
       final includeParams = <String, String>{
@@ -647,9 +777,55 @@ class EmailDataApiService {
       return [];
     }
   }
-  // #endregion
 
-  // #region Update
+  /// GET `/email/list/sync` — triggers both bill and payment email syncs and
+  /// returns the newly fetched raw [EmailData] records grouped by type.
+  ///
+  /// Returns `{'bills': [...], 'payments': [...]}` on success.
+  /// Returns `null` when the server responds with HTTP 409 (sync already in
+  /// progress).
+  Future<Map<String, List<EmailData>>?> getSyncedEmailData({
+    int maxEmails = 50,
+    DateTime? earliestEmailDate,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'maxEmails': '$maxEmails',
+        if (earliestEmailDate != null)
+          'earliestEmailDate': earliestEmailDate.toIso8601String(),
+      };
+      final uri = Uri.parse('$baseUrl/email/list/sync')
+          .replace(queryParameters: queryParams);
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> json = jsonDecode(response.body);
+        return {
+          'bills': (json['bills'] as List<dynamic>? ?? [])
+              .whereType<Map<String, dynamic>>()
+              .map((e) => EmailData.fromJson(e))
+              .toList(),
+          'payments': (json['payments'] as List<dynamic>? ?? [])
+              .whereType<Map<String, dynamic>>()
+              .map((e) => EmailData.fromJson(e))
+              .toList(),
+        };
+      } else if (response.statusCode == 409) {
+        AppLogger().w('Email sync is already running');
+        return null;
+      } else {
+        AppLogger().e('Failed to sync email data: ${response.statusCode} - $response');
+        return {};
+      }
+    } catch (e) {
+      AppLogger().e('Error syncing email data: $e');
+      return {};
+    }
+  }
+  //endregion
+
+  //region Update
+  /// PUT `/email` — updates an existing email record.  Returns `"OK"` or an error string.
   Future<String> updateEmailData(EmailData emailData) async {
     try {
       final response = await http.put(
@@ -669,9 +845,10 @@ class EmailDataApiService {
       return e.toString();
     }
   }
-  // #endregion
+  //endregion
 
-  // #region Delete
+  //region Delete
+  /// DELETE `/email/<id>` — deletes the email record with [id].
   Future<String> deleteEmailData(String id) async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/email/$id'));
@@ -688,6 +865,7 @@ class EmailDataApiService {
     }
   }
 
+  /// DELETE `/email/list` — deletes all email records.
   Future<String> deleteAllEmailData() async {
     try {
       final response = await http.delete(Uri.parse('$baseUrl/email/list'));
@@ -703,7 +881,142 @@ class EmailDataApiService {
       return e.toString();
     }
   }
-  // #endregion
+  //endregion
 
-  // #endregion
+  //endregion
+}
+
+/// HTTP client for the server configuration endpoint (`/config`).
+class ConfigApiService {
+  static final ConfigApiService _instance = ConfigApiService._internal();
+
+  factory ConfigApiService() {
+    return _instance;
+  }
+
+  ConfigApiService._internal();
+
+  String baseUrl = '';
+
+  /// GET `/config` — returns the active [ServerConfig], or `null` on error.
+  Future<ServerConfig?> getConfig() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/config'));
+      if (response.statusCode == 200) {
+        return ServerConfig.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+      } else {
+        AppLogger().e('Failed to get config: ${response.statusCode} - $response');
+        return null;
+      }
+    } catch (e) {
+      AppLogger().e('Error getting config: $e');
+      return null;
+    }
+  }
+
+  /// POST `/config` — creates a new configuration.  Returns the created
+  /// [ServerConfig] on success, or `null` on error.
+  Future<ServerConfig?> createConfig(ServerConfig config) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/config'),
+        body: jsonEncode(config.toJson()),
+        headers: {'Content-Type': 'application/json'},
+      );
+      if (response.statusCode == 200) {
+        return ServerConfig.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+      } else {
+        AppLogger().e('Failed to create config: ${response.statusCode} - $response');
+        return null;
+      }
+    } catch (e) {
+      AppLogger().e('Error creating config: $e');
+      return null;
+    }
+  }
+
+  /// PUT `/config` — updates the stored configuration.  Returns the updated
+  /// [ServerConfig] on success, or `null` on error.
+  Future<ServerConfig?> updateConfig(ServerConfig config) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/config'),
+        body: jsonEncode(config.toJson()),
+        headers: {'Content-Type': 'application/json'},
+      );
+      if (response.statusCode == 200) {
+        return ServerConfig.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+      } else {
+        AppLogger().e('Failed to update config: ${response.statusCode} - $response');
+        return null;
+      }
+    } catch (e) {
+      AppLogger().e('Error updating config: $e');
+      return null;
+    }
+  }
+
+  /// DELETE `/config` — deletes the stored configuration.
+  /// Returns `"OK"` on success or an error string on failure.
+  Future<String> deleteConfig() async {
+    try {
+      final response = await http.delete(Uri.parse('$baseUrl/config'));
+      if (response.statusCode == 200) {
+        return "OK";
+      } else {
+        AppLogger().e('Failed to delete config: ${response.statusCode} - $response');
+        return response.toString();
+      }
+    } catch (e) {
+      AppLogger().e('Error deleting config: $e');
+      return e.toString();
+    }
+  }
+}
+
+/// HTTP client for notification endpoints (`/device/token`).
+///
+/// The SSE stream at `GET /connect` must be consumed directly via a streaming
+/// HTTP client (e.g. `dart:io HttpClient`); this service only wraps the
+/// FCM token-registration side-channel.
+class NotificationApiService {
+  static final NotificationApiService _instance =
+      NotificationApiService._internal();
+
+  factory NotificationApiService() {
+    return _instance;
+  }
+
+  NotificationApiService._internal();
+
+  String baseUrl = '';
+
+  /// POST `/device/token` — registers [fcmToken] for [deviceId] so the server
+  /// can deliver FCM push notifications to this device.
+  ///
+  /// Requires the `x-device-id` request header; the server returns 400 if it
+  /// is absent or if [fcmToken] is empty.  Returns `"OK"` on success.
+  Future<String> registerDeviceToken(String deviceId, String fcmToken) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/device/token'),
+        body: jsonEncode({'fcmToken': fcmToken}),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-device-id': deviceId,
+        },
+      );
+      if (response.statusCode == 200) {
+        return "OK";
+      } else {
+        AppLogger().e(
+          'Failed to register device token: ${response.statusCode} - $response',
+        );
+        return response.toString();
+      }
+    } catch (e) {
+      AppLogger().e('Error registering device token: $e');
+      return e.toString();
+    }
+  }
 }

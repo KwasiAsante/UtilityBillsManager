@@ -6,6 +6,22 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+- `SseService` (`lib/services/notification/sse_service.dart`) — persistent Server-Sent Events client for the `/connect` endpoint. Exposes a broadcast `Stream<SseEvent>`. Reconnects automatically with exponential back-off (5 s base, 60 s cap); a `retry:` field from the server overrides the base delay. Explicit `disconnect()` cancels all reconnect attempts.
+- `NotificationService` (`lib/services/notification/notification_service.dart`) — singleton that orchestrates SSE and Firebase Cloud Messaging (FCM). Initialises `flutter_local_notifications`, requests FCM permission, registers the device token via `NotificationApiService`, and subscribes to `SseService.events`. On each `SseEvent` it shows a local system notification, adds an `AppNotification` to `AppNotificationStore`, and reloads the relevant repository (`BillsRepository` or `PaymentsRepository`). FCM background handler registered as a top-level isolate entry-point.
+- `AppNotificationStore` (`lib/services/notification/app_notification_store.dart`) — in-memory `ChangeNotifier` list of `AppNotification` items. Supports `add`, `markRead`, `markAllRead`, and `clear`.
+- `AppNotification` model (`lib/data/models/app_notification.dart`) — lightweight notification value object with `id`, `title`, `body`, `type`, `isRead`, and `createdAt`.
+- `SseEvent` model (`lib/data/models/sse_event.dart`) — typed wrapper for SSE payloads; parses `event:` / `data:` lines and maps known event names to `SseEventType` (`newBill`, `newPayment`).
+- `NotificationBellIcon` widget (`lib/widgets/notification_bell_icon.dart`) — `AppBar` action icon with an animated unread-count badge. Tapping opens `NotificationPanel`.
+- `NotificationPanel` widget (`lib/widgets/notification_panel.dart`) — slide-in drawer listing `AppNotification` items with mark-read and clear-all actions.
+- `ServerConfig` model (`lib/data/models/server_config.dart`) — client-side mirror of the server's `Configuration` model. Stores IMAP credentials and email sync scheduling parameters. `toJson`/`fromJson` share the same wire format as the server so they interoperate without conversion. `emailImapSecure` tolerates both integer (0/1) and boolean string forms on deserialisation.
+- `DatabaseHelper` v15: new `configuration` table (9 columns). `_onCreate` creates the table; `_onUpgrade` adds it via `CREATE TABLE IF NOT EXISTS` for existing installs. New CRUD methods: `createConfiguration` (clears before insert to enforce single-row invariant), `readConfiguration`, `updateConfiguration`, `deleteConfiguration`.
+- `ConfigApiService` (`ApiService.config()`): new singleton HTTP client for `/config` endpoints. Methods `getConfig`, `createConfig`, `updateConfig`, `deleteConfig` now accept/return typed `ServerConfig` objects instead of raw maps.
+- `NotificationApiService` (`ApiService.notifications()`): new singleton HTTP client with `registerDeviceToken(deviceId, fcmToken)` for `POST /device/token`.
+- Sync endpoints on existing API service classes: `BillsApiService.getSyncedBills`, `PaymentsApiService.getSyncedPayments`, and `EmailDataApiService.getSyncedEmailData` — each calls the corresponding `/list/sync` route and returns `null` on HTTP 409 (sync already in progress).
+- `ServerConfigHelper` (`lib/helpers/configuration/server_config_helper.dart`) — singleton service layer that routes configuration CRUD to `DatabaseHelper` (local mode) or `ConfigApiService` (API mode), following the same pattern as all other helpers.
+- `ServerConfigRepository` (`lib/data/repositories/server_config_repository.dart`) — singleton `ChangeNotifier` repository. Holds a single nullable `ServerConfig?` in memory; `create`/`update`/`delete` call `reload` and `notifyListeners` on success.
+
 ### Changed
 - `AppConfig`: default `APP_MODE` changed from `server` to `client`; fallback in `mode` getter now also returns `AppMode.client`.
 - `AddEditPaymentScreen`: switched from `PaymentsHelper` to `PaymentsRepository` for create/update; fixed bill due-date display to use `DateFormat('yyyy-MM-dd')` instead of raw `DateTime.toString()`.
@@ -13,13 +29,13 @@ All notable changes to this project are documented here.
 - `ApiService` (payments): `createPayment` and `updatePayment` now serialize via `toJson(include: {'bill': true, 'rentor': true})` so bill IDs and rentor ID are sent to the API; `getPayments` now maps `billList` from the response into full `Bill` objects via `Payment.fromJson`.
 - `ApiService` (emails): `getEmail` forwards a `query_by_email_id` query parameter to the API.
 
-### Added
+### Fixed
+- `SummaryScreen._isConsideredPaid`: bills with `PaymentStatus.paid` are now always treated as paid regardless of threshold calculation.
+
+### Added (prior entries)
 - `Payment.toJson`: optional `include` map parameter — passing `{'bill': true}` appends `billIds` and `{'rentor': true}` ensures `rentorId` is present in the serialized output.
 - `DatabaseHelper.readEmail` / `EmailDataHelper.readEmail`: new `queryByEmailId` flag to query email records by `emailId` (IMAP message ID) instead of the default `emailDataId` primary key.
 - `SummaryScreen`: `fetchPaymentEmails()` is now called alongside `fetchBillEmails()` during Gmail sync so payment-related emails are also fetched.
-
-### Fixed
-- `SummaryScreen._isConsideredPaid`: bills with `PaymentStatus.paid` are now always treated as paid regardless of threshold calculation.
 
 ---
 

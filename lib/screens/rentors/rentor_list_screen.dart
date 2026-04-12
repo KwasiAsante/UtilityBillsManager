@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import '../../widgets/notification_bell_icon.dart';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -164,6 +166,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
           ),
         ),
         actions: [
+          const NotificationBellIcon(),
           if (_searchQuery.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.clear),
