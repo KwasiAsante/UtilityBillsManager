@@ -179,6 +179,7 @@ class ServerConfiguration {
       defaultEarliestDateTime;
   static Future<void> setEmailEarliestDate(DateTime date) async {
     await Preferences.setString('EMAIL_EARLIEST_DATE', date.toIso8601String());
+    await _serverConfigRepo.update(serverConfigFromPreferences);
   }
 
   /// Email sync delay duration (how long to wait after server startup before performing the first sync).

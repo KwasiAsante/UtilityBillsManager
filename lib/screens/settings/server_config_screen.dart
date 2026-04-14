@@ -27,7 +27,7 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
   bool _passwordVisible = false;
   bool _saving = false;
 
-  DateTime? _earliestDate;
+  late DateTime _earliestDate;
   final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
 
   @override
@@ -48,7 +48,7 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
     _imapSecure = ServerConfiguration.emailImapSecure;
     _earliestDate = ServerConfiguration.emailEarliestDate;
     _earliestDateController = TextEditingController(
-      text: _dateFormat.format(_earliestDate!),
+      text: _dateFormat.format(_earliestDate),
     );
     _syncDelayController = TextEditingController(
       text: ServerConfiguration.emailSyncDelayDuration.inSeconds.toString(),
@@ -73,11 +73,11 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: _earliestDate ?? DateTime.now(),
+      initialDate: _earliestDate,
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         _earliestDate = picked;
         _earliestDateController.text = _dateFormat.format(picked);
@@ -102,9 +102,7 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
         int.parse(_imapPortController.text.trim()),
       );
       await ServerConfiguration.setEmailImapSecure(_imapSecure);
-      if (_earliestDate != null) {
-        await ServerConfiguration.setEmailEarliestDate(_earliestDate!);
-      }
+      await ServerConfiguration.setEmailEarliestDate(_earliestDate);
       await ServerConfiguration.setEmailSyncDelayDuration(
         Duration(seconds: int.parse(_syncDelayController.text.trim())),
       );
@@ -137,6 +135,14 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
     return null;
   }
 
+  String? _validatePort(String? value) {
+    final base = _validateInt(value, 'IMAP Port');
+    if (base != null) return base;
+    final port = int.parse(value!.trim());
+    if (port < 1 || port > 65535) return 'IMAP Port must be between 1 and 65535';
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -166,6 +172,11 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
                         ),
                         keyboardType: TextInputType.emailAddress,
                         autocorrect: false,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return 'Email address is required';
+                          if (!value.contains('@')) return 'Enter a valid email address';
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -211,6 +222,10 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
                           hintText: 'imap.gmail.com',
                         ),
                         autocorrect: false,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) return 'IMAP server is required';
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -220,7 +235,7 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
                           hintText: '993',
                         ),
                         keyboardType: TextInputType.number,
-                        validator: (v) => _validateInt(v, 'IMAP Port'),
+                        validator: _validatePort,
                       ),
                       const SizedBox(height: 8),
                       SwitchListTile(
