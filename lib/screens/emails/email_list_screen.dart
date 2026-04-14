@@ -1,17 +1,17 @@
 import 'dart:ui';
 
-import '../../widgets/notification_bell_icon.dart';
-
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import 'edit_email_data_screen.dart';
 import '../../config/app_config.dart';
+import '../../config/server_configuration.dart';
 import '../../data/models/email_data.dart';
 import '../../data/repositories/email_data_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
-import 'edit_email_data_screen.dart';
+import '../../widgets/notification_bell_icon.dart';
 
 /// Screen that displays the list of imported email records.
 ///
@@ -37,7 +37,7 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
   Future<void> onGoogleSignedIn({bool canSync = true}) async {
     await _loadEmails(
       syncEmails: canSync,
-      earliestEmailDate: AppConfig.emailEarliestDate,
+      earliestEmailDate: ServerConfiguration.emailEarliestDate,
     );
   }
 
@@ -64,16 +64,18 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
   void initState() {
     super.initState();
     if (isGoogleSignInEnabled) {
+      if (widget.isVisible) {
+        subscribeToSignedInEvents();
+      }
+
       initGoogleSignInForWeb();
-    } else {
+    } else if (widget.isVisible) {
       _loadEmails(
         syncEmails: !kIsWeb && AppConfig.mode == AppMode.server,
-        earliestEmailDate: AppConfig.emailEarliestDate,
+        earliestEmailDate: ServerConfiguration.emailEarliestDate,
       );
     }
-    if (widget.isVisible && isGoogleSignInEnabled) {
-      subscribeToSignedInEvents();
-    }
+
     _scrollController.addListener(_checkScrollability);
     _emailDataRepository.addListener(_onEmailsUpdated);
   }

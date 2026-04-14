@@ -10,6 +10,9 @@ import 'package:logger/logger.dart';
 ///
 /// The underlying [Logger] uses the default [DevelopmentFilter], so output is
 /// suppressed automatically in release builds.
+///
+/// Each log message is automatically prefixed with the calling class and method
+/// name, e.g. `[ApiService.fetchBills] Error fetching bills`.
 class AppLogger {
   static final AppLogger _instance = AppLogger._internal();
 
@@ -28,21 +31,60 @@ class AppLogger {
     ),
   );
 
-  void t(dynamic message, {Object? error, StackTrace? stackTrace}) =>
-      _logger.t(message, error: error, stackTrace: stackTrace);
+  /// Returns a `[caller] ` prefix by finding the first non-logger, non-SDK frame.
+  ///
+  /// Handles both VM format (`#N  Class.method (package:...)`) and the web DDC
+  /// format (`package:path/file.dart line:col  method`).
+  static String _caller(StackTrace stackTrace) {
+    for (final raw in stackTrace.toString().split('\n')) {
+      final frame = raw.trim();
+      if (frame.isEmpty) continue;
+      if (frame.contains('dart-sdk/') || frame.contains('app_logger.dart')) {
+        continue;
+      }
 
-  void d(dynamic message, {Object? error, StackTrace? stackTrace}) =>
-      _logger.d(message, error: error, stackTrace: stackTrace);
+      // VM / native format: #N      ClassName.methodName (package:...)
+      final vmMatch = RegExp(r'#\d+\s+(.+?)\s+\(').firstMatch(frame);
+      if (vmMatch != null) return '[${vmMatch.group(1)}] ';
 
-  void i(dynamic message, {Object? error, StackTrace? stackTrace}) =>
-      _logger.i(message, error: error, stackTrace: stackTrace);
+      // Web DDC format: package:path/to/file.dart line:col   methodName
+      final webMatch =
+          RegExp(r'package:[^\s]+/([^/]+)\.dart\s+\d+:\d+\s+(.+)$')
+              .firstMatch(frame);
+      if (webMatch != null) {
+        return '[${webMatch.group(1)!}.${webMatch.group(2)!}] ';
+      }
+    }
+    return '';
+  }
 
-  void w(dynamic message, {Object? error, StackTrace? stackTrace}) =>
-      _logger.w(message, error: error, stackTrace: stackTrace);
+  void t(dynamic message, {Object? error, StackTrace? stackTrace}) {
+    final caller = _caller(StackTrace.current);
+    _logger.t('$caller$message', error: error, stackTrace: stackTrace);
+  }
 
-  void e(dynamic message, {Object? error, StackTrace? stackTrace}) =>
-      _logger.e(message, error: error, stackTrace: stackTrace);
+  void d(dynamic message, {Object? error, StackTrace? stackTrace}) {
+    final caller = _caller(StackTrace.current);
+    _logger.d('$caller$message', error: error, stackTrace: stackTrace);
+  }
 
-  void f(dynamic message, {Object? error, StackTrace? stackTrace}) =>
-      _logger.f(message, error: error, stackTrace: stackTrace);
+  void i(dynamic message, {Object? error, StackTrace? stackTrace}) {
+    final caller = _caller(StackTrace.current);
+    _logger.i('$caller$message', error: error, stackTrace: stackTrace);
+  }
+
+  void w(dynamic message, {Object? error, StackTrace? stackTrace}) {
+    final caller = _caller(StackTrace.current);
+    _logger.w('$caller$message', error: error, stackTrace: stackTrace);
+  }
+
+  void e(dynamic message, {Object? error, StackTrace? stackTrace}) {
+    final caller = _caller(StackTrace.current);
+    _logger.e('$caller$message', error: error, stackTrace: stackTrace);
+  }
+
+  void f(dynamic message, {Object? error, StackTrace? stackTrace}) {
+    final caller = _caller(StackTrace.current);
+    _logger.f('$caller$message', error: error, stackTrace: stackTrace);
+  }
 }

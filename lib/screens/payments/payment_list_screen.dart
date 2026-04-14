@@ -1,12 +1,10 @@
 import 'dart:ui';
 
-import '../../widgets/notification_bell_icon.dart';
-
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../config/app_config.dart';
+import '../../config/server_configuration.dart';
 import '../../data/models/payment.dart';
 import '../../data/repositories/payments_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
@@ -16,6 +14,7 @@ import '../../utils/comparable_utils.dart';
 import '../../utils/constants.dart';
 import '../../utils/dialogs/due_date_filter_sheet.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
+import '../../widgets/notification_bell_icon.dart';
 
 import 'add_edit_payment_screen.dart';
 
@@ -33,7 +32,8 @@ class PaymentListScreen extends StatefulWidget {
   State<PaymentListScreen> createState() => _PaymentListScreenState();
 }
 
-class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen> {
+class _PaymentListScreenState
+    extends GoogleSignInScreenState<PaymentListScreen> {
   // ---------------------------------------------------------------------------
   // GoogleSignInScreenState contract
   // ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
   Future<void> onGoogleSignedIn({bool canSync = true}) async {
     await _loadPayments(
       syncEmails: canSync,
-      earliestEmailDate: AppConfig.emailEarliestDate,
+      earliestEmailDate: ServerConfiguration.emailEarliestDate,
     );
   }
 
@@ -82,16 +82,16 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
     _scrollController.addListener(_checkScrollability);
     _paymentsRepository.addListener(_onPaymentsUpdated);
 
-    if (kIsWeb) {
+    if (isGoogleSignInEnabled) {
       if (widget.isVisible) {
         subscribeToSignedInEvents();
       }
 
       initGoogleSignInForWeb();
-    } else {
+    } else if (widget.isVisible) {
       _loadPayments(
         syncEmails: true,
-        earliestEmailDate: AppConfig.emailEarliestDate,
+        earliestEmailDate: ServerConfiguration.emailEarliestDate,
       );
     }
   }
@@ -99,10 +99,12 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
   @override
   void didUpdateWidget(covariant PaymentListScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!oldWidget.isVisible && widget.isVisible) {
-      subscribeToSignedInEvents();
-    } else if (oldWidget.isVisible && !widget.isVisible) {
-      unsubscribeFromSignedInEvents();
+    if (isGoogleSignInEnabled) {
+      if (!oldWidget.isVisible && widget.isVisible) {
+        subscribeToSignedInEvents();
+      } else if (oldWidget.isVisible && !widget.isVisible) {
+        unsubscribeFromSignedInEvents();
+      }
     }
   }
 
@@ -131,7 +133,7 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
 
   //region Payments
   Future<void> _syncPayments() async {
-    if (kIsWeb && !googleAccountService.isAuthorized) {
+    if (isGoogleSignInEnabled && !googleAccountService.isAuthorized) {
       googleAccountService.showAuthorizationRequiredMessage(context);
       return;
     }
@@ -155,7 +157,9 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
       _loading = true;
     });
 
-    if (syncEmails && (!kIsWeb || googleAccountService.isAuthorized)) {
+    if (syncEmails &&
+        (!kIsWeb ||
+            (isGoogleSignInEnabled && googleAccountService.isAuthorized))) {
       await _emailDataHelper.fetchPaymentEmails(
         earliestEmailDate: earliestEmailDate,
         maxEmails: maxEmails,
@@ -166,26 +170,30 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
     await _paymentsRepository.reload();
     // _onPaymentsUpdated() handles the rest via listener
   }
-  
+
   Future<void> _deleteAllPayments() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete All Payments'),
-        content: const Text(
-          'Are you sure you want to delete all payments? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete All Payments'),
+            content: const Text(
+              'Are you sure you want to delete all payments? This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
@@ -193,7 +201,9 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
       if (result.isError) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting payments: ${result.errorMessage}')),
+            SnackBar(
+              content: Text('Error deleting payments: ${result.errorMessage}'),
+            ),
           );
         }
         return;
@@ -201,36 +211,44 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
 
       await _paymentsRepository.reload();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('All payments deleted.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('All payments deleted.')));
       }
     }
   }
 
   void _updateDisplayedPayments() {
     var displayedPayments =
-    _allPayments.where((payment) {
-      final paymentDate = payment.paymentDate;
-      final matchesYear =
-          _selectedPaymentYear == null ||
+        _allPayments.where((payment) {
+          final paymentDate = payment.paymentDate;
+          final matchesYear =
+              _selectedPaymentYear == null ||
               (paymentDate.year == _selectedPaymentYear);
-      final matchesMonth =
-          _selectedPaymentMonth == null ||
+          final matchesMonth =
+              _selectedPaymentMonth == null ||
               (paymentDate.month == _selectedPaymentMonth);
-      final matchesDateRange =
-          (_dateRangeStart == null && _dateRangeEnd == null) ||
-              ((_dateRangeStart == null || !paymentDate.isBefore(_dateRangeStart!)) &&
-                  (_dateRangeEnd == null || !paymentDate.isAfter(_dateRangeEnd!)));
-      return matchesYear && matchesMonth && matchesDateRange;
-    }).toList();
+          final matchesDateRange =
+              (_dateRangeStart == null && _dateRangeEnd == null) ||
+              ((_dateRangeStart == null ||
+                      !paymentDate.isBefore(_dateRangeStart!)) &&
+                  (_dateRangeEnd == null ||
+                      !paymentDate.isAfter(_dateRangeEnd!)));
+          return matchesYear && matchesMonth && matchesDateRange;
+        }).toList();
 
     switch (_selectedSort) {
       case 'Payment Date (Earliest)':
-        displayedPayments.sort((a, b) => ComparableUtils.compareNullable(a.paymentDate, b.paymentDate));
+        displayedPayments.sort(
+          (a, b) =>
+              ComparableUtils.compareNullable(a.paymentDate, b.paymentDate),
+        );
         break;
       case 'Payment Date (Latest)':
-        displayedPayments.sort((a, b) => ComparableUtils.compareNullable(b.paymentDate, a.paymentDate));
+        displayedPayments.sort(
+          (a, b) =>
+              ComparableUtils.compareNullable(b.paymentDate, a.paymentDate),
+        );
         break;
       case 'Amount Paid (Lowest)':
         displayedPayments.sort((a, b) => a.amountPaid.compareTo(b.amountPaid));
@@ -264,27 +282,27 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
 
   bool get _hasActivePaymentDateFilter =>
       _selectedPaymentYear != null ||
-          _selectedPaymentMonth != null ||
-          _dateRangeStart != null ||
-          _dateRangeEnd != null;
+      _selectedPaymentMonth != null ||
+      _dateRangeStart != null ||
+      _dateRangeEnd != null;
 
   String _buildPaymentDateFilterTooltip() {
     if (_dateRangeStart != null || _dateRangeEnd != null) {
       final start =
-      _dateRangeStart != null
-          ? DueDateFilterSheet.formatDate(_dateRangeStart!)
-          : 'Any';
+          _dateRangeStart != null
+              ? DueDateFilterSheet.formatDate(_dateRangeStart!)
+              : 'Any';
       final end =
-      _dateRangeEnd != null
-          ? DueDateFilterSheet.formatDate(_dateRangeEnd!)
-          : 'Any';
+          _dateRangeEnd != null
+              ? DueDateFilterSheet.formatDate(_dateRangeEnd!)
+              : 'Any';
       return 'Date range: $start – $end';
     }
     final yearLabel = _selectedPaymentYear?.toString() ?? 'All years';
     final monthLabel =
-    _selectedPaymentMonth == null
-        ? 'All months'
-        : AppConstants.monthNames[_selectedPaymentMonth! - 1];
+        _selectedPaymentMonth == null
+            ? 'All months'
+            : AppConstants.monthNames[_selectedPaymentMonth! - 1];
     return 'Due date filter: $yearLabel, $monthLabel';
   }
 
@@ -330,7 +348,8 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
         title: const Text('Payments'),
         actions: [
           const NotificationBellIcon(),
-          if (kIsWeb) googleAccountService.buildWebGoogleAction(authorizeGoogleAccount),
+          if (isGoogleSignInEnabled)
+            googleAccountService.buildWebGoogleAction(authorizeGoogleAccount),
           IconButton(
             tooltip: _buildPaymentDateFilterTooltip(),
             icon: Icon(
@@ -368,17 +387,17 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
           DropdownButton<String>(
             value: _selectedSort,
             items:
-            [
-              'Payment Date (Earliest)',
-              'Payment Date (Latest)',
-              'Amount Paid (Lowest)',
-              'Amount Paid (Highest)',
-            ].map((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value),
-              );
-            }).toList(),
+                [
+                  'Payment Date (Earliest)',
+                  'Payment Date (Latest)',
+                  'Amount Paid (Lowest)',
+                  'Amount Paid (Highest)',
+                ].map((String value) {
+                  return DropdownMenuItem<String>(
+                    value: value,
+                    child: Text(value),
+                  );
+                }).toList(),
             onChanged: (String? newValue) {
               if (newValue != null) {
                 setState(() {
@@ -402,150 +421,202 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
           const SizedBox(width: 16),
         ],
       ),
-      body: Column (
+      body: Column(
         children: [
-          if (googleAccountService.buildWebWarningBanner() != null)
+          if (isGoogleSignInEnabled &&
+              googleAccountService.buildWebWarningBanner() != null)
             googleAccountService.buildWebWarningBanner()!,
           Expanded(
             child:
-            _loading
-                ? const Center(child: CircularProgressIndicator())
-                : FutureBuilder<List<Payment>>(
-                future: _payments,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    if (!kIsWeb ||
-                        (googleAccountService.isSignedIn &&
-                            googleAccountService.isAuthorized)) {
-                      return Center(child: Text('No payments found. Pull down or click on the Refresh button to sync with Gmail or click the + button to add a payment.'));
-                    } else {
-                      return Center(
-                        child: Text(
-                          'Please sign in to your Google account to view payments.',
-                        ),
-                      );
-                    }
-                  }
+                _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : FutureBuilder<List<Payment>>(
+                      future: _payments,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        } else if (snapshot.hasError) {
+                          return Center(
+                            child: Text('Error: ${snapshot.error}'),
+                          );
+                        } else if (!snapshot.hasData ||
+                            snapshot.data!.isEmpty) {
+                          if (!isGoogleSignInEnabled ||
+                              (googleAccountService.isSignedIn &&
+                                  googleAccountService.isAuthorized)) {
+                            return Center(
+                              child: Text(
+                                'No payments found. Pull down or click on the Refresh button to sync with Gmail or click the + button to add a payment.',
+                              ),
+                            );
+                          } else {
+                            return Center(
+                              child: Text(
+                                'Please sign in to your Google account to view payments.',
+                              ),
+                            );
+                          }
+                        }
 
-                  final payments = snapshot.data!;
-                  return RefreshIndicator(
-                    onRefresh: () async {
-                      await Future.delayed(Duration(seconds: 2));
-                      await _syncPayments();
-                    },
-                    child: ScrollConfiguration(
-                      behavior: ScrollConfiguration.of(context).copyWith(
-                        dragDevices: {
-                          PointerDeviceKind.touch,
-                          PointerDeviceKind.mouse,
-                        },
-                      ),
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.only(bottom: 80),
-                        itemCount: payments.length,
-                        itemBuilder: (context, index) {
-                          final payment = payments[index];
-                          final hasBills = payment.bills != null && payment.bills!.isNotEmpty;
-                          return Card(
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              isThreeLine: hasBills && payment.rentorName != "Unknown Rentor",
-                              onTap: () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        AddEditPaymentScreen(payment: payment),
+                        final payments = snapshot.data!;
+                        return RefreshIndicator(
+                          onRefresh: () async {
+                            await Future.delayed(Duration(seconds: 2));
+                            await _syncPayments();
+                          },
+                          child: ScrollConfiguration(
+                            behavior: ScrollConfiguration.of(context).copyWith(
+                              dragDevices: {
+                                PointerDeviceKind.touch,
+                                PointerDeviceKind.mouse,
+                              },
+                            ),
+                            child: ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.only(bottom: 80),
+                              itemCount: payments.length,
+                              itemBuilder: (context, index) {
+                                final payment = payments[index];
+                                final hasBills =
+                                    payment.bills != null &&
+                                    payment.bills!.isNotEmpty;
+                                return Card(
+                                  child: ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    isThreeLine:
+                                        hasBills &&
+                                        payment.rentorName != "Unknown Rentor",
+                                    onTap: () async {
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => AddEditPaymentScreen(
+                                                payment: payment,
+                                              ),
+                                        ),
+                                      );
+                                    },
+                                    title: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            hasBills
+                                                ? payment.billNames(
+                                                  newLine: false,
+                                                )
+                                                : payment.rentorName !=
+                                                    "Unknown Rentor"
+                                                ? payment.rentorName
+                                                : 'Payment',
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.titleSmall?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '\$${payment.amountPaid.toStringAsFixed(2)}',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                            color: Colors.green[700],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    subtitle: Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Paid: ${DateFormat('MMM d, yyyy').format(payment.paymentDate)}',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                          if (hasBills &&
+                                              payment.rentorName !=
+                                                  "Unknown Rentor")
+                                            Text(
+                                              'By: ${payment.rentorName}',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    trailing: PopupMenuButton<String>(
+                                      onSelected: (value) async {
+                                        if (value == 'edit') {
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder:
+                                                  (context) =>
+                                                      AddEditPaymentScreen(
+                                                        payment: payment,
+                                                      ),
+                                            ),
+                                          );
+                                        } else if (value == 'delete') {
+                                          await _paymentsRepository.delete(
+                                            payment.paymentId!,
+                                          );
+                                        }
+                                      },
+                                      itemBuilder:
+                                          (context) => [
+                                            const PopupMenuItem(
+                                              value: 'edit',
+                                              child: Text('Edit'),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'delete',
+                                              textStyle: TextStyle(
+                                                color: Colors.red,
+                                              ),
+                                              child: Text('Delete'),
+                                            ),
+                                          ],
+                                    ),
                                   ),
                                 );
                               },
-                              title: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      hasBills
-                                          ? payment.billNames(newLine: false)
-                                          : payment.rentorName != "Unknown Rentor" ? payment.rentorName : 'Payment',
-                                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '\$${payment.amountPaid.toStringAsFixed(2)}',
-                                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.green[700]),
-                                  ),
-                                ],
-                              ),
-                              subtitle: Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Paid: ${DateFormat('MMM d, yyyy').format(payment.paymentDate)}',
-                                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                    ),
-                                    if (hasBills && payment.rentorName != "Unknown Rentor")
-                                      Text(
-                                        'By: ${payment.rentorName}',
-                                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              trailing: PopupMenuButton<String>(
-                                onSelected: (value) async {
-                                  if (value == 'edit') {
-                                    await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder:
-                                            (context) =>
-                                            AddEditPaymentScreen(payment: payment),
-                                      ),
-                                    );
-                                  } else if (value == 'delete') {
-                                    await _paymentsRepository.delete(payment.paymentId!);
-                                  }
-                                },
-                                itemBuilder:
-                                    (context) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('Edit'),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    textStyle: TextStyle(color: Colors.red),
-                                    child: Text('Delete'),
-                                  ),
-                                ],
-                              ),
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                }
-            ),
-          )
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const AddEditPaymentScreen()),
+            MaterialPageRoute(
+              builder: (context) => const AddEditPaymentScreen(),
+            ),
           );
         },
         child: const Icon(Icons.add),

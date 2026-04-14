@@ -2,13 +2,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
 
-
 import 'firebase_options.dart';
 import 'config/app_config.dart';
-import 'database/db_factory.dart';
-import 'screens/main_tab_screen.dart';
+import 'config/server_configuration.dart';
 import 'data/models/app_state.dart';
+import 'database/db_factory.dart';
 import 'helpers/database/database_helper.dart';
+import 'screens/main_tab_screen.dart';
 import 'services/api/api_service.dart';
 import 'services/notification/notification_service.dart';
 
@@ -37,13 +37,16 @@ void main() async {
 
   await AppConfig.init();
 
+  AppState().localDB = AppConfig.mode == AppMode.server;
+
   initDb(); // automatically picks the right implementation
 
   // Initialize local database on all platforms (including web with FFI web)
   await DatabaseHelper().database;
 
-  AppState().localDB = AppConfig.mode == AppMode.server;
   ApiService.configure(baseUrl: AppConfig.apiBaseUrl);
+
+  await ServerConfiguration.init();
 
   await NotificationService().initialize();
 

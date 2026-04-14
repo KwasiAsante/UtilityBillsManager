@@ -1,12 +1,10 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
-
-import '../../widgets/notification_bell_icon.dart';
 import 'package:flutter/material.dart';
-
 import 'package:intl/intl.dart';
 
+import '../../data/repositories/email_data_repository.dart';
 import '../base/google_sign_in_screen_state.dart';
-import '../../config/app_config.dart';
+import '../../config/server_configuration.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
@@ -16,6 +14,7 @@ import '../../data/repositories/rentors_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../utils/export_utils.dart';
+import '../../widgets/notification_bell_icon.dart';
 
 /// Screen that provides a financial overview across all bills, payments, and
 /// rentors.
@@ -48,7 +47,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
   Future<void> onGoogleSignedIn({bool canSync = true}) async {
     await _loadData(
       syncEmails: canSync,
-      earliestEmailDate: AppConfig.emailEarliestDate,
+      earliestEmailDate: ServerConfiguration.emailEarliestDate,
     );
   }
 
@@ -62,6 +61,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
   final BillsRepository _billsRepo = BillsRepository();
   final RentorsRepository _rentorsRepo = RentorsRepository();
   final PaymentsRepository _paymentsRepo = PaymentsRepository();
+  final EmailDataRepository _emailDataRepo = EmailDataRepository();
   final EmailDataHelper _emailDataHelper = EmailDataHelper();
 
   List<Bill> _bills = [];
@@ -126,18 +126,31 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     _billsRepo.addListener(_onDataChanged);
     _rentorsRepo.addListener(_onDataChanged);
     _paymentsRepo.addListener(_onDataChanged);
+    _emailDataRepo.addListener(_onDataChanged);
 
-    if (kIsWeb) {
+    if (isGoogleSignInEnabled) {
       if (widget.isVisible) {
         subscribeToSignedInEvents();
       }
 
       initGoogleSignInForWeb();
-    } else {
+    } else if (widget.isVisible) {
       _loadData(
         syncEmails: true,
-        earliestEmailDate: AppConfig.emailEarliestDate,
+        earliestEmailDate: ServerConfiguration.emailEarliestDate,
       );
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant SummaryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (isGoogleSignInEnabled) {
+      if (!oldWidget.isVisible && widget.isVisible) {
+        subscribeToSignedInEvents();
+      } else if (oldWidget.isVisible && !widget.isVisible) {
+        unsubscribeFromSignedInEvents();
+      }
     }
   }
 
@@ -146,6 +159,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     _billsRepo.removeListener(_onDataChanged);
     _rentorsRepo.removeListener(_onDataChanged);
     _paymentsRepo.removeListener(_onDataChanged);
+    _emailDataRepo.removeListener(_onDataChanged);
     unsubscribeFromSignedInEvents();
     _tabController.dispose();
     super.dispose();
@@ -169,7 +183,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
   }
 
   Future<void> _syncData() async {
-    if (kIsWeb && !googleAccountService.isAuthorized) {
+    if (isGoogleSignInEnabled && !googleAccountService.isAuthorized) {
       googleAccountService.showAuthorizationRequiredMessage(context);
       return;
     }
@@ -191,7 +205,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
   }) async {
     setState(() => _loading = true);
 
-    if (syncEmails) {
+    if (syncEmails && (!kIsWeb || (isGoogleSignInEnabled && googleAccountService.isAuthorized))) {
       await _emailDataHelper.fetchBillEmails(
         earliestEmailDate: earliestEmailDate,
         maxEmails: maxEmails,
@@ -207,6 +221,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
       _billsRepo.reload(),
       _rentorsRepo.reload(),
       _paymentsRepo.reload(),
+      _emailDataRepo.reload(),
     ]);
 
     if (!mounted) return;
@@ -541,7 +556,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
         ),
         actions: [
           const NotificationBellIcon(),
-          if (kIsWeb)
+          if (isGoogleSignInEnabled)
             googleAccountService.buildWebGoogleAction(authorizeGoogleAccount),
           IconButton(
             icon: const Icon(Icons.sync),
@@ -585,7 +600,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
       ),
       body: Column(
         children: [
-          if (googleAccountService.buildWebWarningBanner() != null)
+          if (isGoogleSignInEnabled && googleAccountService.buildWebWarningBanner() != null)
             googleAccountService.buildWebWarningBanner()!,
           Expanded(
             child: _loading

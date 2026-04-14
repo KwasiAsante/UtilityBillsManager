@@ -1,10 +1,13 @@
-import 'package:enough_mail/enough_mail.dart';
+
+
+import 'package:enough_mail/codecs.dart' show MimeMessage;
 
 import '../bills/bills_helper.dart';
 import '../database/database_helper.dart';
 import '../payments/payments_helper.dart';
 import '../rentors/rentors_helper.dart';
 import '../../config/app_config.dart';
+import '../../config/server_configuration.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/email_data.dart';
 import '../../data/models/payment.dart';
@@ -31,9 +34,7 @@ import '../../utils/payments/payments_parser.dart';
 class EmailDataHelper {
   static final EmailDataHelper _instance = EmailDataHelper._internal();
 
-  factory EmailDataHelper() {
-    return _instance;
-  }
+  factory EmailDataHelper() => _instance;
 
   EmailDataHelper._internal();
 
@@ -43,11 +44,11 @@ class EmailDataHelper {
 
   /// IMAP client configured from [AppConfig] credentials and server settings.
   late final EmailService emailService = EmailService(
-    email: AppConfig.emailAddress,
-    password: AppConfig.emailPassword,
-    imapServer: AppConfig.emailImapServer,
-    imapPort: AppConfig.emailImapPort,
-    isImapSecure: AppConfig.emailImapSecure,
+    email: ServerConfiguration.emailAddress,
+    password: ServerConfiguration.emailPassword,
+    imapServer: ServerConfiguration.emailImapServer,
+    imapPort: ServerConfiguration.emailImapPort,
+    isImapSecure: ServerConfiguration.emailImapSecure,
   );
 
   final BillsHelper _billsHelper = BillsHelper();

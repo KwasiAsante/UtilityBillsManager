@@ -1,12 +1,12 @@
 import 'dart:ui';
 
-import '../../widgets/notification_bell_icon.dart';
-
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'add_edit_bill_screen.dart';
 import '../../config/app_config.dart';
+import '../../config/server_configuration.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
 import '../../data/repositories/bills_repository.dart';
@@ -15,8 +15,8 @@ import '../../screens/base/google_sign_in_screen_state.dart';
 import '../../utils/constants.dart';
 import '../../utils/dialogs/due_date_filter_sheet.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
+import '../../widgets/notification_bell_icon.dart';
 
-import 'add_edit_bill_screen.dart';
 
 /// Screen that displays the list of utility bills.
 ///
@@ -44,7 +44,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   Future<void> onGoogleSignedIn({bool canSync = true}) async {
     await _loadBills(
       syncEmails: canSync,
-      earliestEmailDate: AppConfig.emailEarliestDate,
+      earliestEmailDate: ServerConfiguration.emailEarliestDate,
     );
   }
 
@@ -84,10 +84,10 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
       }
 
       initGoogleSignInForWeb();
-    } else {
+    } else if (widget.isVisible) {
       _loadBills(
         syncEmails: !kIsWeb && AppConfig.mode == AppMode.server,
-        earliestEmailDate: AppConfig.emailEarliestDate,
+        earliestEmailDate: ServerConfiguration.emailEarliestDate,
       );
     }
   }
@@ -160,7 +160,6 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
 
     if (!mounted) return;
     await _billsRepository.reload();
-    // _onBillsUpdated() handles the rest via listener
   }
 
   Future<void> _deleteAllBills() async {
