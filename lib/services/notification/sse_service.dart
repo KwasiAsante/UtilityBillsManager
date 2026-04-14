@@ -161,6 +161,7 @@ class SseService {
         http.post(connectUrl, body: _deviceId).catchError(
           (Object e) {
             AppLogger().w('[SSE] Failed to register deviceId: $e');
+            return http.Response('', 500);
           }
         ),
       );
