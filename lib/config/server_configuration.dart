@@ -93,6 +93,8 @@ class ServerConfiguration {
       emailImapPort: emailImapPort,
       emailImapSecure: emailImapSecure,
       emailEarliestDate: emailEarliestDate,
+      emailSyncDelayDuration: _emailSyncDelayDurationFromPreferences,
+      emailSyncInterval: _emailSyncIntervalFromPreferences,
     );
   }
 

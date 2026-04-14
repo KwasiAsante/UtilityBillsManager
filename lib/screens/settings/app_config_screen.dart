@@ -83,6 +83,9 @@ class _AppConfigScreenState extends State<AppConfigScreen> {
                       if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
                         return 'Enter a valid URL (e.g. http://127.0.0.1:8080)';
                       }
+                      if (uri.scheme != 'http' && uri.scheme != 'https') {
+                        return 'URL must use http or https';
+                      }
                       return null;
                     },
                   ),

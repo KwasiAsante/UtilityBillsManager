@@ -129,8 +129,12 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
     if (value == null || value.trim().isEmpty) {
       return '$fieldName is required';
     }
-    if (int.tryParse(value.trim()) == null) {
+    final parsed = int.tryParse(value.trim());
+    if (parsed == null) {
       return '$fieldName must be a whole number';
+    }
+    if (parsed <= 0) {
+      return '$fieldName must be greater than zero';
     }
     return null;
   }
@@ -174,7 +178,11 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
                         autocorrect: false,
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) return 'Email address is required';
-                          if (!value.contains('@')) return 'Enter a valid email address';
+                          final trimmed = value.trim();
+                          final atIndex = trimmed.indexOf('@');
+                          if (atIndex <= 0 || atIndex == trimmed.length - 1) {
+                            return 'Enter a valid email address';
+                          }
                           return null;
                         },
                       ),
