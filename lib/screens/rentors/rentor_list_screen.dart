@@ -1,8 +1,5 @@
 import 'dart:ui';
 
-import '../../widgets/notification_bell_icon.dart';
-import '../../widgets/settings_icon_button.dart';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -11,6 +8,8 @@ import '../../data/models/rentor.dart';
 import '../../data/repositories/rentors_repository.dart';
 import '../../helpers/rentors/rentors_helper.dart';
 import '../../utils/comparable_utils.dart';
+import '../../widgets/notification_bell_icon.dart';
+import '../../widgets/settings_icon_button.dart';
 
 /// Screen that displays the list of rentors (tenants).
 ///

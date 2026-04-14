@@ -18,7 +18,6 @@ import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../widgets/notification_bell_icon.dart';
 import '../../widgets/settings_icon_button.dart';
 
-
 /// Screen that displays the list of utility bills.
 ///
 /// Supports status filtering, due-date filtering (year / month / custom range),

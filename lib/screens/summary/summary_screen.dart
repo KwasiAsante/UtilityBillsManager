@@ -597,6 +597,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
             tooltip: 'Delete All Data',
             onPressed: _deleteAllData,
           ),
+          const SizedBox(width: 16),
           const SettingsIconButton(),
         ],
       ),
