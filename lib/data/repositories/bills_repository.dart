@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/bill.dart';
 import '../models/result.dart';
 import '../../helpers/bills/bills_helper.dart';
+import 'email_data_repository.dart';
 
 /// In-memory cache and [ChangeNotifier] for [Bill] data.
 ///
@@ -52,14 +53,20 @@ class BillsRepository extends ChangeNotifier {
   /// Deletes the bill with [id] (its `billId` UUID) and refreshes the list.
   Future<Result<Bill>> delete(String id) async {
     final result = await _helper.deleteBill(id);
-    if (result.isSuccess) await reload();
+    if (result.isSuccess) {
+      await reload();
+      await EmailDataRepository().reload();
+    }
     return result;
   }
 
   /// Deletes all bills from the data source and clears the in-memory list.
   Future<Result<void>> deleteAll() async {
     final result = await _helper.deleteAllBills();
-    if (result.isSuccess) await reload();
+    if (result.isSuccess) {
+      await reload();
+      await EmailDataRepository().reload();
+    }
     return result;
   }
 }

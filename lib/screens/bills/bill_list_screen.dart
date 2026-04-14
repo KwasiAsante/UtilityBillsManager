@@ -151,7 +151,9 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   }) async {
     setState(() => _loading = true);
 
-    if (syncEmails && (!kIsWeb || (isGoogleSignInEnabled && googleAccountService.isAuthorized))) {
+    if (syncEmails &&
+        (!kIsWeb ||
+            (isGoogleSignInEnabled && googleAccountService.isAuthorized))) {
       await _emailDataHelper.fetchBillEmails(
         earliestEmailDate: earliestEmailDate,
         maxEmails: maxEmails,
@@ -188,12 +190,22 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
     );
 
     if (confirmed == true) {
-      await _billsRepository.deleteAll();
+      final result = await _billsRepository.deleteAll();
+      if (result.isError) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting bills: ${result.errorMessage}'),
+            ),
+          );
+        }
+        return;
+      }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('All bills deleted.'))
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('All bills deleted.')));
       }
     }
   }
@@ -212,14 +224,13 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                 _searchQuery.toLowerCase(),
               );
           final matchesYear =
-              _selectedDueYear == null ||
-              (dueDate.year == _selectedDueYear);
+              _selectedDueYear == null || (dueDate.year == _selectedDueYear);
           final matchesMonth =
-              _selectedDueMonth == null ||
-              (dueDate.month == _selectedDueMonth);
+              _selectedDueMonth == null || (dueDate.month == _selectedDueMonth);
           final matchesDateRange =
               (_dateRangeStart == null && _dateRangeEnd == null) ||
-              ((_dateRangeStart == null || !dueDate.isBefore(_dateRangeStart!)) &&
+              ((_dateRangeStart == null ||
+                      !dueDate.isBefore(_dateRangeStart!)) &&
                   (_dateRangeEnd == null || !dueDate.isAfter(_dateRangeEnd!)));
           return matchesFilter &&
               matchesSearch &&
@@ -267,9 +278,9 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
 
   bool get _hasActiveDueDateFilter =>
       _selectedDueYear != null ||
-          _selectedDueMonth != null ||
-          _dateRangeStart != null ||
-          _dateRangeEnd != null;
+      _selectedDueMonth != null ||
+      _dateRangeStart != null ||
+      _dateRangeEnd != null;
 
   String _buildDueDateFilterTooltip() {
     if (_dateRangeStart != null || _dateRangeEnd != null) {
@@ -449,149 +460,168 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
       ),
       body: Column(
         children: [
-          if (isGoogleSignInEnabled && googleAccountService.buildWebWarningBanner() != null)
+          if (isGoogleSignInEnabled &&
+              googleAccountService.buildWebWarningBanner() != null)
             googleAccountService.buildWebWarningBanner()!,
           Expanded(
             child:
                 _loading
                     ? const Center(child: CircularProgressIndicator())
                     : FutureBuilder<List<Bill>>(
-                        future: _bills,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
+                      future: _bills,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        } else if (snapshot.hasError) {
+                          return Center(
+                            child: Text('Error: ${snapshot.error}'),
+                          );
+                        } else if (!snapshot.hasData ||
+                            snapshot.data!.isEmpty) {
+                          if (!isGoogleSignInEnabled ||
+                              (googleAccountService.isSignedIn &&
+                                  googleAccountService.isAuthorized)) {
                             return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          } else if (snapshot.hasError) {
-                            return Center(
-                              child: Text('Error: ${snapshot.error}'),
-                            );
-                          } else if (!snapshot.hasData ||
-                              snapshot.data!.isEmpty) {
-                            if (!isGoogleSignInEnabled ||
-                                (googleAccountService.isSignedIn &&
-                                    googleAccountService.isAuthorized)) {
-                              return const Center(
-                                child: Text(
-                                  'No bills found. Pull down or click on the Refresh button to sync with Gmail or click the + button to add a bill.',
-                                ),
-                              );
-                            } else {
-                              return const Center(
-                                child: Text(
-                                  'Please sign in to your Google account to view bills.',
-                                ),
-                              );
-                            }
-                          }
-
-                          final bills = snapshot.data!;
-                          return RefreshIndicator(
-                            onRefresh: () async {
-                              await Future.delayed(const Duration(seconds: 2));
-                              await _syncBills();
-                            },
-                            child: ScrollConfiguration(
-                              behavior: ScrollConfiguration.of(
-                                context,
-                              ).copyWith(
-                                dragDevices: {
-                                  PointerDeviceKind.touch,
-                                  PointerDeviceKind.mouse,
-                                },
+                              child: Text(
+                                'No bills found. Pull down or click on the Refresh button to sync with Gmail or click the + button to add a bill.',
                               ),
-                              child: ListView.builder(
-                                controller: _scrollController,
-                                padding: const EdgeInsets.only(bottom: 80),
-                                itemCount: bills.length,
-                                itemBuilder: (context, index) {
-                                  final bill = bills[index];
-                                  return Card(
-                                    child: ListTile(
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                      isThreeLine: true,
-                                      onTap: () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                AddEditBillScreen(bill: bill),
+                            );
+                          } else {
+                            return const Center(
+                              child: Text(
+                                'Please sign in to your Google account to view bills.',
+                              ),
+                            );
+                          }
+                        }
+
+                        final bills = snapshot.data!;
+                        return RefreshIndicator(
+                          onRefresh: () async {
+                            await Future.delayed(const Duration(seconds: 2));
+                            await _syncBills();
+                          },
+                          child: ScrollConfiguration(
+                            behavior: ScrollConfiguration.of(context).copyWith(
+                              dragDevices: {
+                                PointerDeviceKind.touch,
+                                PointerDeviceKind.mouse,
+                              },
+                            ),
+                            child: ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.only(bottom: 80),
+                              itemCount: bills.length,
+                              itemBuilder: (context, index) {
+                                final bill = bills[index];
+                                return Card(
+                                  child: ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    isThreeLine: true,
+                                    onTap: () async {
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) =>
+                                                  AddEditBillScreen(bill: bill),
+                                        ),
+                                      );
+                                    },
+                                    title: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            bill.companyName,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.titleSmall?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                        );
-                                      },
-                                      title: Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '\$${bill.amount.toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    subtitle: Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          Expanded(
-                                            child: Text(
-                                              bill.companyName,
-                                              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                          Text(
+                                            '${bill.type.name[0].toUpperCase()}${bill.type.name.substring(1)}  ·  Due ${DateFormat('MMM d, yyyy').format(bill.dueDate)}',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[600],
                                             ),
                                           ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '\$${bill.amount.toStringAsFixed(2)}',
-                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                                          ),
+                                          const SizedBox(height: 6),
+                                          _buildStatusBadge(bill.status),
                                         ],
                                       ),
-                                      subtitle: Padding(
-                                        padding: const EdgeInsets.only(top: 4),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              '${bill.type.name[0].toUpperCase()}${bill.type.name.substring(1)}  ·  Due ${DateFormat('MMM d, yyyy').format(bill.dueDate)}',
-                                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                                            ),
-                                            const SizedBox(height: 6),
-                                            _buildStatusBadge(bill.status),
-                                          ],
-                                        ),
-                                      ),
-                                      trailing: PopupMenuButton<String>(
-                                        onSelected: (value) async {
-                                          if (value == 'edit') {
-                                            await Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder:
-                                                    (context) => AddEditBillScreen(
-                                                      bill: bill,
-                                                    ),
-                                              ),
-                                            );
-                                          } else if (value == 'delete') {
-                                            await _billsRepository.delete(
-                                              bill.billId,
-                                            );
-                                          }
-                                        },
-                                        itemBuilder:
-                                            (context) => [
-                                              const PopupMenuItem(
-                                                value: 'edit',
-                                                child: Text('Edit'),
-                                              ),
-                                              const PopupMenuItem(
-                                                value: 'delete',
-                                                textStyle: TextStyle(color: Colors.red),
-                                                child: Text('Delete'),
-                                              ),
-                                            ],
-                                      ),
                                     ),
-                                  );
-                                },
-                              ),
+                                    trailing: PopupMenuButton<String>(
+                                      onSelected: (value) async {
+                                        if (value == 'edit') {
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder:
+                                                  (context) =>
+                                                      AddEditBillScreen(
+                                                        bill: bill,
+                                                      ),
+                                            ),
+                                          );
+                                        } else if (value == 'delete') {
+                                          await _billsRepository.delete(
+                                            bill.billId,
+                                          );
+                                        }
+                                      },
+                                      itemBuilder:
+                                          (context) => [
+                                            const PopupMenuItem(
+                                              value: 'edit',
+                                              child: Text('Edit'),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'delete',
+                                              textStyle: TextStyle(
+                                                color: Colors.red,
+                                              ),
+                                              child: Text('Delete'),
+                                            ),
+                                          ],
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        );
+                      },
+                    ),
           ),
         ],
       ),
@@ -631,7 +661,11 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
       ),
       child: Text(
         PaymentStatusExtension.getName(status),
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textColor),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: textColor,
+        ),
       ),
     );
   }

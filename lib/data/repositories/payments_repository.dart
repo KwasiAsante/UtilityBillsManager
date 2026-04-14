@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/payment.dart';
 import '../models/result.dart';
 import '../../helpers/payments/payments_helper.dart';
+import 'email_data_repository.dart';
 
 /// Singleton [ChangeNotifier] repository that manages the in-memory list of
 /// [Payment] records and delegates persistence to [PaymentsHelper].
@@ -56,14 +57,20 @@ class PaymentsRepository extends ChangeNotifier {
   /// Deletes the payment identified by [id] and reloads the list on success.
   Future<Result<void>> delete(String id) async {
     final result = await _helper.deletePayment(id);
-    if (result.isSuccess) await reload();
+    if (result.isSuccess) {
+      await reload();
+      await EmailDataRepository().reload();
+    }
     return result;
   }
 
   /// Deletes all payments from the data source and clears the in-memory list.
   Future<Result<void>> deleteAll() async {
     final result = await _helper.deleteAllPayments();
-    if (result.isSuccess) await reload();
+    if (result.isSuccess) {
+      await reload();
+      await EmailDataRepository().reload();
+    }
     return result;
   }
 }

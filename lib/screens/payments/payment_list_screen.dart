@@ -8,7 +8,6 @@ import '../../config/server_configuration.dart';
 import '../../data/models/payment.dart';
 import '../../data/repositories/payments_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
-import '../../helpers/payments/payments_helper.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
 import '../../utils/comparable_utils.dart';
 import '../../utils/constants.dart';
@@ -59,7 +58,6 @@ class _PaymentListScreenState
   // Fields
   // ---------------------------------------------------------------------------
 
-  final PaymentsHelper _paymentsHelper = PaymentsHelper();
   final PaymentsRepository _paymentsRepository = PaymentsRepository();
   final EmailDataHelper _emailDataHelper = EmailDataHelper();
   final ScrollController _scrollController = ScrollController();
@@ -198,7 +196,7 @@ class _PaymentListScreenState
     );
 
     if (confirmed == true) {
-      final result = await _paymentsHelper.deleteAllPayments();
+      final result = await _paymentsRepository.deleteAll();
       if (result.isError) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -210,11 +208,11 @@ class _PaymentListScreenState
         return;
       }
 
-      await _paymentsRepository.reload();
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('All payments deleted.')));
+        ).showSnackBar(
+            const SnackBar(content: Text('All payments deleted.')));
       }
     }
   }
