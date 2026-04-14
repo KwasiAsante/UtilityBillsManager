@@ -12,6 +12,7 @@ import '../../helpers/email/email_data_helper.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../widgets/notification_bell_icon.dart';
+import '../../widgets/settings_icon_button.dart';
 
 /// Screen that displays the list of imported email records.
 ///
@@ -325,6 +326,7 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
             onPressed: _deleteAllEmails,
           ),
           const SizedBox(width: 16),
+          const SettingsIconButton(),
         ],
       ),
       body: Column(

@@ -15,6 +15,7 @@ import '../../helpers/email/email_data_helper.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../utils/export_utils.dart';
 import '../../widgets/notification_bell_icon.dart';
+import '../../widgets/settings_icon_button.dart';
 
 /// Screen that provides a financial overview across all bills, payments, and
 /// rentors.
@@ -596,6 +597,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
             tooltip: 'Delete All Data',
             onPressed: _deleteAllData,
           ),
+          const SettingsIconButton(),
         ],
       ),
       body: Column(

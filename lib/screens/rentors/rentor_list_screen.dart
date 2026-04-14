@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import '../../widgets/notification_bell_icon.dart';
+import '../../widgets/settings_icon_button.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -212,6 +213,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
             },
           ),
           const SizedBox(width: 16),
+          const SettingsIconButton(),
         ],
       ),
       body: _loading

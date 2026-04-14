@@ -16,6 +16,7 @@ import '../../utils/constants.dart';
 import '../../utils/dialogs/due_date_filter_sheet.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../widgets/notification_bell_icon.dart';
+import '../../widgets/settings_icon_button.dart';
 
 
 /// Screen that displays the list of utility bills.
@@ -444,6 +445,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
             onPressed: _deleteAllBills,
           ),
           const SizedBox(width: 16),
+          const SettingsIconButton(),
         ],
       ),
       body: Column(

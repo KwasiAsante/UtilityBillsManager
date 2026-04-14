@@ -15,6 +15,7 @@ import '../../utils/constants.dart';
 import '../../utils/dialogs/due_date_filter_sheet.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../widgets/notification_bell_icon.dart';
+import '../../widgets/settings_icon_button.dart';
 
 import 'add_edit_payment_screen.dart';
 
@@ -419,6 +420,7 @@ class _PaymentListScreenState
             onPressed: _deleteAllPayments,
           ),
           const SizedBox(width: 16),
+          const SettingsIconButton(),
         ],
       ),
       body: Column(
