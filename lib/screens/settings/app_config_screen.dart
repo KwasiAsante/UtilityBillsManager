@@ -75,6 +75,16 @@ class _AppConfigScreenState extends State<AppConfigScreen> {
                     ),
                     keyboardType: TextInputType.url,
                     autocorrect: false,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'API Base URL is required';
+                      }
+                      final uri = Uri.tryParse(value.trim());
+                      if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
+                        return 'Enter a valid URL (e.g. http://127.0.0.1:8080)';
+                      }
+                      return null;
+                    },
                   ),
                 ),
               ),
@@ -82,10 +92,13 @@ class _AppConfigScreenState extends State<AppConfigScreen> {
               FilledButton(
                 onPressed: _saving ? null : _saveSettings,
                 child: _saving
-                    ? const SizedBox(
+                    ? SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                        ),
                       )
                     : const Text('Save'),
               ),
