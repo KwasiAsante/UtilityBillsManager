@@ -15,8 +15,50 @@ import '../../data/models/server_config.dart';
 /// when connecting to a remote host).  Use the static factory methods
 /// ([bills], [rentors], [payments], [emails]) to obtain the type-specific
 /// service singletons — they all share the same [baseUrl].
+
+/// An [http.BaseClient] that logs every outgoing request and its response.
+///
+/// Logs the HTTP method and URL before the request is sent, then logs the
+/// status code and elapsed time when the response arrives (or the error if the
+/// request throws).
+class LoggingHttpClient extends http.BaseClient {
+  final http.Client _inner = http.Client();
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final stopwatch = Stopwatch()..start();
+    AppLogger().d('→ ${request.method} ${request.url}');
+    try {
+      final response = await _inner.send(request);
+      stopwatch.stop();
+      final bodyBytes = await response.stream.toBytes();
+      final body = utf8.decode(bodyBytes, allowMalformed: true);
+      AppLogger().d(
+        '← ${response.statusCode} ${request.url} (${stopwatch.elapsedMilliseconds}ms)\n$body',
+      );
+      return http.StreamedResponse(
+        Stream.value(bodyBytes),
+        response.statusCode,
+        contentLength: response.contentLength,
+        request: response.request,
+        headers: response.headers,
+        isRedirect: response.isRedirect,
+        persistentConnection: response.persistentConnection,
+        reasonPhrase: response.reasonPhrase,
+      );
+    } catch (e) {
+      stopwatch.stop();
+      AppLogger().e(
+        '✗ ${request.method} ${request.url} failed after ${stopwatch.elapsedMilliseconds}ms: $e',
+      );
+      rethrow;
+    }
+  }
+}
+
 class ApiService {
   static String baseUrl = 'http://127.0.0.1:8080';
+  static final http.Client _client = LoggingHttpClient();
 
   /// Overrides the base URL for all API service singletons.
   static void configure({required String baseUrl}) {
@@ -87,7 +129,7 @@ class BillsApiService {
   /// POST `/bill` — creates a new bill.  Returns `"OK"` or an error string.
   Future<String> createBill(Bill bill) async {
     try {
-      final response = await http.post(
+      final response = await ApiService._client.post(
         Uri.parse('$baseUrl/bill'),
         body: jsonEncode(bill),
         headers: {'Content-Type': 'application/json'},
@@ -110,7 +152,7 @@ class BillsApiService {
   /// GET `/bill/<id>` — returns the bill with [id], or `null` if not found.
   Future<Bill?> getBill(String id) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/bill/$id'));
+      final response = await ApiService._client.get(Uri.parse('$baseUrl/bill/$id'));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> json = jsonDecode(response.body);
@@ -128,7 +170,7 @@ class BillsApiService {
   /// GET `/bill/list` — returns all bills.
   Future<List<Bill>> getAllBills() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/bill/list'));
+      final response = await ApiService._client.get(Uri.parse('$baseUrl/bill/list'));
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -155,7 +197,7 @@ class BillsApiService {
           'bill_ids': ids.join(','),
       };
       final uri = Uri.parse('$baseUrl/bill/list/$status').replace(queryParameters: queryParams.isEmpty ? null : queryParams);
-      final response = await http.get(uri);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -191,7 +233,7 @@ class BillsApiService {
       };
       final uri = Uri.parse('$baseUrl/bill/list/sync')
           .replace(queryParameters: queryParams);
-      final response = await http.get(uri);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -217,7 +259,7 @@ class BillsApiService {
   /// PUT `/bill` — updates an existing bill.  Returns `"OK"` or an error string.
   Future<String> updateBill(Bill bill) async {
     try {
-      final response = await http.put(
+      final response = await ApiService._client.put(
         Uri.parse('$baseUrl/bill'),
         body: jsonEncode(bill),
         headers: {'Content-Type': 'application/json'},
@@ -240,7 +282,7 @@ class BillsApiService {
   /// DELETE `/bill/<id>` — deletes the bill with [id].
   Future<String> deleteBill(String id) async {
     try {
-      final response = await http.delete(Uri.parse('$baseUrl/bill/$id'));
+      final response = await ApiService._client.delete(Uri.parse('$baseUrl/bill/$id'));
 
       if (response.statusCode == 200) {
         return "OK";
@@ -257,7 +299,7 @@ class BillsApiService {
   /// DELETE `/bill/list` — deletes all bills.
   Future<String> deleteAllBills() async {
     try {
-      final response = await http.delete(Uri.parse('$baseUrl/bill/list'));
+      final response = await ApiService._client.delete(Uri.parse('$baseUrl/bill/list'));
 
       if (response.statusCode == 200) {
         return "OK";
@@ -293,7 +335,7 @@ class RentorsApiService {
   /// POST `/rentor` — creates a new rentor.  Returns `"OK"` or an error string.
   Future<String> createRentor(Rentor rentor) async {
     try {
-      final response = await http.post(
+      final response = await ApiService._client.post(
         Uri.parse('$baseUrl/rentor'),
         body: jsonEncode(rentor),
         headers: {'Content-Type': 'application/json'},
@@ -316,7 +358,7 @@ class RentorsApiService {
   /// GET `/rentor/<id>` — returns the rentor with [id], or `null` if not found.
   Future<Rentor?> getRentor(String id) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/rentor/$id'));
+      final response = await ApiService._client.get(Uri.parse('$baseUrl/rentor/$id'));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> json = jsonDecode(response.body);
@@ -334,7 +376,7 @@ class RentorsApiService {
   /// GET `/rentor/list` — returns all rentors.
   Future<List<Rentor>> getAllRentors() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/rentor/list'));
+      final response = await ApiService._client.get(Uri.parse('$baseUrl/rentor/list'));
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -357,7 +399,7 @@ class RentorsApiService {
   /// PUT `/rentor` — updates an existing rentor.  Returns `"OK"` or an error string.
   Future<String> updateRentor(Rentor rentor) async {
     try {
-      final response = await http.put(
+      final response = await ApiService._client.put(
         Uri.parse('$baseUrl/rentor'),
         body: jsonEncode(rentor),
         headers: {'Content-Type': 'application/json'},
@@ -380,7 +422,7 @@ class RentorsApiService {
   /// DELETE `/rentor/<id>` — deletes the rentor with [id].
   Future<String> deleteRentor(String id) async {
     try {
-      final response = await http.delete(Uri.parse('$baseUrl/rentor/$id'));
+      final response = await ApiService._client.delete(Uri.parse('$baseUrl/rentor/$id'));
 
       if (response.statusCode == 200) {
         return "OK";
@@ -397,7 +439,7 @@ class RentorsApiService {
   /// DELETE `/rentor/list` — deletes all rentors.
   Future<String> deleteAllRentors() async {
     try {
-      final response = await http.delete(Uri.parse('$baseUrl/rentor/list'));
+      final response = await ApiService._client.delete(Uri.parse('$baseUrl/rentor/list'));
 
       if (response.statusCode == 200) {
         return "OK";
@@ -434,7 +476,7 @@ class PaymentsApiService {
   /// Returns `"OK"` or an error string.
   Future<String> createPayment(Payment payment) async {
     try {
-      final response = await http.post(
+      final response = await ApiService._client.post(
         Uri.parse('$baseUrl/payment'),
         body: jsonEncode(payment.toJson(include: {'bill': true, 'rentor': true})),
         headers: {'Content-Type': 'application/json'},
@@ -466,7 +508,7 @@ class PaymentsApiService {
       final uri = Uri.parse(
         '$baseUrl/payment/$id',
       ).replace(queryParameters: includeParams.isEmpty ? null : includeParams);
-      final response = await http.get(uri);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> json = jsonDecode(response.body);
@@ -496,7 +538,7 @@ class PaymentsApiService {
       final uri = Uri.parse(
         '$baseUrl/payment/list',
       ).replace(queryParameters: queryParams.isEmpty ? null : queryParams);
-      final response = await http.get(uri);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -539,7 +581,7 @@ class PaymentsApiService {
       };
       final uri = Uri.parse('$baseUrl/payment/list/sync')
           .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
-      final response = await http.get(uri);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -565,7 +607,7 @@ class PaymentsApiService {
   /// PUT `/payment` — updates an existing payment.  Returns `"OK"` or an error string.
   Future<String> updatePayment(Payment payment) async {
     try {
-      final response = await http.put(
+      final response = await ApiService._client.put(
         Uri.parse('$baseUrl/payment'),
         body: jsonEncode(payment.toJson(include: {'bill': true, 'rentor': true})),
         headers: {'Content-Type': 'application/json'},
@@ -588,7 +630,7 @@ class PaymentsApiService {
   /// DELETE `/payment/<id>` — deletes the payment with [id].
   Future<String> deletePayment(String id) async {
     try {
-      final response = await http.delete(Uri.parse('$baseUrl/payment/$id'));
+      final response = await ApiService._client.delete(Uri.parse('$baseUrl/payment/$id'));
 
       if (response.statusCode == 200) {
         return "OK";
@@ -605,7 +647,7 @@ class PaymentsApiService {
   /// DELETE `/payment/list` — deletes all payments.
   Future<String> deleteAllPayments() async {
     try {
-      final response = await http.delete(Uri.parse('$baseUrl/payment/list'));
+      final response = await ApiService._client.delete(Uri.parse('$baseUrl/payment/list'));
 
       if (response.statusCode == 200) {
         return "OK";
@@ -641,7 +683,7 @@ class EmailDataApiService {
   /// POST `/email` — creates a new email record.  Returns `"OK"` or an error string.
   Future<String> createEmailData(EmailData emailData) async {
     try {
-      final response = await http.post(
+      final response = await ApiService._client.post(
         Uri.parse('$baseUrl/email'),
         body: jsonEncode(emailData),
         headers: {'Content-Type': 'application/json'},
@@ -676,7 +718,7 @@ class EmailDataApiService {
       final uri = Uri.parse('$baseUrl/email/$id').replace(
         queryParameters: queryParams.isEmpty ? null : queryParams,
       );
-      final response = await http.get(uri);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> json = jsonDecode(response.body);
@@ -702,7 +744,7 @@ class EmailDataApiService {
       final uri = Uri.parse('$baseUrl/email/list').replace(
         queryParameters: includeParams.isEmpty ? null : includeParams,
       );
-      final response = await http.get(uri);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -731,7 +773,7 @@ class EmailDataApiService {
       final uri = Uri.parse('$baseUrl/email/list/unprocessed').replace(
         queryParameters: includeParams.isEmpty ? null : includeParams,
       );
-      final response = await http.get(uri);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -760,7 +802,7 @@ class EmailDataApiService {
       final uri = Uri.parse('$baseUrl/email/list/processed').replace(
         queryParameters: includeParams.isEmpty ? null : includeParams,
       );
-      final response = await http.get(uri);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonList = jsonDecode(response.body);
@@ -796,7 +838,7 @@ class EmailDataApiService {
       };
       final uri = Uri.parse('$baseUrl/email/list/sync')
           .replace(queryParameters: queryParams);
-      final response = await http.get(uri);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> json = jsonDecode(response.body);
@@ -828,7 +870,7 @@ class EmailDataApiService {
   /// PUT `/email` — updates an existing email record.  Returns `"OK"` or an error string.
   Future<String> updateEmailData(EmailData emailData) async {
     try {
-      final response = await http.put(
+      final response = await ApiService._client.put(
         Uri.parse('$baseUrl/email'),
         body: jsonEncode(emailData),
         headers: {'Content-Type': 'application/json'},
@@ -851,7 +893,7 @@ class EmailDataApiService {
   /// DELETE `/email/<id>` — deletes the email record with [id].
   Future<String> deleteEmailData(String id) async {
     try {
-      final response = await http.delete(Uri.parse('$baseUrl/email/$id'));
+      final response = await ApiService._client.delete(Uri.parse('$baseUrl/email/$id'));
 
       if (response.statusCode == 200) {
         return "OK";
@@ -868,7 +910,7 @@ class EmailDataApiService {
   /// DELETE `/email/list` — deletes all email records.
   Future<String> deleteAllEmailData() async {
     try {
-      final response = await http.delete(Uri.parse('$baseUrl/email/list'));
+      final response = await ApiService._client.delete(Uri.parse('$baseUrl/email/list'));
 
       if (response.statusCode == 200) {
         return "OK";
@@ -901,7 +943,7 @@ class ConfigApiService {
   /// GET `/config` — returns the active [ServerConfig], or `null` on error.
   Future<ServerConfig?> getConfig() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/config'));
+      final response = await ApiService._client.get(Uri.parse('$baseUrl/config'));
       if (response.statusCode == 200) {
         return ServerConfig.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
       } else {
@@ -918,7 +960,7 @@ class ConfigApiService {
   /// [ServerConfig] on success, or `null` on error.
   Future<ServerConfig?> createConfig(ServerConfig config) async {
     try {
-      final response = await http.post(
+      final response = await ApiService._client.post(
         Uri.parse('$baseUrl/config'),
         body: jsonEncode(config.toJson()),
         headers: {'Content-Type': 'application/json'},
@@ -939,7 +981,7 @@ class ConfigApiService {
   /// [ServerConfig] on success, or `null` on error.
   Future<ServerConfig?> updateConfig(ServerConfig config) async {
     try {
-      final response = await http.put(
+      final response = await ApiService._client.put(
         Uri.parse('$baseUrl/config'),
         body: jsonEncode(config.toJson()),
         headers: {'Content-Type': 'application/json'},
@@ -960,7 +1002,7 @@ class ConfigApiService {
   /// Returns `"OK"` on success or an error string on failure.
   Future<String> deleteConfig() async {
     try {
-      final response = await http.delete(Uri.parse('$baseUrl/config'));
+      final response = await ApiService._client.delete(Uri.parse('$baseUrl/config'));
       if (response.statusCode == 200) {
         return "OK";
       } else {
@@ -998,7 +1040,7 @@ class NotificationApiService {
   /// is absent or if [fcmToken] is empty.  Returns `"OK"` on success.
   Future<String> registerDeviceToken(String deviceId, String fcmToken) async {
     try {
-      final response = await http.post(
+      final response = await ApiService._client.post(
         Uri.parse('$baseUrl/device/token'),
         body: jsonEncode({'fcmToken': fcmToken}),
         headers: {

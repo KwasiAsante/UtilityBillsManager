@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../config/server_configuration.dart';
 import '../models/result.dart';
 import '../models/server_config.dart';
 import '../../helpers/configuration/server_config_helper.dart';
@@ -40,6 +41,9 @@ class ServerConfigRepository extends ChangeNotifier {
     } else {
       lastError = result.errorMessage;
     }
+
+    ServerConfiguration.updateServerConfigPreferences();
+
     notifyListeners();
   }
 

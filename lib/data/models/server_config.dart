@@ -69,7 +69,7 @@ class ServerConfig {
     };
   }
 
-  /// Deserialises a [ServerConfig] from a SQLite row or API JSON map.
+  /// Deserializes a [ServerConfig] from a SQLite row or API JSON map.
   ///
   /// [Duration] fields are stored as integers (seconds) and reconstructed here.
   /// [emailImapSecure] tolerates both integer (0/1) and boolean string forms.
