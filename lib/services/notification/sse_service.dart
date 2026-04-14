@@ -2,10 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:utility_bills_manager/utils/app_logger.dart';
 
 import '../../data/models/sse_event.dart';
+import '../api/api_service.dart';
+import '_sse_web_stub.dart'
+    if (dart.library.js_interop) '_sse_web.dart';
 
 /// Manages a persistent Server-Sent Events connection to `/connect`.
 ///
@@ -30,11 +34,10 @@ class SseService {
   // ---------------------------------------------------------------------------
 
   /// Broadcast stream of domain events sent by the server.
-  ///
-  /// The internal `connected` confirmation is consumed here and never
-  /// forwarded; only [SseEventType.newBill] and [SseEventType.newPayment]
-  /// reach listeners.
   Stream<SseEvent> get events => _eventController.stream;
+
+  /// Whether the SSE connection is currently active.
+  bool get isConnected => _state == _SseState.connected;
 
   // ---------------------------------------------------------------------------
   // Internals
@@ -75,7 +78,11 @@ class SseService {
     _deviceId = deviceId;
     _state = _SseState.connecting;
 
-    await _open();
+    if (kIsWeb) {
+      _openWeb();
+    } else {
+      await _open();
+    }
   }
 
   /// Closes the connection and cancels any pending reconnect timer.
@@ -85,7 +92,11 @@ class SseService {
     AppLogger().d('[SSE] Disconnecting');
     _state = _SseState.disconnected;
     _reconnectTimer?.cancel();
-    _cleanup(closeClient: true);
+    if (kIsWeb) {
+      closeWebSse();
+    } else {
+      _cleanup(closeClient: true);
+    }
     _attempt = 0;
   }
 
@@ -93,15 +104,40 @@ class SseService {
   // Connection
   // ---------------------------------------------------------------------------
 
+  void _openWeb() {
+    assert(_serverUrl != null && _deviceId != null);
+    final url = '$_serverUrl/connect';
+    AppLogger().d('[SSE] Opening SSE connection (web): $url');
+
+    openWebSse(
+      url: url,
+      deviceId: _deviceId!,
+      onEvent: _eventController.add,
+      onConnected: () {
+        _state = _SseState.connected;
+        _attempt = 0;
+        AppLogger().d('[SSE] Stream opened (web)');
+      },
+      onClosed: () {
+        if (_state == _SseState.disconnected) return;
+        _state = _SseState.idle;
+        _scheduleReconnect();
+      },
+    );
+  }
+
   Future<void> _open() async {
     assert(_serverUrl != null && _deviceId != null);
 
     try {
       _client?.close();
-      _client = http.Client();
+      _client = LoggingHttpClient();
 
-      final request = http.Request('GET', Uri.parse('$_serverUrl/connect'));
-      request.headers['x-device-id'] = _deviceId!;
+      // SseHandler identifies connections by `sseClientId` query param.
+      final connectUrl = Uri.parse(
+        '$_serverUrl/connect?sseClientId=${Uri.encodeComponent(_deviceId!)}',
+      );
+      final request = http.Request('GET', connectUrl);
       request.headers['Accept'] = 'text/event-stream';
       request.headers['Cache-Control'] = 'no-cache';
 
@@ -119,6 +155,16 @@ class SseService {
       _resetAccumulator();
       AppLogger().d('[SSE] Stream opened');
 
+      // Send deviceId as first message so the server can register this client.
+      // SseHandler routes POSTs to the connection identified by sseClientId.
+      unawaited(
+        http.post(connectUrl, body: _deviceId).catchError(
+          (Object e) {
+            AppLogger().w('[SSE] Failed to register deviceId: $e');
+          }
+        ),
+      );
+
       _lineSubscription = response.stream
           .transform(utf8.decoder)
           .transform(const LineSplitter())
@@ -128,8 +174,8 @@ class SseService {
             onError: _onError,
             cancelOnError: false,
           );
-    } catch (e) {
-      AppLogger().e('[SSE] Connection failed: $e');
+    } catch (e, stackTrace) {
+      AppLogger().e('[SSE] Connection failed: $e', error: e, stackTrace: stackTrace);
       _state = _SseState.idle;
       _scheduleReconnect();
     }
@@ -185,25 +231,27 @@ class SseService {
   }
 
   void _dispatch(String type, String rawData) {
-    // `connected` is a server-internal confirmation — log, do not forward.
-    if (type == 'connected') {
-      AppLogger().i('[SSE] Server confirmed connection');
-      return;
-    }
-
     if (rawData.isEmpty) return;
 
     try {
       final json = jsonDecode(rawData) as Map<String, dynamic>;
 
-      final eventType = switch (type) {
+      // Server embeds `type` in the JSON payload for unnamed data events.
+      final typeName = type.isNotEmpty ? type : json['type'] as String? ?? '';
+
+      if (typeName == 'connected') {
+        AppLogger().i('[SSE] Server confirmed connection');
+        return;
+      }
+
+      final eventType = switch (typeName) {
         'newBill' => SseEventType.newBill,
         'newPayment' => SseEventType.newPayment,
         _ => null,
       };
 
       if (eventType == null) {
-        AppLogger().w('[SSE] Unknown event type "$type" — ignored');
+        AppLogger().w('[SSE] Unknown event type "$typeName" — ignored');
         return;
       }
 
@@ -255,7 +303,12 @@ class SseService {
     AppLogger().d('[SSE] Reconnect in ${delay}ms (attempt $_attempt)');
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(Duration(milliseconds: delay), () {
-      if (_state == _SseState.idle) _open();
+      if (_state != _SseState.idle) return;
+      if (kIsWeb) {
+        _openWeb();
+      } else {
+        _open();
+      }
     });
   }
 

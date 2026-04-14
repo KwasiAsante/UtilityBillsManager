@@ -14,25 +14,17 @@ import '../../services/api/api_service.dart';
 import '../../utils/app_logger.dart';
 import 'app_notification_store.dart';
 import 'sse_service.dart';
+import '_notification_web_stub.dart'
+    if (dart.library.js_interop) '_notification_web.dart';
 
-/// Whether FCM is supported on the current platform.
-///
-/// FCM is available on Android, iOS, macOS, and Web.
-/// Windows and Linux are not supported by the firebase_messaging package.
 bool get _fcmSupported =>
     kIsWeb ||
     defaultTargetPlatform == TargetPlatform.android ||
     defaultTargetPlatform == TargetPlatform.iOS ||
     defaultTargetPlatform == TargetPlatform.macOS;
 
-/// Whether flutter_local_notifications is supported on the current platform.
-///
-/// Supports Android, iOS, macOS, Windows, and Linux — not Web.
 bool get _localNotificationsSupported => !kIsWeb;
 
-/// Top-level FCM background message handler (separate isolate).
-///
-/// Firebase displays the notification automatically; the handler only logs.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   AppLogger().d('[FCM] Background message: ${message.messageId}');
@@ -41,19 +33,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 const _androidChannelId = 'utility_bills_notifications';
 const _androidChannelName = 'Utility Bills';
 
-/// Singleton that orchestrates SSE and FCM for client mode.
-///
-/// Startup sequence (called once from [main]):
-///   1. [initialize] — guards against server mode and double-init.
-///   2. [_initLocalNotifications] — sets up flutter_local_notifications.
-///   3. [_initFcm] — requests permission, registers token, sets up handlers.
-///   4. [_connectSse] — opens the SSE stream and subscribes to events.
-///
-/// When the server pushes a [SseEvent]:
-///   • A system notification is shown via flutter_local_notifications.
-///   • An [AppNotification] is added to [AppNotificationStore].
-///   • The relevant repository ([BillsRepository] / [PaymentsRepository])
-///     is reloaded, which notifies listening screens via [ChangeNotifier].
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -66,10 +45,6 @@ class NotificationService {
   StreamSubscription<SseEvent>? _sseEventsSubscription;
   bool _initialized = false;
 
-  // ---------------------------------------------------------------------------
-  // Initialisation
-  // ---------------------------------------------------------------------------
-
   Future<void> initialize() async {
     if (_initialized) return;
     if (AppConfig.mode == AppMode.server) return;
@@ -78,6 +53,10 @@ class NotificationService {
 
     if (_localNotificationsSupported) {
       await _initLocalNotifications();
+    }
+
+    if (kIsWeb) {
+      await requestWebNotificationPermission();
     }
 
     if (_fcmSupported) {
@@ -98,9 +77,7 @@ class NotificationService {
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       iOS: DarwinInitializationSettings(),
       macOS: DarwinInitializationSettings(),
-      linux: LinuxInitializationSettings(
-        defaultActionName: 'Open',
-      ),
+      linux: LinuxInitializationSettings(defaultActionName: 'Open'),
       windows: WindowsInitializationSettings(
         appName: 'Utility Bills Manager',
         appUserModelId: 'com.example.UtilityBillsManager',
@@ -110,7 +87,6 @@ class NotificationService {
 
     await _localNotifications.initialize(settings: initSettings);
 
-    // Create the Android notification channel.
     await _localNotifications
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
@@ -125,6 +101,17 @@ class NotificationService {
     AppLogger().d('[LocalNotifications] Initialised');
   }
 
+  Future<void> _showNotification({
+    required String title,
+    required String body,
+  }) async {
+    if (kIsWeb) {
+      showWebNotification(title: title, body: body);
+      return;
+    }
+    await _showLocalNotification(title: title, body: body);
+  }
+
   Future<void> _showLocalNotification({
     required String title,
     required String body,
@@ -132,7 +119,7 @@ class NotificationService {
     if (!_localNotificationsSupported) return;
 
     await _localNotifications.show(
-      id: DateTime.now().millisecondsSinceEpoch & 0x7FFFFFFF, // int-safe id
+      id: DateTime.now().millisecondsSinceEpoch & 0x7FFFFFFF,
       title: title,
       body: body,
       notificationDetails: const NotificationDetails(
@@ -158,37 +145,58 @@ class NotificationService {
     final settings = await FirebaseMessaging.instance.requestPermission();
     AppLogger().d('[FCM] Permission: ${settings.authorizationStatus}');
 
-    final token = await FirebaseMessaging.instance.getToken();
+    final token = kIsWeb
+        ? await FirebaseMessaging.instance.getToken(
+            vapidKey: await AppConfig.firebaseWebPushPublicKey)
+        : await FirebaseMessaging.instance.getToken();
     if (token != null) await _registerFcmToken(token);
 
     _tokenRefreshSubscription =
         FirebaseMessaging.instance.onTokenRefresh.listen(_registerFcmToken);
 
-    // Foreground FCM: the SSE event already handled the reload and
-    // notification, so we only log here to avoid duplicates.
-    FirebaseMessaging.onMessage.listen((msg) {
-      AppLogger().d(
-        '[FCM] Foreground: ${msg.notification?.title} — ${msg.notification?.body}',
-      );
-    });
+    // SSE handles foreground events; FCM foreground is a fallback.
+    FirebaseMessaging.onMessage.listen(_handleFcmForeground);
 
-    // Notification tap from background state.
     FirebaseMessaging.onMessageOpenedApp.listen(_handleFcmOpen);
 
-    // Notification tap from terminated state.
     final initial = await FirebaseMessaging.instance.getInitialMessage();
     if (initial != null) _handleFcmOpen(initial);
   }
 
   Future<void> _registerFcmToken(String token) async {
-    AppLogger().d('[FCM] Registering token for device ${AppConfig.deviceId}');
-    await ApiService.notifications()
-        .registerDeviceToken(AppConfig.deviceId, token);
+    final deviceId = await AppConfig.deviceId;
+    AppLogger().d('[FCM] Registering token for device $deviceId');
+    await ApiService.notifications().registerDeviceToken(deviceId, token);
+  }
+
+  void _handleFcmForeground(RemoteMessage message) {
+    // Only act if SSE is not connected (avoid duplicate notifications).
+    if (SseService.instance.isConnected) return;
+
+    AppLogger().d('[FCM] Foreground fallback: ${message.notification?.title}');
+    final type = message.data['type'];
+    final eventType = switch (type) {
+      'newBill' => SseEventType.newBill,
+      'newPayment' => SseEventType.newPayment,
+      _ => null,
+    };
+    if (eventType == null) return;
+
+    final title = message.notification?.title ?? '';
+    final body = message.notification?.body ?? '';
+    _showNotification(title: title, body: body);
+    _addToStore(type: eventType, title: title, body: body);
+
+    switch (eventType) {
+      case SseEventType.newBill:
+        BillsRepository().reload();
+      case SseEventType.newPayment:
+        PaymentsRepository().reload();
+    }
   }
 
   void _handleFcmOpen(RemoteMessage message) {
     AppLogger().d('[FCM] Opened from notification: ${message.data}');
-    // Add to in-app store so the user sees it even if the SSE event was missed.
     final type = message.data['type'];
     if (type == 'newBill' || type == 'newPayment') {
       _addToStore(
@@ -203,8 +211,9 @@ class NotificationService {
   // SSE
   // ---------------------------------------------------------------------------
 
-  void _connectSse() {
-    SseService.instance.connect(AppConfig.apiBaseUrl, AppConfig.deviceId);
+  void _connectSse() async {
+    final deviceId = await AppConfig.deviceId;
+    await SseService.instance.connect(AppConfig.apiBaseUrl, deviceId);
     _sseEventsSubscription =
         SseService.instance.events.listen(_handleSseEvent);
   }
