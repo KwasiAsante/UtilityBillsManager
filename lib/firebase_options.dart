@@ -64,7 +64,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '263909690816',
     projectId: 'utilitybills-c942a',
     storageBucket: 'utilitybills-c942a.firebasestorage.app',
-    iosBundleId: 'com.example.utilityBillsManager',
+    iosBundleId: 'com.asante.utilityBillsManager',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -73,7 +73,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '263909690816',
     projectId: 'utilitybills-c942a',
     storageBucket: 'utilitybills-c942a.firebasestorage.app',
-    iosBundleId: 'com.example.utilityBillsManager',
+    iosBundleId: 'com.asante.utilityBillsManager',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
