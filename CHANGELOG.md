@@ -7,6 +7,17 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 ### Added
+- **Settings UI** — `SettingsScreen` landing page accessible from a new `SettingsIconButton` in every tab's `AppBar`. Sub-screens:
+  - `AppConfigScreen` — edit the API base URL; live reachability indicator turns green/red as the URL is typed; validates URL format before saving.
+  - `ServerConfigScreen` — full form for IMAP credentials (address, password, server, port, secure flag), email earliest-date, and sync schedule parameters; loads existing `ServerConfig` on open and writes via `ServerConfigRepository`.
+- **Platform-specific services** — service layer split into conditional imports with `_native`, `_web`, and `_stub` variants so the app compiles on all platforms without `dart:io` / plugin gaps:
+  - `db_factory` (web / native / stub) — calls `initDb()` from `main.dart` to pick the correct `sqflite` factory per platform.
+  - `EmailService` (web / native / stub) — platform-aware IMAP fetch; web variant uses Gmail REST API while native uses `enough_mail`.
+  - `GoogleAccountService` (web / native / stub) — platform-aware Google sign-in; web uses `google_sign_in_web`, native uses `google_sign_in`.
+  - `NotificationService` (native / web / windows variants) — `NotificationServiceBase` abstract class; `NotificationServiceNative` handles FCM + local notifications on Android/iOS/macOS; `NotificationServiceWeb` uses the browser Notifications API; `NotificationServiceWindows` is a no-op stub.
+  - `SseService` (native / web variants) — `SseServiceBase` abstract class; `SseServiceNative` uses `http` streaming; `SseServiceWeb` uses the browser `EventSource` API.
+- **Firebase** — added `firebase_core` and `firebase_auth`; `Firebase.initializeApp` called in `main.dart` with generated `firebase_options.dart`; Android `google-services.json` and Gradle plugin wiring added; Firebase Core/Auth registered in macOS and Windows plugin registrants.
+- `WINDOWS_BUILD_ERROR_SOLUTION.md` — troubleshooting guide for Windows build errors related to notification plugins.
 - `SseService` (`lib/services/notification/sse_service.dart`) — persistent Server-Sent Events client for the `/connect` endpoint. Exposes a broadcast `Stream<SseEvent>`. Reconnects automatically with exponential back-off (5 s base, 60 s cap); a `retry:` field from the server overrides the base delay. Explicit `disconnect()` cancels all reconnect attempts.
 - `NotificationService` (`lib/services/notification/notification_service.dart`) — singleton that orchestrates SSE and Firebase Cloud Messaging (FCM). Initialises `flutter_local_notifications`, requests FCM permission, registers the device token via `NotificationApiService`, and subscribes to `SseService.events`. On each `SseEvent` it shows a local system notification, adds an `AppNotification` to `AppNotificationStore`, and reloads the relevant repository (`BillsRepository` or `PaymentsRepository`). FCM background handler registered as a top-level isolate entry-point.
 - `AppNotificationStore` (`lib/services/notification/app_notification_store.dart`) — in-memory `ChangeNotifier` list of `AppNotification` items. Supports `add`, `markRead`, `markAllRead`, and `clear`.
@@ -23,6 +34,9 @@ All notable changes to this project are documented here.
 - `ServerConfigRepository` (`lib/data/repositories/server_config_repository.dart`) — singleton `ChangeNotifier` repository. Holds a single nullable `ServerConfig?` in memory; `create`/`update`/`delete` call `reload` and `notifyListeners` on success.
 
 ### Changed
+- **Local server removed** — `lib/services/api/local_server.dart` and `local_server_stub.dart` deleted; the app no longer embeds a shelf HTTP server. Server mode is handled by the separate `utility_bills_server` package.
+- `ApiService.baseUrl` default restored to `http://127.0.0.1:8080` (was temporarily `9090`).
+- `main.dart` simplified: Firebase initialization added; local-server start and commented notification scaffolding removed; `initDb()` called for platform DB factory setup.
 - `AppConfig`: default `APP_MODE` changed from `server` to `client`; fallback in `mode` getter now also returns `AppMode.client`.
 - `AddEditPaymentScreen`: switched from `PaymentsHelper` to `PaymentsRepository` for create/update; fixed bill due-date display to use `DateFormat('yyyy-MM-dd')` instead of raw `DateTime.toString()`.
 - `AddEditRentorScreen`: removed unused `_calculateAmountOwed()` method and its "Amount Owed" UI field; removed unused `BillsHelper` and `Payment` imports.
@@ -30,6 +44,8 @@ All notable changes to this project are documented here.
 - `ApiService` (emails): `getEmail` forwards a `query_by_email_id` query parameter to the API.
 
 ### Fixed
+- `SseService`: `catchError` handler now returns a `Response` object, resolving a Dart type-warning about the return type of the error callback.
+- `EmailDataRepository`: `deleteEmailData` and `deleteAllEmailData` now call `sync()` after deletion so the in-memory list stays consistent with the local database.
 - `SummaryScreen._isConsideredPaid`: bills with `PaymentStatus.paid` are now always treated as paid regardless of threshold calculation.
 
 ### Added (prior entries)
