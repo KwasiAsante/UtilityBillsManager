@@ -7,6 +7,13 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 ### Added
+- **Calculate Amount Owed (Rentor form)** — New button on `AddEditRentorScreen` that calculates what the rentor owes for a selected month:
+  - Clicking the button opens a period-selection dialog whose dropdown is limited to year/month combinations that have at least one unpaid or partial bill.
+  - After selecting a period, a breakdown dialog shows the owed amount per bill type, accounting for the rentor's per-type percentage overrides (falling back to `defaultPercentage`), excluded bill types, and payments the rentor has already made toward each bill. If the rentor has paid their full share of a bill, that bill contributes $0.
+  - Confirming the result saves it (in-memory only) to a read-only "Amount Owed" field next to the button, formatted as `"MMMM yyyy – $0.00"`.
+- **Rentors Owed card (Summary screen)** — A collapsible card above the Monthly / By Bill Type tabs shows what each rentor owes toward the current month's unpaid or partial bills. Per-rentor rows list the owed amount broken down by bill type; rentors who have paid their full share show "All settled". The card is hidden while data is loading and shows a placeholder message when there are no unpaid bills for the current month.
+
+### Changed
 - **Settings UI** — `SettingsScreen` landing page accessible from a new `SettingsIconButton` in every tab's `AppBar`. Sub-screens:
   - `AppConfigScreen` — edit the API base URL; live reachability indicator turns green/red as the URL is typed; validates URL format before saving.
   - `ServerConfigScreen` — full form for IMAP credentials (address, password, server, port, secure flag), email earliest-date, and sync schedule parameters; loads existing `ServerConfig` on open and writes via `ServerConfigRepository`.

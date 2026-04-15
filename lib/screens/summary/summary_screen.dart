@@ -555,6 +555,118 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     );
   }
 
+  // ── Rentor Owed (current month) ──────────────────────────────────────────────
+
+  Widget _buildRentorOwedSection() {
+    if (_rentors.isEmpty) return const SizedBox.shrink();
+
+    final now = DateTime.now();
+    final currentMonthBills = _bills
+        .where((b) =>
+            b.dueDate.year == now.year &&
+            b.dueDate.month == now.month &&
+            (b.status == PaymentStatus.unpaid || b.status == PaymentStatus.partial))
+        .toList();
+
+    // rentorId -> billId -> total already paid by that rentor
+    final Map<String, Map<String, double>> rentorPaidPerBill = {};
+    for (final payment in _payments) {
+      if (payment.rentorId != null && payment.billIds != null) {
+        final map = rentorPaidPerBill.putIfAbsent(payment.rentorId!, () => {});
+        for (final billId in payment.billIds!) {
+          map[billId] = (map[billId] ?? 0.0) + payment.amountPaid;
+        }
+      }
+    }
+
+    final monthLabel = DateFormat('MMMM yyyy').format(now);
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: ExpansionTile(
+        initiallyExpanded: true,
+        title: Text(
+          'Rentors Owed – $monthLabel',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        children: [
+          const Divider(height: 1),
+          if (currentMonthBills.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'No unpaid or partial bills for the current month.',
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+            )
+          else
+            ..._rentors.map((rentor) => _buildRentorOwedRow(rentor, currentMonthBills, rentorPaidPerBill)),
+          const SizedBox(height: 4),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRentorOwedRow(
+    Rentor rentor,
+    List<Bill> currentMonthBills,
+    Map<String, Map<String, double>> rentorPaidPerBill,
+  ) {
+    final Map<BillType, double> breakdown = {};
+    for (final bill in currentMonthBills) {
+      if (rentor.excludedBillTypes.contains(bill.type)) continue;
+      final pct = rentor.billPercentages[bill.type] ?? rentor.defaultPercentage;
+      final totalOwed = bill.amount * (pct / 100);
+      final alreadyPaid = rentorPaidPerBill[rentor.rentorId]?[bill.billId] ?? 0.0;
+      final stillOwes = (totalOwed - alreadyPaid).clamp(0.0, double.infinity);
+      if (stillOwes > 0) {
+        breakdown[bill.type] = (breakdown[bill.type] ?? 0.0) + stillOwes;
+      }
+    }
+
+    final total = breakdown.values.fold(0.0, (sum, v) => sum + v);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(rentor.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              total > 0
+                  ? Text('\$${total.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))
+                  : Text('All settled',
+                      style: TextStyle(
+                          color: Colors.green[700],
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500)),
+            ],
+          ),
+          if (breakdown.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            ...breakdown.entries.map((e) => Padding(
+                  padding: const EdgeInsets.only(left: 8, top: 2),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(e.key.name,
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                      Text('\$${e.value.toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                )),
+          ],
+          const Divider(height: 16),
+        ],
+      ),
+    );
+  }
+
   // ── Build ────────────────────────────────────────────────────────────────────
 
   @override
@@ -619,6 +731,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
         children: [
           if (isGoogleSignInEnabled && googleAccountService.buildWebWarningBanner() != null)
             googleAccountService.buildWebWarningBanner()!,
+          if (!_loading) _buildRentorOwedSection(),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())

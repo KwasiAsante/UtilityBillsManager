@@ -6,9 +6,9 @@ A cross-platform Flutter application for tracking utility bills, managing rentor
 
 - **Bill Management** — Create, edit, and delete utility bills (electric, gas, water, internet). Track due dates, amounts, and payment status (paid / partial / unpaid).
 - **Payment Tracking** — Log payments, assign them to specific bills and rentors, and automatically reverse applied amounts when a payment is deleted.
-- **Rentor Management** — Manage rentors, assign them to bills, track how much each owes, and record their last payment date.
+- **Rentor Management** — Manage rentors, assign them to bills, track how much each owes, and record their last payment date. The add/edit form includes a **Calculate Amount Owed** button: select a month from periods that have unpaid or partial bills, and the app shows a per-bill-type breakdown of what the rentor still owes (accounting for their percentage overrides, excluded bill types, and payments already made). The calculated total is saved to a read-only field on the form.
 - **Email Sync (Gmail)** — Sign in with Google to pull bill-related emails from your inbox. Parsed emails are matched to bills and payments automatically.
-- **Summary Screen** — Monthly overview grouped by bill type, with "considered paid" threshold logic (e.g. electric/gas/water ≤ 30% unpaid treated as paid). Toggle visibility of actual unpaid amounts.
+- **Summary Screen** — Monthly overview grouped by bill type, with "considered paid" threshold logic (e.g. electric/gas/water ≤ 30% unpaid treated as paid). Toggle visibility of actual unpaid amounts. A **Rentors Owed** card at the top of the screen shows what each rentor owes toward the current month's unpaid bills, broken down by bill type.
 - **Export** — Export summaries as CSV or PDF, including per-bill rentor contributions.
 - **Real-time Notifications** — Server-Sent Events (SSE) connection to the companion server pushes `newBill` / `newPayment` events instantly. Firebase Cloud Messaging (FCM) handles push notifications when the app is backgrounded. In-app notification bell with unread badge and slide-in panel.
 - **Settings** — In-app settings accessible from every screen via a gear icon. `AppConfigScreen` lets you update the API base URL with a live reachability indicator. `ServerConfigScreen` lets you update IMAP credentials and email sync scheduling parameters directly from the app.

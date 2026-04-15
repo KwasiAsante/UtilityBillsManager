@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/models/bill.dart';
+import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
+import '../../data/repositories/bills_repository.dart';
+import '../../data/repositories/payments_repository.dart';
 import '../../data/repositories/rentors_repository.dart';
 
 /// Form screen for creating a new rentor or editing an existing one.
@@ -33,10 +36,13 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
   final Map<BillType, TextEditingController> _billPercentageControllers = {};
 
   final RentorsRepository _rentorsRepository = RentorsRepository();
+  final BillsRepository _billsRepository = BillsRepository();
+  final PaymentsRepository _paymentsRepository = PaymentsRepository();
 
   DateTime? _lastPaymentDate;
   late List<BillType> _selectedBillTypes;
   late List<BillType> _excludedBillTypes;
+  final _amountOwedController = TextEditingController();
 
   @override
   void initState() {
@@ -73,6 +79,7 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     _phoneController.dispose();
     _percentageController.dispose();
     _lastPaymentDateController.dispose();
+    _amountOwedController.dispose();
     for (var controller in _billPercentageControllers.values) {
       controller.dispose();
     }
@@ -92,6 +99,98 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
       setState(() {
         _lastPaymentDate = picked;
         _lastPaymentDateController.text = DateFormat('yyyy-MM-dd').format(picked);
+      });
+    }
+  }
+
+  double _getPercentageForBillType(BillType type) {
+    final controller = _billPercentageControllers[type];
+    if (controller != null && controller.text.trim().isNotEmpty) {
+      return double.tryParse(controller.text.trim()) ?? 0.0;
+    }
+    return double.tryParse(_percentageController.text.trim()) ?? 0.0;
+  }
+
+  Future<void> _showCalculateAmountOwedDialog() async {
+    if (_billsRepository.bills.isEmpty) {
+      await _billsRepository.reload();
+    }
+    if (_paymentsRepository.payments.isEmpty) {
+      await _paymentsRepository.reload();
+    }
+
+    final eligibleBills = _billsRepository.bills
+        .where((b) => b.status == PaymentStatus.unpaid || b.status == PaymentStatus.partial)
+        .toList();
+
+    if (eligibleBills.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No unpaid or partial bills found')),
+        );
+      }
+      return;
+    }
+
+    final Set<DateTime> periodSet = {};
+    for (final bill in eligibleBills) {
+      periodSet.add(DateTime(bill.dueDate.year, bill.dueDate.month));
+    }
+    final sortedPeriods = periodSet.toList()..sort((a, b) => a.compareTo(b));
+
+    if (!mounted) return;
+
+    final selectedPeriod = await showDialog<DateTime>(
+      context: context,
+      builder: (context) => _MonthYearSelectionDialog(periods: sortedPeriods),
+    );
+
+    if (selectedPeriod == null || !mounted) return;
+
+    final periodBills = eligibleBills
+        .where((b) => b.dueDate.year == selectedPeriod.year && b.dueDate.month == selectedPeriod.month)
+        .toList();
+
+    // Sum payments already made by this rentor, keyed by billId.
+    final rentorId = widget.rentor?.rentorId;
+    final Map<String, double> rentorPaidPerBill = {};
+    if (rentorId != null) {
+      for (final payment in _paymentsRepository.payments) {
+        if (payment.rentorId == rentorId && payment.billIds != null) {
+          for (final billId in payment.billIds!) {
+            rentorPaidPerBill[billId] = (rentorPaidPerBill[billId] ?? 0.0) + payment.amountPaid;
+          }
+        }
+      }
+    }
+
+    final Map<BillType, double> breakdown = {};
+    for (final bill in periodBills) {
+      if (_excludedBillTypes.contains(bill.type)) continue;
+      final percentage = _getPercentageForBillType(bill.type);
+      final totalOwed = bill.amount * (percentage / 100);
+      final alreadyPaid = rentorPaidPerBill[bill.billId] ?? 0.0;
+      final stillOwes = (totalOwed - alreadyPaid).clamp(0.0, double.infinity);
+      if (stillOwes > 0) {
+        breakdown[bill.type] = (breakdown[bill.type] ?? 0.0) + stillOwes;
+      }
+    }
+
+    if (!mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => _AmountOwedResultDialog(
+        period: selectedPeriod,
+        breakdown: breakdown,
+      ),
+    );
+
+    if (confirmed == true) {
+      final total = breakdown.values.fold(0.0, (sum, v) => sum + v);
+      final periodLabel = DateFormat('MMMM yyyy').format(selectedPeriod);
+      setState(() {
+        _amountOwedController.text = '$periodLabel – \$${total.toStringAsFixed(2)}';
       });
     }
   }
@@ -321,6 +420,31 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
                           ),
                         ),
                       ),
+                      const SizedBox(height: 20),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _showCalculateAmountOwedDialog,
+                            icon: const Icon(Icons.calculate),
+                            label: const Text('Calculate Amount Owed'),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _amountOwedController,
+                              readOnly: true,
+                              decoration: InputDecoration(
+                                labelText: 'Amount Owed',
+                                hintText: '—',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -334,6 +458,115 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MonthYearSelectionDialog extends StatefulWidget {
+  final List<DateTime> periods;
+
+  const _MonthYearSelectionDialog({required this.periods});
+
+  @override
+  State<_MonthYearSelectionDialog> createState() => _MonthYearSelectionDialogState();
+}
+
+class _MonthYearSelectionDialogState extends State<_MonthYearSelectionDialog> {
+  late DateTime _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.periods.first;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Select Period'),
+      content: DropdownButton<DateTime>(
+        value: _selected,
+        isExpanded: true,
+        items: widget.periods.map((period) {
+          final label = DateFormat('MMMM yyyy').format(period);
+          return DropdownMenuItem(value: period, child: Text(label));
+        }).toList(),
+        onChanged: (value) {
+          if (value != null) setState(() => _selected = value);
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _selected),
+          child: const Text('Next'),
+        ),
+      ],
+    );
+  }
+}
+
+class _AmountOwedResultDialog extends StatelessWidget {
+  final DateTime period;
+  final Map<BillType, double> breakdown;
+
+  const _AmountOwedResultDialog({
+    required this.period,
+    required this.breakdown,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final total = breakdown.values.fold(0.0, (sum, v) => sum + v);
+    final periodLabel = DateFormat('MMMM yyyy').format(period);
+
+    return AlertDialog(
+      title: Text('Amount Owed – $periodLabel'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (breakdown.isEmpty)
+              const Text('No applicable bills for this period.')
+            else
+              ...breakdown.entries.map((entry) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(entry.key.name),
+                        Text('\$${entry.value.toStringAsFixed(2)}'),
+                      ],
+                    ),
+                  )),
+            const Divider(),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  '\$${total.toStringAsFixed(2)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: const Text('OK'),
+        ),
+      ],
     );
   }
 }
