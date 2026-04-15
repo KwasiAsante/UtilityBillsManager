@@ -15,7 +15,7 @@ class ServerConfiguration {
   /// the SharedPreferences instance.
   ///
   /// Call this once during startup (before reading any config).
-  static Future<void> init({String? assetPath}) async {
+  static Future<void> init({String? assetPath = "assets/config/local_secrets.json"}) async {
     await Future.wait([
       _loadServerConfig(assetPath: assetPath),
       Preferences.sharedPrefs,

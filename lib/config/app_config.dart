@@ -56,6 +56,8 @@ class AppConfig {
     await Preferences.setString('APP_MODE', newMode.name);
   }
 
+  static const String _defaultApiBaseUrl = 'http://192.168.2.172:8080';
+
   /// Base URL used by the app when it needs to call the API.
   ///
   /// - Server mode: defaults to localhost (self-hosted API)
@@ -70,10 +72,12 @@ class AppConfig {
       return apiUrl;
     }
 
-    return const String.fromEnvironment(
+    String url = const String.fromEnvironment(
       'API_BASE_URL',
-      defaultValue: 'http://127.0.0.1:8080',
+      defaultValue: _defaultApiBaseUrl,
     );
+
+    return url;
   }
   static Future<void> setApiBaseUrl(String newUrl) async {
     await Preferences.setString('API_BASE_URL', newUrl);
