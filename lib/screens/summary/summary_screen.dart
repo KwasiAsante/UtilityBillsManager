@@ -1,7 +1,5 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:utility_bills_manager/utils/app_logger.dart';
 
 import '../../data/repositories/email_data_repository.dart';
 import '../base/google_sign_in_screen_state.dart';
@@ -208,25 +206,12 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     setState(() => _loading = true);
 
     if (syncEmails) {
-      if (kIsWeb) {
-        if (isGoogleSignInEnabled && !googleAccountService.isAuthorized) {
-          AppLogger().w('Unable to sync emails on web server without Google Sign-In authorization');
-          return;
-        }
-        else if (!isGoogleSignInEnabled) {
-          AppLogger().w('Syncing emails on web platform without Google Sign-In. Google Account implementation is being handled on the server');
-        }
-
-      } else {
-        AppLogger().i('Syncing emails');
+      if (shouldAbortWebSync('bills and payments')) {
+        setState(() => _loading = false);
+        return;
       }
 
-      await _emailDataHelper.syncBillEmails(
-        earliestEmailDate: earliestEmailDate,
-        maxEmails: maxEmails,
-      );
-
-      await _emailDataHelper.syncPaymentEmails(
+      await _emailDataHelper.syncEmails(
         earliestEmailDate: earliestEmailDate,
         maxEmails: maxEmails,
       );
@@ -612,17 +597,11 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     List<Bill> currentMonthBills,
     Map<String, Map<String, double>> rentorPaidPerBill,
   ) {
-    final Map<BillType, double> breakdown = {};
-    for (final bill in currentMonthBills) {
-      if (rentor.excludedBillTypes.contains(bill.type)) continue;
-      final pct = rentor.billPercentages[bill.type] ?? rentor.defaultPercentage;
-      final totalOwed = bill.amount * (pct / 100);
-      final alreadyPaid = rentorPaidPerBill[rentor.rentorId]?[bill.billId] ?? 0.0;
-      final stillOwes = (totalOwed - alreadyPaid).clamp(0.0, double.infinity);
-      if (stillOwes > 0) {
-        breakdown[bill.type] = (breakdown[bill.type] ?? 0.0) + stillOwes;
-      }
-    }
+    final alreadyPaidForRentor = rentorPaidPerBill[rentor.rentorId] ?? {};
+    final breakdown = rentor.calculateOwedBreakdown(
+      bills: currentMonthBills,
+      alreadyPaidPerBill: alreadyPaidForRentor,
+    );
 
     final total = breakdown.values.fold(0.0, (sum, v) => sum + v);
 

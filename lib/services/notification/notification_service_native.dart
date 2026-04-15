@@ -19,7 +19,12 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 const _androidChannelId = 'utility_bills_notifications';
 const _androidChannelName = 'Utility Bills';
 
-/// Concrete [NotificationServiceBase] for Android, iOS, macOS, Windows, Linux.
+/// Concrete [NotificationServiceBase] for Android, iOS, and macOS.
+///
+/// This file is also the fallback for Windows and Linux when
+/// `--dart-define=BUILD_TARGET=windows` is not passed at build time.
+/// Both of those platforms skip local-notification and FCM init to avoid
+/// crashes — only SSE runs on them via this file.
 class NotificationService extends NotificationServiceBase {
   static final NotificationService _instance =
   NotificationService._internal();
@@ -39,8 +44,19 @@ class NotificationService extends NotificationServiceBase {
     if (AppConfig.mode == AppMode.server) return;
     initialized = true;
 
-    await _initLocalNotifications();
-    await _initFcm();
+    // Windows and Linux skip local-notification and FCM init:
+    // - Windows: flutter_local_notifications_windows is a separate package
+    //   handled by notification_service_windows.dart. If this file is reached
+    //   on Windows (missing --dart-define=BUILD_TARGET=windows), initialising
+    //   the wrong plugin would crash.
+    // - Linux: no Firebase config and no notification daemon is guaranteed.
+    // SSE still connects on both platforms.
+    final isDesktopFallback = defaultTargetPlatform == TargetPlatform.linux ||
+        defaultTargetPlatform == TargetPlatform.windows;
+    if (!isDesktopFallback) {
+      await _initLocalNotifications();
+      await _initFcm();
+    }
     await connectSse(AppConfig.apiBaseUrl, await AppConfig.deviceId);
   }
 
@@ -83,6 +99,13 @@ class NotificationService extends NotificationServiceBase {
     required String title,
     required String body,
   }) async {
+    if (defaultTargetPlatform == TargetPlatform.linux ||
+        defaultTargetPlatform == TargetPlatform.windows) {
+      // Local notifications are skipped on Windows/Linux (no init was performed).
+      AppLogger().d('[LocalNotifications] Skipped on ${defaultTargetPlatform.name}: $title');
+      return;
+    }
+
     await _localNotifications.show(
       id: DateTime.now().millisecondsSinceEpoch & 0x7FFFFFFF,
       title: title,

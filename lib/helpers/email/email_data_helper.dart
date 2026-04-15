@@ -282,7 +282,7 @@ class EmailDataHelper {
               bill = billResult.isSuccess ? billResult.data : null;
             }
 
-            if (bill != null) {
+            if (bill == null) {
               bill = await BillsParser.parseEmailToBill(message);
               if (bill != null) {
                 AppLogger().d(

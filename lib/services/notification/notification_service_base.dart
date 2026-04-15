@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_notification_store.dart';
@@ -14,8 +15,8 @@ import '../../utils/app_logger.dart';
 abstract class NotificationServiceBase {
   final uuid = const Uuid();
 
-  StreamSubscription<SseEvent>? sseEventsSubscription;
-  bool initialized = false;
+  @protected StreamSubscription<SseEvent>? sseEventsSubscription;
+  @protected bool initialized = false;
 
   // ---------------------------------------------------------------------------
   // Public lifecycle

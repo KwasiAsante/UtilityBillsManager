@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:263909690816:android:2ca8f9500c1846c5edcc25",
+        "mobilesdk_app_id": "1:263909690816:android:17cd340b18c5a1fbedcc25",
         "android_client_info": {
-          "package_name": "com.example.utility_bills_manager"
+          "package_name": "com.asante.utility_bills_manager"
         }
       },
       "oauth_client": [],

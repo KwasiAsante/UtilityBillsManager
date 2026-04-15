@@ -17,8 +17,9 @@ import '../../utils/comparable_utils.dart';
 /// - An [excludedBillTypes] list for bill types the rentor never pays.
 /// - A [lastPaymentDate] that is updated whenever a new [Payment] is recorded.
 ///
-/// Amount calculations are available via [owedAmount], [totalOwed], and the
-/// static helpers [calculateOwedAmount] / [calculateTotalOwed].
+/// Amount calculations are available via [owedAmount] and the static helper
+/// [calculateOwedAmount]. For payment-aware breakdowns use [calculateOwedBreakdown]
+/// from [RentorExtensions].
 class Rentor {
   final int? id;
   final String rentorId;
@@ -178,28 +179,15 @@ class Rentor {
   /// that would override the user's explicit zero assignment).  The result is
   /// rounded to the nearest whole dollar.
   static double calculateOwedAmount(Rentor rentor, Bill bill) {
+    if (rentor.excludedBillTypes.contains(bill.type)) return 0.0;
     double? customPercentage = rentor.billPercentages[bill.type];
-    double percentage = customPercentage ?? 0.0;
+    double percentage = customPercentage ?? rentor.defaultPercentage;
     return (bill.amount * (percentage / 100)).round().toDouble();
-  }
-
-  /// Sums [calculateOwedAmount] across all [bills] for [rentor].
-  static double calculateTotalOwed(Rentor rentor, List<Bill> bills) {
-    double total = 0;
-    for (var bill in bills) {
-      total += calculateOwedAmount(rentor, bill);
-    }
-    return total;
   }
 
   /// Convenience instance wrapper for [calculateOwedAmount].
   double owedAmount(Bill bill) {
     return calculateOwedAmount(this, bill);
-  }
-
-  /// Convenience instance wrapper for [calculateTotalOwed].
-  double totalOwed(List<Bill> bills) {
-    return calculateTotalOwed(this, bills);
   }
 
   /// Updates [lastPaymentDate] to the most recent payment date in [payments].
@@ -239,10 +227,33 @@ class Rentor {
 
 /// Additional computed helpers for [Rentor] that rely on bill fold operations.
 extension RentorExtensions on Rentor {
-  /// Returns the total amount owed by this rentor across all [bills], computed
-  /// by summing [Rentor.calculateOwedAmount] for each bill via a fold.
-  double getAmountOwed(List<Bill> bills) {
-    return bills.fold(0.0, (total, bill) =>
-      total + Rentor.calculateOwedAmount(this, bill));
+  /// Computes the remaining-owed breakdown by [BillType] for [bills], after
+  /// subtracting [alreadyPaidPerBill] (a map from bill ID to the amount already
+  /// paid by this rentor toward that bill).
+  ///
+  /// Bill types in [excludedBillTypes] are skipped. Pass [percentageForType] to
+  /// override the percentage lookup (e.g. to use live form-controller values);
+  /// otherwise [billPercentages] is used with [defaultPercentage] as fallback.
+  ///
+  /// Only entries where the remaining amount is greater than zero are included.
+  Map<BillType, double> calculateOwedBreakdown({
+    required List<Bill> bills,
+    required Map<String, double> alreadyPaidPerBill,
+    double Function(BillType)? percentageForType,
+  }) {
+    final breakdown = <BillType, double>{};
+    for (final bill in bills) {
+      if (excludedBillTypes.contains(bill.type)) continue;
+      final pct = percentageForType != null
+          ? percentageForType(bill.type)
+          : (billPercentages[bill.type] ?? defaultPercentage);
+      final totalOwed = bill.amount * (pct / 100);
+      final alreadyPaid = alreadyPaidPerBill[bill.billId] ?? 0.0;
+      final stillOwes = (totalOwed - alreadyPaid).clamp(0.0, double.infinity);
+      if (stillOwes > 0) {
+        breakdown[bill.type] = (breakdown[bill.type] ?? 0.0) + stillOwes;
+      }
+    }
+    return breakdown;
   }
 }

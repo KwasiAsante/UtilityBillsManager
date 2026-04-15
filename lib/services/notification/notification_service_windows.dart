@@ -40,7 +40,7 @@ class NotificationService extends NotificationServiceBase {
     const initSettings = InitializationSettings(
       windows: WindowsInitializationSettings(
         appName: 'Utility Bills Manager',
-        appUserModelId: 'com.example.UtilityBillsManager',
+        appUserModelId: 'com.asante.UtilityBillsManager',
         guid: 'a3f1d2c4-8b7e-4f6a-9c2d-1e5b0a3f8d7c',
       ),
     );

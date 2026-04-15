@@ -152,6 +152,8 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
         .toList();
 
     // Sum payments already made by this rentor, keyed by billId.
+    // For a new rentor (widget.rentor == null), rentorId is null so no payments
+    // are subtracted — correct, since a new rentor has no payment history yet.
     final rentorId = widget.rentor?.rentorId;
     final Map<String, double> rentorPaidPerBill = {};
     if (rentorId != null) {
@@ -164,17 +166,23 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
       }
     }
 
-    final Map<BillType, double> breakdown = {};
-    for (final bill in periodBills) {
-      if (_excludedBillTypes.contains(bill.type)) continue;
-      final percentage = _getPercentageForBillType(bill.type);
-      final totalOwed = bill.amount * (percentage / 100);
-      final alreadyPaid = rentorPaidPerBill[bill.billId] ?? 0.0;
-      final stillOwes = (totalOwed - alreadyPaid).clamp(0.0, double.infinity);
-      if (stillOwes > 0) {
-        breakdown[bill.type] = (breakdown[bill.type] ?? 0.0) + stillOwes;
-      }
-    }
+    // A minimal Rentor is constructed to call calculateOwedBreakdown.
+    // percentageForType is always supplied here (live form values), so
+    // billPercentages and defaultPercentage on this object are never consulted
+    // inside the extension method — only excludedBillTypes matters.
+    // If percentageForType were ever omitted, defaultPercentage: 0.0 would
+    // silently produce incorrect results.
+    final tempRentor = Rentor(
+      name: '',
+      defaultPercentage: double.tryParse(_percentageController.text.trim()) ?? 0.0,
+      billPercentages: const {},
+      excludedBillTypes: _excludedBillTypes,
+    );
+    final breakdown = tempRentor.calculateOwedBreakdown(
+      bills: periodBills,
+      alreadyPaidPerBill: rentorPaidPerBill,
+      percentageForType: _getPercentageForBillType,
+    );
 
     if (!mounted) return;
 

@@ -1,6 +1,5 @@
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -158,17 +157,9 @@ class _PaymentListScreenState
     });
 
     if (syncEmails) {
-      if (kIsWeb) {
-        if (isGoogleSignInEnabled && !googleAccountService.isAuthorized) {
-          AppLogger().w('Unable to sync payments on web server without Google Sign-In authorization');
-          return;
-        }
-        else if (!isGoogleSignInEnabled) {
-          AppLogger().w('Syncing payments on web platform without Google Sign-In. Google Account implementation is being handled on the server');
-        }
-
-      } else {
-        AppLogger().i('Syncing payments');
+      if (shouldAbortWebSync('payments')) {
+        setState(() => _loading = false);
+        return;
       }
 
       await _emailDataHelper.syncPaymentEmails(

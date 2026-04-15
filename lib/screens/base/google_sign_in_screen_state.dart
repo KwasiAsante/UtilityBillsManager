@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../config/app_config.dart';
 import '../../services/google/google_account_service_native.dart';
+import '../../utils/app_logger.dart';
 
 /// Abstract base [State] that encapsulates Google sign-in lifecycle logic.
 ///
@@ -103,6 +104,36 @@ abstract class GoogleSignInScreenState<T extends StatefulWidget>
     final canSync =
         googleAccountService.isAuthenticated && googleAccountService.isSignedIn;
     await onGoogleSignedIn(canSync: canSync);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sync guard
+  // ---------------------------------------------------------------------------
+
+  /// Checks whether a web email sync should be aborted due to missing Google
+  /// Sign-In authorization. Also emits the appropriate log message for each
+  /// platform path.
+  ///
+  /// Returns `true` when the caller should abort (and reset its loading state).
+  /// [entityName] is used in log messages (e.g. `'bills'`, `'payments'`).
+  @protected
+  bool shouldAbortWebSync(String entityName) {
+    if (kIsWeb) {
+      if (isGoogleSignInEnabled && !googleAccountService.isAuthorized) {
+        AppLogger().w(
+          'Unable to sync $entityName on web server without Google Sign-In authorization',
+        );
+        return true;
+      } else if (!isGoogleSignInEnabled) {
+        AppLogger().w(
+          'Syncing $entityName on web platform without Google Sign-In. '
+          'Google Account implementation is being handled on the server',
+        );
+      }
+    } else {
+      AppLogger().i('Syncing $entityName');
+    }
+    return false;
   }
 
   // ---------------------------------------------------------------------------

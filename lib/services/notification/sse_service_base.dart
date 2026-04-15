@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+
 import '../../data/models/sse_event.dart';
 import '../../utils/app_logger.dart';
 
@@ -20,20 +22,20 @@ abstract class SseServiceBase {
   // Internals
   // ---------------------------------------------------------------------------
 
-  final eventController = StreamController<SseEvent>.broadcast();
+  @protected final eventController = StreamController<SseEvent>.broadcast();
 
-  SseState state = SseState.idle;
+  @protected SseState state = SseState.idle;
 
   /// Reconnect config — base delay may be overridden by server's `retry:` field.
-  int baseDelayMs = 5000;
-  int attempt = 0;
+  @protected int baseDelayMs = 5000;
+  @protected int attempt = 0;
   static const int maxDelayMs = 60000;
 
-  Timer? reconnectTimer;
+  @protected Timer? reconnectTimer;
 
   /// Stored after first [connect] so [scheduleReconnect] never needs parameters.
-  String? serverUrl;
-  String? deviceId;
+  @protected String? serverUrl;
+  @protected String? deviceId;
 
   // ---------------------------------------------------------------------------
   // Public API

@@ -102,14 +102,19 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
         emailImapPort: int.parse(_imapPortController.text.trim()),
         emailImapSecure: _imapSecure,
         emailEarliestDate: _earliestDate,
-        emailSyncDelayDuration: Duration(seconds: int.parse(_syncDelayController.text.trim())),
-        emailSyncInterval: Duration(seconds: int.parse(_syncIntervalController.text.trim())),
+        emailSyncDelayDuration: Duration(
+          seconds: int.parse(_syncDelayController.text.trim()),
+        ),
+        emailSyncInterval: Duration(
+          seconds: int.parse(_syncIntervalController.text.trim()),
+        ),
       );
 
-      if (_configRepo.config == null || (_configRepo.config!.configId == null || _configRepo.config!.configId!.isEmpty)) {
+      if (_configRepo.config == null ||
+          (_configRepo.config!.configId == null ||
+              _configRepo.config!.configId!.isEmpty)) {
         await _configRepo.create(config);
-      }
-      else {
+      } else {
         await _configRepo.update(config);
       }
 
@@ -129,7 +134,11 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
     }
   }
 
-  String? _validateInt(String? value, String fieldName) {
+  String? _validateInt(
+    String? value,
+    String fieldName, {
+    bool allowZero = false,
+  }) {
     if (value == null || value.trim().isEmpty) {
       return '$fieldName is required';
     }
@@ -137,14 +146,11 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
     if (parsed == null) {
       return '$fieldName must be a whole number';
     }
-    if (fieldName == "Sync Delay") {
-      if (parsed < 0) {
-        return '$fieldName cannot be negative';
-      }
-    } else {
-      if (parsed <= 0) {
-        return '$fieldName must be greater than zero or ';
-      }
+
+    if (allowZero && parsed < 0) {
+      return '$fieldName cannot be negative';
+    } else if (!allowZero && parsed <= 0) {
+      return '$fieldName must be greater than zero';
     }
     return null;
   }
@@ -303,7 +309,7 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
                           hintText: '30',
                         ),
                         keyboardType: TextInputType.number,
-                        validator: (v) => _validateInt(v, 'Sync Delay'),
+                        validator: (v) => _validateInt(v, 'Sync Delay', allowZero: true),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(

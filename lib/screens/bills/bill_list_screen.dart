@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-import '../../utils/app_logger.dart';
 import 'add_edit_bill_screen.dart';
 import '../../config/app_config.dart';
 import '../../config/server_configuration.dart';
@@ -153,17 +152,9 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
     setState(() => _loading = true);
 
     if (syncEmails) {
-      if (kIsWeb) {
-        if (isGoogleSignInEnabled && !googleAccountService.isAuthorized) {
-          AppLogger().w('Unable to sync bills on web server without Google Sign-In authorization');
-          return;
-        }
-        else if (!isGoogleSignInEnabled) {
-          AppLogger().w('Syncing bills on web platform without Google Sign-In. Google Account implementation is being handled on the server');
-        }
-
-      } else {
-        AppLogger().i('Syncing bills');
+      if (shouldAbortWebSync('bills')) {
+        setState(() => _loading = false);
+        return;
       }
 
       await _emailDataHelper.syncBillEmails(

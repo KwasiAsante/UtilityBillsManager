@@ -400,6 +400,8 @@ class BillsHelper {
     double billAmountPaid = bill.amountPaid ?? 0.0;
     double amountPaidTowardsBill = amountPaid;
     if (rentor != null) {
+      // owedAmount returns 0.0 for excluded bill types (intentional — a rentor
+      // should not have payments applied to bills they are excluded from paying).
       final owedAmount = rentor.owedAmount(bill);
       if (owedAmount <= 0) {
         AppLogger().d(
