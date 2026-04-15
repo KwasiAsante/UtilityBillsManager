@@ -19,7 +19,7 @@ A cross-platform Flutter application for tracking utility bills, managing rentor
 
 ```
 lib/
-├── config/         # AppConfig (dart-define + local_secrets.json)
+├── config/         # AppConfig (dart-define + encrypted local_secrets.json)
 ├── data/
 │   ├── models/     # Bill, Payment, Rentor, EmailData, ServerConfig, AppState
 │   └── repositories/ # ChangeNotifier singletons (Bills, Payments, Rentors, EmailData, ServerConfig)
@@ -54,7 +54,9 @@ The app runs exclusively in **client mode**, talking to a companion Dart shelf s
 
 The app reads secrets from `assets/config/local_secrets.json` (highest priority), `--dart-define` flags, or falls back to safe defaults.
 
-Create `assets/config/local_secrets.json` (keep out of version control):
+#### Secrets file (first-time setup)
+
+Create `assets/config/local_secrets.json` with your plaintext values:
 
 ```json
 {
@@ -62,19 +64,78 @@ Create `assets/config/local_secrets.json` (keep out of version control):
   "EMAIL_PASSWORD": "your-app-password",
   "EMAIL_IMAP_SERVER": "imap.gmail.com",
   "EMAIL_IMAP_PORT": 993,
-  "EMAIL_IMAP_SECURE": true,
-  "EMAIL_EARLIEST_DATE": "2024-01-01"
+  "EMAIL_IMAP_SECURE": true
 }
 ```
 
-Alternatively, pass values at build time:
+`local_secrets.json` is in `.gitignore` — it is never committed.
+
+#### Encrypting the secrets
+
+String values are encrypted at rest using AES-256-GCM. You need a 32-character key. Choose one and keep it safe (e.g. in a password manager).
+
+Run the encryption script once from the project root:
 
 ```sh
-flutter run \
-  --dart-define=EMAIL_ADDRESS=you@example.com \
-  --dart-define=EMAIL_PASSWORD=your-app-password \
-  --dart-define=API_BASE_URL=http://127.0.0.1:8080
+dart run scripts/encrypt_secrets.dart --key=<your-32-char-key>
 ```
+
+This overwrites `local_secrets.json` in place. String values become `enc:...` tokens; int/bool fields are left as-is. Re-running the script is safe — already-encrypted values are skipped.
+
+After encrypting, pass the key at every build and run via `--dart-define=SECRETS_KEY=<your-32-char-key>`.
+
+#### Platform build commands
+
+```sh
+# Android (debug — install directly on device)
+flutter run --dart-define=SECRETS_KEY=<key>
+
+# Android (release APK)
+flutter build apk --dart-define=SECRETS_KEY=<key>
+
+# Android (Play Store bundle)
+flutter build appbundle --dart-define=SECRETS_KEY=<key>
+
+# Web
+flutter build web --dart-define=SECRETS_KEY=<key>
+
+# Windows
+flutter build windows \
+  --dart-define=BUILD_TARGET=windows \
+  --dart-define=SECRETS_KEY=<key>
+```
+
+The `--dart-define=BUILD_TARGET=windows` flag is required on Windows to select the correct notification service (`notification_service_windows.dart` uses `flutter_local_notifications_windows`; omitting it silently falls back to the native service which skips notifications on Windows).
+
+#### Android release signing
+
+A keystore is required for release builds. The file `android/upload-keystore.jks` should exist locally (not in git). `android/key.properties` (also gitignored) must point to it:
+
+```properties
+storePassword=<keystore-password>
+keyPassword=<key-password>
+keyAlias=upload
+storeFile=../upload-keystore.jks
+```
+
+To generate a new keystore:
+
+```sh
+keytool -genkey -v \
+  -keystore android/upload-keystore.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -alias upload
+```
+
+#### VS Code
+
+`.vscode/launch.json` contains pre-configured run targets for Web (Chrome) and Windows. Update the `SECRETS_KEY` value in both args arrays to match your key if you regenerate it.
+
+#### Firebase
+
+- **Android** — `android/app/google-services.json` must be present (download from Firebase Console → Project settings → Android app).
+- **iOS / macOS** — `ios/Runner/GoogleService-Info.plist` and `macos/Runner/GoogleService-Info.plist` must be present (download from Firebase Console → iOS/macOS app).
+- **Linux** — Firebase is skipped at startup; SSE still works.
 
 ### Running
 
@@ -82,11 +143,8 @@ flutter run \
 # Install dependencies
 flutter pub get
 
-# Run (debug)
-flutter run
-
-# Build for web
-flutter build web
+# Run on a connected device / emulator (add --dart-define flags as above)
+flutter run --dart-define=SECRETS_KEY=<key>
 ```
 
 ## Key Dependencies
@@ -104,6 +162,7 @@ flutter build web
 | `firebase_core` / `firebase_auth` | Firebase initialization and authentication |
 | `firebase_messaging` | FCM push notifications (Android, iOS, macOS, Web) |
 | `uuid` | Unique IDs for `AppNotification` instances |
+| `cryptography` | AES-256-GCM encryption/decryption for `local_secrets.json` values |
 
 ## License
 

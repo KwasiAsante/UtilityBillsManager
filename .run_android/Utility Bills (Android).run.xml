@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Utility Bills (Android)" type="FlutterRunConfigurationType" factoryName="Flutter">
-    <option name="additionalArgs" value="-d emulator-5554 --dart-define=BUILD_TARGET=android" />
+    <option name="additionalArgs" value="-d emulator-5554 --dart-define=BUILD_TARGET=android --dart-define=SECRETS_KEY=IC8G7b8XMItFt42/WLZj45Lejbd0wm5k" />
     <option name="filePath" value="$PROJECT_DIR$/lib/main.dart" />
     <method v="2" />
   </configuration>

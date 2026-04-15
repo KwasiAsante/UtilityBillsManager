@@ -10,9 +10,21 @@
             "type": "dart",
             "program": "lib/main.dart",
             "args": [
-                "--web-port=55365"
+                "--web-port=55365",
+                "--dart-define=SECRETS_KEY=IC8G7b8XMItFt42/WLZj45Lejbd0wm5k"
             ],
             "deviceId": "chrome"
+        },
+        {
+            "name": "Flutter Windows",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "--dart-define=BUILD_TARGET=windows",
+                "--dart-define=SECRETS_KEY=IC8G7b8XMItFt42/WLZj45Lejbd0wm5k"
+            ],
+            "deviceId": "windows"
         }
     ]
 }

@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Utility Bills (iOS)" type="FlutterRunConfigurationType" factoryName="Flutter">
-    <option name="additionalArgs" value="-d ios --dart-define=BUILD_TARGET=ios" />
+    <option name="additionalArgs" value="-d ios --dart-define=BUILD_TARGET=ios --dart-define=SECRETS_KEY=IC8G7b8XMItFt42/WLZj45Lejbd0wm5k" />
     <option name="filePath" value="$PROJECT_DIR$/lib/main.dart" />
     <method v="2" />
   </configuration>
