@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:utility_bills_manager/utils/app_logger.dart';
 
 import '../../data/repositories/email_data_repository.dart';
 import '../base/google_sign_in_screen_state.dart';
@@ -206,13 +207,26 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
   }) async {
     setState(() => _loading = true);
 
-    if (syncEmails && (!kIsWeb || (isGoogleSignInEnabled && googleAccountService.isAuthorized))) {
-      await _emailDataHelper.fetchBillEmails(
+    if (syncEmails) {
+      if (kIsWeb) {
+        if (isGoogleSignInEnabled && !googleAccountService.isAuthorized) {
+          AppLogger().w('Unable to sync emails on web server without Google Sign-In authorization');
+          return;
+        }
+        else if (!isGoogleSignInEnabled) {
+          AppLogger().w('Syncing emails on web platform without Google Sign-In. Google Account implementation is being handled on the server');
+        }
+
+      } else {
+        AppLogger().i('Syncing emails');
+      }
+
+      await _emailDataHelper.syncBillEmails(
         earliestEmailDate: earliestEmailDate,
         maxEmails: maxEmails,
       );
 
-      await _emailDataHelper.fetchPaymentEmails(
+      await _emailDataHelper.syncPaymentEmails(
         earliestEmailDate: earliestEmailDate,
         maxEmails: maxEmails,
       );

@@ -826,7 +826,7 @@ class EmailDataApiService {
   /// Returns `{'bills': [...], 'payments': [...]}` on success.
   /// Returns `null` when the server responds with HTTP 409 (sync already in
   /// progress).
-  Future<Map<String, List<EmailData>>?> getSyncedEmailData({
+  Future<Map<String, dynamic>?> getSyncedEmail({
     int maxEmails = 50,
     DateTime? earliestEmailDate,
   }) async {
@@ -845,11 +845,11 @@ class EmailDataApiService {
         return {
           'bills': (json['bills'] as List<dynamic>? ?? [])
               .whereType<Map<String, dynamic>>()
-              .map((e) => EmailData.fromJson(e))
+              .map((e) => Bill.fromJson(e))
               .toList(),
           'payments': (json['payments'] as List<dynamic>? ?? [])
               .whereType<Map<String, dynamic>>()
-              .map((e) => EmailData.fromJson(e))
+              .map((e) => Payment.fromJson(e))
               .toList(),
         };
       } else if (response.statusCode == 409) {

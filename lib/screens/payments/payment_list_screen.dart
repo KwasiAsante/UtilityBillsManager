@@ -9,6 +9,7 @@ import '../../data/models/payment.dart';
 import '../../data/repositories/payments_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
+import '../../utils/app_logger.dart';
 import '../../utils/comparable_utils.dart';
 import '../../utils/constants.dart';
 import '../../utils/dialogs/due_date_filter_sheet.dart';
@@ -156,10 +157,21 @@ class _PaymentListScreenState
       _loading = true;
     });
 
-    if (syncEmails &&
-        (!kIsWeb ||
-            (isGoogleSignInEnabled && googleAccountService.isAuthorized))) {
-      await _emailDataHelper.fetchPaymentEmails(
+    if (syncEmails) {
+      if (kIsWeb) {
+        if (isGoogleSignInEnabled && !googleAccountService.isAuthorized) {
+          AppLogger().w('Unable to sync payments on web server without Google Sign-In authorization');
+          return;
+        }
+        else if (!isGoogleSignInEnabled) {
+          AppLogger().w('Syncing payments on web platform without Google Sign-In. Google Account implementation is being handled on the server');
+        }
+
+      } else {
+        AppLogger().i('Syncing payments');
+      }
+
+      await _emailDataHelper.syncPaymentEmails(
         earliestEmailDate: earliestEmailDate,
         maxEmails: maxEmails,
       );
@@ -611,6 +623,7 @@ class _PaymentListScreenState
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'payment_list_fab',
         onPressed: () async {
           await Navigator.push(
             context,

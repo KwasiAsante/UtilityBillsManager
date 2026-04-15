@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:utility_bills_manager/data/repositories/server_config_repository.dart';
 
 import '../../config/server_configuration.dart';
+import '../../data/models/server_config.dart';
 
 /// Settings form for [ServerConfiguration] — email credentials, IMAP settings,
 /// and sync scheduling.
@@ -29,6 +31,8 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
 
   late DateTime _earliestDate;
   final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
+
+  ServerConfigRepository get _configRepo => ServerConfigRepository();
 
   @override
   void initState() {
@@ -89,26 +93,26 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
-      await ServerConfiguration.setEmailAddress(
-        _emailAddressController.text.trim(),
+      final config = ServerConfig(
+        id: _configRepo.config?.id,
+        configId: _configRepo.config?.configId,
+        emailAddress: _emailAddressController.text.trim(),
+        emailPassword: _emailPasswordController.text,
+        emailImapServer: _imapServerController.text.trim(),
+        emailImapPort: int.parse(_imapPortController.text.trim()),
+        emailImapSecure: _imapSecure,
+        emailEarliestDate: _earliestDate,
+        emailSyncDelayDuration: Duration(seconds: int.parse(_syncDelayController.text.trim())),
+        emailSyncInterval: Duration(seconds: int.parse(_syncIntervalController.text.trim())),
       );
-      await ServerConfiguration.setEmailPassword(
-        _emailPasswordController.text,
-      );
-      await ServerConfiguration.setEmailImapServer(
-        _imapServerController.text.trim(),
-      );
-      await ServerConfiguration.setEmailImapPort(
-        int.parse(_imapPortController.text.trim()),
-      );
-      await ServerConfiguration.setEmailImapSecure(_imapSecure);
-      await ServerConfiguration.setEmailEarliestDate(_earliestDate);
-      await ServerConfiguration.setEmailSyncDelayDuration(
-        Duration(seconds: int.parse(_syncDelayController.text.trim())),
-      );
-      await ServerConfiguration.setEmailSyncInterval(
-        Duration(seconds: int.parse(_syncIntervalController.text.trim())),
-      );
+
+      if (_configRepo.config == null || (_configRepo.config!.configId == null || _configRepo.config!.configId!.isEmpty)) {
+        await _configRepo.create(config);
+      }
+      else {
+        await _configRepo.update(config);
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Server configuration saved')),
@@ -116,9 +120,9 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to save: $e')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -133,8 +137,14 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
     if (parsed == null) {
       return '$fieldName must be a whole number';
     }
-    if (parsed <= 0) {
-      return '$fieldName must be greater than zero';
+    if (fieldName == "Sync Delay") {
+      if (parsed < 0) {
+        return '$fieldName cannot be negative';
+      }
+    } else {
+      if (parsed <= 0) {
+        return '$fieldName must be greater than zero or ';
+      }
     }
     return null;
   }
@@ -143,7 +153,8 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
     final base = _validateInt(value, 'IMAP Port');
     if (base != null) return base;
     final port = int.parse(value!.trim());
-    if (port < 1 || port > 65535) return 'IMAP Port must be between 1 and 65535';
+    if (port < 1 || port > 65535)
+      return 'IMAP Port must be between 1 and 65535';
     return null;
   }
 
@@ -177,7 +188,8 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
                         keyboardType: TextInputType.emailAddress,
                         autocorrect: false,
                         validator: (value) {
-                          if (value == null || value.trim().isEmpty) return 'Email address is required';
+                          if (value == null || value.trim().isEmpty)
+                            return 'Email address is required';
                           final trimmed = value.trim();
                           final atIndex = trimmed.indexOf('@');
                           if (atIndex <= 0 || atIndex == trimmed.length - 1) {
@@ -197,9 +209,10 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
                                   ? Icons.visibility_off_outlined
                                   : Icons.visibility_outlined,
                             ),
-                            onPressed: () => setState(
-                              () => _passwordVisible = !_passwordVisible,
-                            ),
+                            onPressed:
+                                () => setState(
+                                  () => _passwordVisible = !_passwordVisible,
+                                ),
                           ),
                         ),
                         obscureText: !_passwordVisible,
@@ -231,7 +244,8 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
                         ),
                         autocorrect: false,
                         validator: (value) {
-                          if (value == null || value.trim().isEmpty) return 'IMAP server is required';
+                          if (value == null || value.trim().isEmpty)
+                            return 'IMAP server is required';
                           return null;
                         },
                       ),
@@ -309,16 +323,17 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
 
               FilledButton(
                 onPressed: _saving ? null : _saveSettings,
-                child: _saving
-                    ? SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Theme.of(context).colorScheme.onPrimary,
-                        ),
-                      )
-                    : const Text('Save'),
+                child:
+                    _saving
+                        ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
+                        )
+                        : const Text('Save'),
               ),
               const SizedBox(height: 16),
             ],

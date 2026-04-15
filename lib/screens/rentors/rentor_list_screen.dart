@@ -335,6 +335,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'rentor_list_fab',
         onPressed: () async {
           await Navigator.push(
             context,

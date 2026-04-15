@@ -87,12 +87,12 @@ class ServerConfiguration {
   static ServerConfig get serverConfigFromPreferences {
     return ServerConfig(
       configId: _serverConfigRepo.config?.configId,
-      emailAddress: emailAddress,
-      emailPassword: emailPassword,
-      emailImapServer: emailImapServer,
-      emailImapPort: emailImapPort,
-      emailImapSecure: emailImapSecure,
-      emailEarliestDate: emailEarliestDate,
+      emailAddress: Preferences.getString('EMAIL_ADDRESS'),
+      emailPassword: Preferences.getString('EMAIL_PASSWORD'),
+      emailImapServer: Preferences.getString('EMAIL_IMAP_SERVER'),
+      emailImapPort: Preferences.getInt('EMAIL_IMAP_PORT'),
+      emailImapSecure: Preferences.getBool('EMAIL_IMAP_SECURE'),
+      emailEarliestDate: DateTime.tryParse(Preferences.getString('EMAIL_EARLIEST_DATE') ?? ''),
       emailSyncDelayDuration: _emailSyncDelayDurationFromPreferences,
       emailSyncInterval: _emailSyncIntervalFromPreferences,
     );
