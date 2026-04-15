@@ -1,10 +1,12 @@
 import 'dart:convert';
 
+import 'package:cryptography/cryptography.dart' as crypto;
 import 'package:flutter/services.dart';
 import 'package:utility_bills_manager/config/app_config.dart';
 import 'package:utility_bills_manager/data/repositories/server_config_repository.dart';
 
 import '../data/models/server_config.dart';
+import '../utils/app_logger.dart';
 import '../utils/preferences.dart';
 
 class ServerConfiguration {
@@ -251,37 +253,115 @@ class ServerConfiguration {
   }
 }
 
-/// Loads optional local secrets from a JSON file that is NOT bundled
-/// into your app (unless you explicitly package it yourself).
+/// Loads and decrypts secrets from a bundled JSON asset.
 ///
-/// Example `local_secrets.json` (kept out of git and builds):
+/// String values prefixed with `enc:` are decrypted during [loadFromAsset]
+/// using AES-256-GCM with the key supplied via
+/// `--dart-define=SECRETS_KEY=<32-char-key>`. Non-string fields (int, bool)
+/// are stored in plaintext and never touched.
+///
+/// Encrypt values with the bundled script:
+///   dart run scripts/encrypt_secrets.dart --key=<32-char-key>
+///
+/// Example encrypted `local_secrets.json`:
+/// ```json
 /// {
-///   "EMAIL_ADDRESS": "you@example.com",
-///   "EMAIL_PASSWORD": "app-password",
-///   "EMAIL_IMAP_SERVER": "imap.gmail.com",
+///   "EMAIL_ADDRESS": "enc:BASE64_NONCE.BASE64_CIPHERTEXT_MAC",
+///   "EMAIL_PASSWORD": "enc:BASE64_NONCE.BASE64_CIPHERTEXT_MAC",
+///   "EMAIL_IMAP_SERVER": "enc:BASE64_NONCE.BASE64_CIPHERTEXT_MAC",
 ///   "EMAIL_IMAP_PORT": 993,
 ///   "EMAIL_IMAP_SECURE": true
 /// }
+/// ```
 class _LocalSecrets {
   static Map<String, dynamic> _cache = <String, dynamic>{};
   static bool _loaded = false;
 
+  // Key must be exactly 32 characters (AES-256).
+  // Supplied at build time: --dart-define=SECRETS_KEY=<32-char-key>
+  static const _secretsKey = String.fromEnvironment(
+    'SECRETS_KEY',
+    defaultValue: '',
+  );
+
+  /// Loads the JSON asset and decrypts all `enc:`-prefixed string values in
+  /// place. After this call, [_cache] contains only plaintext values and all
+  /// getter methods can remain synchronous.
   static Future<void> loadFromAsset(String assetPath) async {
     if (_loaded) return;
     try {
       final contents = await rootBundle.loadString(assetPath);
       final decoded = jsonDecode(contents);
+      Map<String, dynamic> raw;
       if (decoded is Map<String, dynamic>) {
-        _cache = decoded;
+        raw = decoded;
       } else if (decoded is Map) {
-        _cache = decoded.map((key, value) => MapEntry(key.toString(), value));
+        raw = decoded.map((k, v) => MapEntry(k.toString(), v));
       } else {
-        _cache = <String, dynamic>{};
+        raw = {};
       }
+      _cache = await _decryptAll(raw);
     } catch (_) {
-      _cache = <String, dynamic>{};
+      _cache = {};
     } finally {
       _loaded = true;
+    }
+  }
+
+  /// Walks every entry; decrypts any `enc:`-prefixed string value, leaves
+  /// everything else untouched.
+  static Future<Map<String, dynamic>> _decryptAll(
+      Map<String, dynamic> raw) async {
+    final result = <String, dynamic>{};
+    for (final entry in raw.entries) {
+      if (entry.value is String &&
+          (entry.value as String).startsWith('enc:')) {
+        result[entry.key] =
+            await _decrypt(entry.value as String) ?? entry.value;
+      } else {
+        result[entry.key] = entry.value;
+      }
+    }
+    return result;
+  }
+
+  /// Decrypts one `enc:<base64-nonce>.<base64-ciphertext+mac>` string.
+  /// Uses AES-256-GCM (authenticated encryption).
+  static Future<String?> _decrypt(String value) async {
+    if (_secretsKey.isEmpty) {
+      AppLogger().w(
+          '[LocalSecrets] SECRETS_KEY dart-define not set; cannot decrypt secrets');
+      return null;
+    }
+    if (_secretsKey.length != 32) {
+      AppLogger().w(
+          '[LocalSecrets] SECRETS_KEY must be exactly 32 characters (got ${_secretsKey.length})');
+      return null;
+    }
+    try {
+      final payload = value.substring(4); // strip "enc:"
+      final dot = payload.indexOf('.');
+      if (dot == -1) return null;
+
+      final nonce = base64Decode(payload.substring(0, dot));
+      final cipherAndMac = base64Decode(payload.substring(dot + 1));
+
+      // Last 16 bytes are the GCM authentication tag.
+      final ciphertext = cipherAndMac.sublist(0, cipherAndMac.length - 16);
+      final mac = cipherAndMac.sublist(cipherAndMac.length - 16);
+
+      final algorithm = crypto.AesGcm.with256bits();
+      final secretKey = await algorithm.newSecretKeyFromBytes(
+        _secretsKey.codeUnits,
+      );
+      final plainBytes = await algorithm.decrypt(
+        crypto.SecretBox(ciphertext, nonce: nonce, mac: crypto.Mac(mac)),
+        secretKey: secretKey,
+      );
+      return String.fromCharCodes(plainBytes);
+    } catch (e) {
+      AppLogger().e('[LocalSecrets] Decryption failed: $e');
+      return null;
     }
   }
 

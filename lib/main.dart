@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
 
@@ -28,9 +29,13 @@ import 'services/notification/notification_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Firebase is not configured for Linux. Wrap in a platform guard to avoid
+  // a runtime exception when running on Linux during development.
+  if (defaultTargetPlatform != TargetPlatform.linux) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
 
   // PDF text extraction (email attachments) uses pdfrx on web/mobile/desktop
   await pdfrxFlutterInitialize(dismissPdfiumWasmWarnings: true);

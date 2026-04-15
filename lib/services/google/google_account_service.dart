@@ -5,5 +5,5 @@
 library;
 
 export 'google_account_service_stub.dart'
-    if (dart.library.html) 'google_account_service_web.dart'
+    if (dart.library.js_interop) 'google_account_service_web.dart'
     if (dart.library.io) 'google_account_service_native.dart';

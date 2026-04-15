@@ -5,5 +5,5 @@
 library;
 
 export 'email_service_stub.dart'
-    if (dart.library.html) 'email_service_web.dart'
+    if (dart.library.js_interop) 'email_service_web.dart'
     if (dart.library.io) 'email_service_native.dart';
