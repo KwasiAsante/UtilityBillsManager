@@ -123,6 +123,9 @@ app.*.symbols
 /.serena
 /.vscode
 
+# Git worktrees
+.worktrees/
+
 # Local secrets
 local_secrets.json
 
