@@ -69,20 +69,39 @@ class _RentorListScreenState extends State<RentorListScreen> {
   }
 
   void _updateDisplayedRentors() {
-    var displayed = _allRentors.where((rentor) =>
-      _searchQuery.isEmpty ||
-      rentor.name.toLowerCase().contains(_searchQuery.toLowerCase())
-    ).toList();
+    var displayed =
+        _allRentors
+            .where(
+              (rentor) =>
+                  _searchQuery.isEmpty ||
+                  rentor.name.toLowerCase().contains(
+                    _searchQuery.toLowerCase(),
+                  ),
+            )
+            .toList();
 
     switch (_selectedSort) {
       case 'Percentage':
-        displayed.sort((a, b) => a.defaultPercentage.compareTo(b.defaultPercentage));
+        displayed.sort(
+          (a, b) => a.defaultPercentage.compareTo(b.defaultPercentage),
+        );
         break;
       case 'Last Payment Date (Asc)':
-        displayed.sort((a, b) => ComparableUtils.compareNullable(a.lastPaymentDate, b.lastPaymentDate));
+        displayed.sort(
+          (a, b) => ComparableUtils.compareNullable(
+            a.lastPaymentDate,
+            b.lastPaymentDate,
+          ),
+        );
         break;
       case 'Last Payment Date (Desc)':
-        displayed.sort((a, b) => ComparableUtils.compareNullable(a.lastPaymentDate, b.lastPaymentDate, descending: true));
+        displayed.sort(
+          (a, b) => ComparableUtils.compareNullable(
+            a.lastPaymentDate,
+            b.lastPaymentDate,
+            descending: true,
+          ),
+        );
         break;
     }
 
@@ -95,22 +114,26 @@ class _RentorListScreenState extends State<RentorListScreen> {
   Future<void> _deleteAllRentors() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete All Rentors'),
-        content: const Text(
-          'Are you sure you want to delete all rentors? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete All Rentors'),
+            content: const Text(
+              'Are you sure you want to delete all rentors? This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
@@ -120,9 +143,9 @@ class _RentorListScreenState extends State<RentorListScreen> {
 
       await _rentorsRepository.reload();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('All rentors deleted.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('All rentors deleted.')));
       }
     }
   }
@@ -160,18 +183,19 @@ class _RentorListScreenState extends State<RentorListScreen> {
                 filled: true,
                 fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          setState(() {
-                            _searchQuery = '';
-                          });
-                          _updateDisplayedRentors();
-                        },
-                      )
-                    : null,
+                suffixIcon:
+                    _searchQuery.isNotEmpty
+                        ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                            _updateDisplayedRentors();
+                          },
+                        )
+                        : null,
               ),
               onChanged: (query) {
                 setState(() {
@@ -191,50 +215,57 @@ class _RentorListScreenState extends State<RentorListScreen> {
               setState(() => _selectedSort = value);
               _updateDisplayedRentors();
             },
-            itemBuilder: (context) => [
-              'Percentage',
-              'Last Payment Date (Asc)',
-              'Last Payment Date (Desc)',
-            ]
-                .map((value) => CheckedPopupMenuItem<String>(
-                      value: value,
-                      checked: _selectedSort == value,
-                      child: Text(value),
-                    ))
-                .toList(),
+            itemBuilder:
+                (context) =>
+                    [
+                          'Percentage',
+                          'Last Payment Date (Asc)',
+                          'Last Payment Date (Desc)',
+                        ]
+                        .map(
+                          (value) => CheckedPopupMenuItem<String>(
+                            value: value,
+                            checked: _selectedSort == value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
           ),
-          PopupMenuButton<Object>(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert),
             tooltip: 'More actions',
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'refresh',
-                child: ListTile(
-                  leading: Icon(Icons.refresh),
-                  title: Text('Refresh'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              if (!AppBreakpoints.isWide(context))
-                const PopupMenuItem(
-                  value: 'settings',
-                  child: ListTile(
-                    leading: Icon(Icons.settings_outlined),
-                    title: Text('Settings'),
-                    contentPadding: EdgeInsets.zero,
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem<String>(
+                    value: 'refresh',
+                    child: ListTile(
+                      leading: Icon(Icons.refresh),
+                      title: Text('Refresh'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
-              const PopupMenuItem(
-                value: 'delete_all',
-                child: ListTile(
-                  leading: Icon(Icons.delete_sweep, color: Colors.red),
-                  title: Text('Delete all rentors',
-                      style: TextStyle(color: Colors.red)),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
-            onSelected: (value) async {
+                  if (!AppBreakpoints.isWide(context))
+                    const PopupMenuItem<String>(
+                      value: 'settings',
+                      child: ListTile(
+                        leading: Icon(Icons.settings_outlined),
+                        title: Text('Settings'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  const PopupMenuItem<String>(
+                    value: 'delete_all',
+                    child: ListTile(
+                      leading: Icon(Icons.delete_sweep, color: Colors.red),
+                      title: Text(
+                        'Delete all rentors',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+            onSelected: (String value) async {
               if (value == 'refresh') {
                 await _rentorsRepository.reload();
               } else if (value == 'settings') {
@@ -250,132 +281,167 @@ class _RentorListScreenState extends State<RentorListScreen> {
         ],
       ),
       body: ResponsiveConstraint(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : FutureBuilder<List<Rentor>>(
-        future: _rentors,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No rentors found. Pull down or click on the Refresh button to sync or click the + button to add a rentor.'));
-          }
+        child:
+            _loading
+                ? const Center(child: CircularProgressIndicator())
+                : FutureBuilder<List<Rentor>>(
+                  future: _rentors,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    } else if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(
+                        child: Text(
+                          'No rentors found. Pull down or click on the Refresh button to sync or click the + button to add a rentor.',
+                        ),
+                      );
+                    }
 
-          final rentors = snapshot.data!;
-          return RefreshIndicator(
-            onRefresh: () async {
-              await _rentorsRepository.reload();
-            },
-            child: ScrollConfiguration(
-              behavior: ScrollConfiguration.of(context).copyWith(
-                dragDevices: {
-                  PointerDeviceKind.touch,
-                  PointerDeviceKind.mouse,
-                },
-              ),
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.only(bottom: 80),
-                itemCount: rentors.length,
-                itemBuilder: (context, index) {
-                  final rentor = rentors[index];
-                  return Card(
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      isThreeLine: rentor.email != null || rentor.phone != null,
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                AddEditRentorScreen(rentor: rentor),
-                          ),
-                        );
+                    final rentors = snapshot.data!;
+                    return RefreshIndicator(
+                      onRefresh: () async {
+                        await _rentorsRepository.reload();
                       },
-                      title: Text(
-                        rentor.name,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(
-                                  '${rentor.defaultPercentage.toStringAsFixed(1)}%',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Theme.of(context).colorScheme.primary,
+                      child: ScrollConfiguration(
+                        behavior: ScrollConfiguration.of(context).copyWith(
+                          dragDevices: {
+                            PointerDeviceKind.touch,
+                            PointerDeviceKind.mouse,
+                          },
+                        ),
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.only(bottom: 80),
+                          itemCount: rentors.length,
+                          itemBuilder: (context, index) {
+                            final rentor = rentors[index];
+                            return Card(
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                isThreeLine:
+                                    rentor.email != null ||
+                                    rentor.phone != null,
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => AddEditRentorScreen(
+                                            rentor: rentor,
+                                          ),
+                                    ),
+                                  );
+                                },
+                                title: Text(
+                                  rentor.name,
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                                subtitle: Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            '${rentor.defaultPercentage.toStringAsFixed(1)}%',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color:
+                                                  Theme.of(
+                                                    context,
+                                                  ).colorScheme.primary,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Text(
+                                            rentor.lastPaymentDate != null
+                                                ? 'Last paid: ${DateFormat('MMM d, yyyy').format(rentor.lastPaymentDate!)}'
+                                                : 'No payments yet',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey[600],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (rentor.email != null ||
+                                          rentor.phone != null) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          [
+                                            if (rentor.email != null)
+                                              rentor.email!,
+                                            if (rentor.phone != null)
+                                              rentor.phone!,
+                                          ].join('  ·  '),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.grey[500],
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  rentor.lastPaymentDate != null
-                                      ? 'Last paid: ${DateFormat('MMM d, yyyy').format(rentor.lastPaymentDate!)}'
-                                      : 'No payments yet',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                trailing: PopupMenuButton<String>(
+                                  onSelected: (value) async {
+                                    if (value == 'edit') {
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => AddEditRentorScreen(
+                                                rentor: rentor,
+                                              ),
+                                        ),
+                                      );
+                                    } else if (value == 'delete') {
+                                      await _rentorsRepository.delete(
+                                        rentor.rentorId,
+                                      );
+                                    }
+                                  },
+                                  itemBuilder:
+                                      (context) => [
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: Text('Edit'),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          textStyle: TextStyle(
+                                            color: Colors.red,
+                                          ),
+                                          child: Text('Delete'),
+                                        ),
+                                      ],
                                 ),
-                              ],
-                            ),
-                            if (rentor.email != null || rentor.phone != null) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                [
-                                  if (rentor.email != null) rentor.email!,
-                                  if (rentor.phone != null) rentor.phone!,
-                                ].join('  ·  '),
-                                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      trailing: PopupMenuButton<String>(
-                        onSelected: (value) async {
-                          if (value == 'edit') {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AddEditRentorScreen(rentor: rentor),
                               ),
                             );
-                          } else if (value == 'delete') {
-                            await _rentorsRepository.delete(rentor.rentorId);
-                          }
-                        },
-                        itemBuilder:
-                            (context) => [
-                          const PopupMenuItem(
-                            value: 'edit',
-                            child: Text('Edit'),
-                          ),
-                          const PopupMenuItem(
-                            value: 'delete',
-                            textStyle: TextStyle(color: Colors.red),
-                            child: Text('Delete'),
-                          ),
-                        ],
+                          },
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          );
-        },
-      ),
+                    );
+                  },
+                ),
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'rentor_list_fab',
         onPressed: () async {
           await Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const AddEditRentorScreen()),
+            MaterialPageRoute(
+              builder: (context) => const AddEditRentorScreen(),
+            ),
           );
         },
         child: const Icon(Icons.add),
