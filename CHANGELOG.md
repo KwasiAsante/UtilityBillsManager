@@ -6,6 +6,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Changed
+- **Notification service factory pattern** — `notification_service.dart` is now an abstract `interface class NotificationService` instead of a conditional-export shim. A new `lib/factory/notification/` directory holds the factory entry point (`notification_service_factory.dart`) and platform-specific factory implementations (`notification_service_factory_native.dart`, `notification_service_factory_web.dart`). `main.dart` calls `createNotificationService()` at startup to obtain the correct concrete instance. `notification_service_base.dart` removed — its shared state and helpers have been absorbed into the platform implementations.
+- **Android build configuration** — `build.gradle.kts`, `settings.gradle.kts`, and `gradle-wrapper.properties` updated to align with the latest AGP and Kotlin plugin versions; added a second Android run configuration (`.run_android/Utility Bills (Android) My Phone.run.xml`).
+
 ### Added
 - **Calculate Amount Owed (Rentor form)** — New button on `AddEditRentorScreen` that calculates what the rentor owes for a selected month:
   - Clicking the button opens a period-selection dialog whose dropdown is limited to year/month combinations that have at least one unpaid or partial bill.

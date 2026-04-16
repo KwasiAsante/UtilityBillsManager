@@ -24,20 +24,22 @@ lib/
 │   ├── models/     # Bill, Payment, Rentor, EmailData, ServerConfig, AppState
 │   └── repositories/ # ChangeNotifier singletons (Bills, Payments, Rentors, EmailData, ServerConfig)
 ├── database/       # db_factory with web/native/stub conditional exports
+├── factory/
+│   └── notification/ # NotificationServiceFactory — createNotificationService() returns platform-correct impl
 ├── helpers/        # Database, Bills, Payments, Rentors, Email, Configuration helpers
 ├── screens/        # UI screens per domain (bills, payments, rentors, emails, summary, settings)
 ├── services/
 │   ├── api/        # ApiService facade + Bills/Rentors/Payments/EmailData/Config/Notification clients
 │   ├── email/      # EmailService with web/native/stub conditional exports
 │   ├── google/     # GoogleAccountService with web/native/stub conditional exports
-│   └── notification/ # NotificationService & SseService (base + native/web/windows variants)
+│   └── notification/ # NotificationService (abstract interface) + concrete native/web/windows impls; SseService
 ├── widgets/        # Reusable widgets: NotificationBellIcon, NotificationPanel, SettingsIconButton
 └── utils/          # Parsers, calculators, export, logger, dialogs
 ```
 
 The app uses **SQLite** (`sqflite` / `sqflite_common_ffi` / `sqflite_common_ffi_web`) for local persistence with manual migrations (currently schema v15). The correct SQLite factory is selected at startup via a platform-conditional `db_factory`. Repositories are `ChangeNotifier` singletons that screens listen to for reactive updates.
 
-Platform-specific behavior (database initialization, email/IMAP access, Google sign-in, SSE streaming, local notifications) is isolated behind conditional-export files (`_web`, `_native`, `_stub` variants) so the same codebase compiles cleanly on Android, iOS, macOS, Windows, Linux, and Web.
+Platform-specific behavior (database initialization, email/IMAP access, Google sign-in, SSE streaming, local notifications) is isolated behind conditional-export files (`_web`, `_native`, `_stub` variants) so the same codebase compiles cleanly on Android, iOS, macOS, Windows, Linux, and Web. The notification service uses a factory pattern: `NotificationService` is an abstract interface, and `createNotificationService()` (in `lib/factory/notification/`) returns the correct concrete implementation for each platform at startup.
 
 **Firebase** (`firebase_core`, `firebase_auth`, `firebase_messaging`) is initialized at app startup. FCM handles push notifications when the app is backgrounded.
 
