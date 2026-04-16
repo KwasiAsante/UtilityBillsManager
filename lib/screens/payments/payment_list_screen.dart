@@ -62,7 +62,6 @@ class _PaymentListScreenState
   final PaymentsRepository _paymentsRepository = PaymentsRepository();
   final EmailDataHelper _emailDataHelper = EmailDataHelper();
   final ScrollController _scrollController = ScrollController();
-  final TextEditingController _searchController = TextEditingController();
 
   Future<List<Payment>>? _payments;
   List<Payment> _allPayments = [];
@@ -73,7 +72,6 @@ class _PaymentListScreenState
   int? _selectedPaymentMonth;
   DateTime? _dateRangeStart;
   DateTime? _dateRangeEnd;
-  String _searchQuery = '';
 
   //region Lifecycle
   @override
@@ -115,7 +113,6 @@ class _PaymentListScreenState
     _paymentsRepository.removeListener(_onPaymentsUpdated);
     _scrollController.removeListener(_checkScrollability);
     _scrollController.dispose();
-    _searchController.dispose();
     super.dispose();
   }
 
@@ -350,43 +347,6 @@ class _PaymentListScreenState
     return Scaffold(
       appBar: AppBar(
         title: const Text('Payments'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(60),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search payments...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                filled: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                suffixIcon:
-                    _searchQuery.isNotEmpty
-                        ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() {
-                              _searchQuery = '';
-                            });
-                            _updateDisplayedPayments();
-                          },
-                        )
-                        : null,
-              ),
-              onChanged: (query) {
-                setState(() {
-                  _searchQuery = query;
-                });
-                _updateDisplayedPayments();
-              },
-            ),
-          ),
-        ),
         actions: [
           const NotificationBellIcon(),
           if (isGoogleSignInEnabled)
