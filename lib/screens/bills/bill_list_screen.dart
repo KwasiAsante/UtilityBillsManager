@@ -59,6 +59,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   final BillsRepository _billsRepository = BillsRepository();
   final EmailDataHelper _emailDataHelper = EmailDataHelper();
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
 
   Future<List<Bill>>? _bills;
   List<Bill> _allBills = [];
@@ -112,6 +113,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
     _billsRepository.removeListener(_onBillsUpdated);
     _scrollController.removeListener(_checkScrollability);
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -352,6 +354,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
           child: Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
+              controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search by company...',
                 prefixIcon: const Icon(Icons.search),
@@ -361,6 +364,18 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                 filled: true,
                 fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchQuery = '';
+                          });
+                          _updateDisplayedBills();
+                        },
+                      )
+                    : null,
               ),
               onChanged: (query) {
                 setState(() {
