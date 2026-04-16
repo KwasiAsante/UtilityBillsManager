@@ -13,6 +13,8 @@
 ///   flutter build apk --dart-define=SECRETS_KEY=<32-char-key>
 ///   flutter build web --dart-define=SECRETS_KEY=<32-char-key>
 ///   flutter build windows --dart-define=BUILD_TARGET=windows --dart-define=SECRETS_KEY=<32-char-key>
+library;
+
 import 'dart:convert';
 import 'dart:io';
 

@@ -8,10 +8,11 @@ import 'config/app_config.dart';
 import 'config/server_configuration.dart';
 import 'data/models/app_state.dart';
 import 'database/db_factory.dart';
+import 'factory/notification/notification_service_factory.dart';
 import 'helpers/database/database_helper.dart';
 import 'screens/main_tab_screen.dart';
 import 'services/api/api_service.dart';
-import 'services/notification/notification_service.dart';
+import 'utils/app_logger.dart';
 
 
 /// Application entry point.
@@ -26,7 +27,12 @@ import 'services/notification/notification_service.dart';
 /// 6. Set [AppState.localDB] and configure [ApiService.baseUrl].
 /// 7. Start the local shelf HTTP server when running in server mode.
 /// 8. Launch the Flutter widget tree.
+
+final notificationService = createNotificationService();
 void main() async {
+  final s = const String.fromEnvironment('BUILD_TARGET');
+  AppLogger().i('BUILD_TARGET: $s');
+  
   WidgetsFlutterBinding.ensureInitialized();
 
   // Firebase is not configured for Linux. Wrap in a platform guard to avoid
@@ -53,7 +59,7 @@ void main() async {
 
   await ServerConfiguration.init();
 
-  await NotificationService().initialize();
+  await notificationService.initialize();
 
   runApp(const MyApp());
 }

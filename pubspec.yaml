@@ -62,6 +62,8 @@ dependencies:
   sse: ^4.2.0
   cryptography: ^2.9.0
 
+  sqflite_common_ffi_web: any
+  google_sign_in_web: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

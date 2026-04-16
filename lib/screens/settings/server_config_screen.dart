@@ -159,8 +159,9 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
     final base = _validateInt(value, 'IMAP Port');
     if (base != null) return base;
     final port = int.parse(value!.trim());
-    if (port < 1 || port > 65535)
+    if (port < 1 || port > 65535) {
       return 'IMAP Port must be between 1 and 65535';
+    }
     return null;
   }
 
@@ -194,8 +195,9 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
                         keyboardType: TextInputType.emailAddress,
                         autocorrect: false,
                         validator: (value) {
-                          if (value == null || value.trim().isEmpty)
+                          if (value == null || value.trim().isEmpty) {
                             return 'Email address is required';
+                          }
                           final trimmed = value.trim();
                           final atIndex = trimmed.indexOf('@');
                           if (atIndex <= 0 || atIndex == trimmed.length - 1) {
@@ -250,8 +252,9 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
                         ),
                         autocorrect: false,
                         validator: (value) {
-                          if (value == null || value.trim().isEmpty)
+                          if (value == null || value.trim().isEmpty) {
                             return 'IMAP server is required';
+                          }
                           return null;
                         },
                       ),

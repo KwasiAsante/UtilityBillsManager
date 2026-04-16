@@ -1,42 +1,66 @@
 import 'dart:async';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:uuid/uuid.dart';
 
-import 'notification_service_base.dart';
-import '../../config/app_config.dart';
+import 'app_notification_store.dart';
+import 'notification_service.dart';
+import 'sse_service_native.dart';
+import '../../data/models/app_notification.dart';
+import '../../data/repositories/bills_repository.dart';
+import '../../data/repositories/payments_repository.dart';
 import '../../utils/app_logger.dart';
+import '../../config/app_config.dart';
+import '../../data/models/sse_event.dart';
 
-/// Concrete [NotificationServiceBase] for Windows.
-///
-/// Windows does not support FCM. Notifications are delivered exclusively
-/// via [flutter_local_notifications] (WinRT toast API) and SSE.
-class NotificationService extends NotificationServiceBase {
-  static final NotificationService _instance =
-  NotificationService._internal();
-  factory NotificationService() => _instance;
-  NotificationService._internal();
+class WindowsNotificationService implements NotificationService {
+  static final WindowsNotificationService _instance = WindowsNotificationService._internal();
+
+  factory WindowsNotificationService() => _instance;
+
+  WindowsNotificationService._internal();
+
+  final uuid = const Uuid();
+
+  @override
+  bool initialized = false;
+
+  @override
+  StreamSubscription<SseEvent>? sseEventsSubscription;
 
   final _localNotifications = FlutterLocalNotificationsPlugin();
 
-  // ---------------------------------------------------------------------------
-  // Lifecycle
-  // ---------------------------------------------------------------------------
-
+  //region Lifecycle
   @override
   Future<void> initialize() async {
-    if (initialized) return;
     if (AppConfig.mode == AppMode.server) return;
+    if (initialized) return;
+
     initialized = true;
 
-    await _initLocalNotifications();
-    await connectSse(AppConfig.apiBaseUrl, await AppConfig.deviceId);
+    AppLogger().d('[NotificationService](Windows) Initializing...');
+
+    try {
+      await initLocalNotifications();
+      await connectSse(AppConfig.apiBaseUrl, await AppConfig.deviceId);
+      AppLogger().d('[NotificationService](Windows) Initialized successfully');
+    } catch (e) {
+      AppLogger().e('[NotificationService](Windows) Initialization failed: $e', error: e);
+      initialized = false;
+    }
   }
 
-  // ---------------------------------------------------------------------------
-  // Local notifications (WinRT toast)
-  // ---------------------------------------------------------------------------
+  @override
+  void dispose() {
+    sseEventsSubscription?.cancel();
+    SseService.instance.disconnect();
+    initialized = false;
+  }
+  //endregion
 
-  Future<void> _initLocalNotifications() async {
+  //region Local Notifications
+  @override
+  Future<void> initLocalNotifications() async {
     const initSettings = InitializationSettings(
       windows: WindowsInitializationSettings(
         appName: 'Utility Bills Manager',
@@ -63,4 +87,67 @@ class NotificationService extends NotificationServiceBase {
       ),
     );
   }
+
+  @override
+  Future<void> cancelNotification(int id, {String? tag}) =>
+      _localNotifications.cancel(id: id, tag: tag);
+
+  @override
+  Future<void> cancelAllNotifications() => _localNotifications.cancelAll();
+
+  @override
+  Future<void> cancelAllPendingNotifications() =>
+      _localNotifications.cancelAllPendingNotifications();
+
+  //endregion
+
+  //region SSE
+  @override
+  Future<void> connectSse(String apiBaseUrl, String deviceId) async {
+    await SseService.instance.connect(apiBaseUrl, deviceId);
+    sseEventsSubscription = SseService.instance.events.listen(handleSseEvent);
+  }
+
+  @override
+  void handleSseEvent(SseEvent event) {
+    final title = switch (event.type) {
+      SseEventType.newBill => 'New Bill',
+      SseEventType.newPayment => 'New Payment',
+    };
+
+    AppLogger().d('[SSE] ${event.type}: $title');
+    showNotification(title: title, body: event.message);
+    addToStore(type: event.type, title: title, body: event.message);
+    reloadRepository(event.type);
+  }
+  //endregion
+
+  //region Store & repository helpers
+  @override
+  void addToStore({
+    required SseEventType type,
+    required String title,
+    required String body,
+  }) {
+    AppNotificationStore().add(
+      AppNotification(
+        id: uuid.v4(),
+        type: type,
+        title: title,
+        body: body,
+        timestamp: DateTime.now(),
+      ),
+    );
+  }
+
+  @override
+  void reloadRepository(SseEventType type) {
+    switch (type) {
+      case SseEventType.newBill:
+        BillsRepository().reload();
+      case SseEventType.newPayment:
+        PaymentsRepository().reload();
+    }
+  }
+  //endregion
 }
