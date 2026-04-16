@@ -96,6 +96,9 @@ void main() {
       );
       expect(find.byKey(const Key('inner')), findsOneWidget);
       expect(find.byType(ConstrainedBox), findsOneWidget);
+      // Verify the constraint value
+      final cb = tester.widget<ConstrainedBox>(find.byType(ConstrainedBox));
+      expect(cb.constraints.maxWidth, 720);
     });
   });
 }
