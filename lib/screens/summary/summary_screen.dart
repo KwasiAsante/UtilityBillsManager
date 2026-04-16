@@ -13,8 +13,10 @@ import '../../data/repositories/rentors_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../utils/export_utils.dart';
+import '../../utils/app_breakpoints.dart';
 import '../../widgets/notification_bell_icon.dart';
-import '../../widgets/settings_icon_button.dart';
+import '../../widgets/responsive_constraint.dart';
+import '../settings/settings_screen.dart';
 
 /// Screen that provides a financial overview across all bills, payments, and
 /// rentors.
@@ -37,7 +39,8 @@ class SummaryScreen extends StatefulWidget {
   State<SummaryScreen> createState() => _SummaryScreenState();
 }
 
-class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with SingleTickerProviderStateMixin {
+class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
+    with SingleTickerProviderStateMixin {
   // ── GoogleSignInScreenState contract ─────────────────────────────────────────
 
   @override
@@ -101,7 +104,8 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     if (actualUnpaid <= 0) return true;
     // Within the percentage threshold, OR within $1.00 of the threshold amount.
     final thresholdAmount = bill.amount * threshold;
-    return actualUnpaid <= thresholdAmount + 1.0 || bill.status == PaymentStatus.paid;
+    return actualUnpaid <= thresholdAmount + 1.0 ||
+        bill.status == PaymentStatus.paid;
   }
 
   /// The paid amount to display, respecting the toggle and threshold.
@@ -192,9 +196,9 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     if (options == null || !mounted) return;
 
     await _loadData(
-        syncEmails: true,
-        earliestEmailDate: options.earliestDate,
-        maxEmails: options.maxEmails
+      syncEmails: true,
+      earliestEmailDate: options.earliestDate,
+      maxEmails: options.maxEmails,
     );
   }
 
@@ -286,8 +290,10 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
       final month = DateFormat('MMMM yyyy').format(bill.dueDate);
       grouped.putIfAbsent(month, () => []).add(bill);
     }
-    final sorted = grouped.entries.toList()
-      ..sort((a, b) => b.value.first.dueDate.compareTo(a.value.first.dueDate));
+    final sorted =
+        grouped.entries.toList()..sort(
+          (a, b) => b.value.first.dueDate.compareTo(a.value.first.dueDate),
+        );
     return Map.fromEntries(sorted);
   }
 
@@ -299,7 +305,10 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('CSV export failed: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('CSV export failed: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -311,7 +320,10 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PDF export failed: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('PDF export failed: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -324,7 +336,8 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     if (grouped.isEmpty) return const Center(child: Text('No bills found.'));
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: grouped.entries.map((e) => _buildMonthCard(e.key, e.value)).toList(),
+      children:
+          grouped.entries.map((e) => _buildMonthCard(e.key, e.value)).toList(),
     );
   }
 
@@ -337,8 +350,12 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: ExpansionTile(
-        title: Text(month,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+        title: Text(
+          month,
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
           child: _summaryRow(total, paid, unpaid),
@@ -372,25 +389,39 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('${bill.type.name} — ${bill.company}',
-                    style: const TextStyle(fontSize: 13)),
+                Text(
+                  '${bill.type.name} — ${bill.company}',
+                  style: const TextStyle(fontSize: 13),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   'Due Date: ${DateFormat('MMM d, yyyy').format(bill.dueDate)}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600], fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 if (rentorNames.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
                     'Paid by: ${rentorNames.join(', ')}',
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600], fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
                 if (hasHiddenRemainder && !_showActualUnpaid) ...[
                   const SizedBox(height: 2),
                   Text(
                     '* within paid threshold',
-                    style: TextStyle(fontSize: 10, color: Colors.orange[700], fontStyle: FontStyle.italic),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.orange[700],
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ],
               ],
@@ -401,14 +432,29 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('Bill Amount: \$${bill.amount.toStringAsFixed(2)}',
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              Text('Paid: \$${displayPaid.toStringAsFixed(2)}',
-                  style: TextStyle(color: Colors.green[700], fontSize: 11, fontWeight: FontWeight.bold)),
+              Text(
+                'Bill Amount: \$${bill.amount.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              Text(
+                'Paid: \$${displayPaid.toStringAsFixed(2)}',
+                style: TextStyle(
+                  color: Colors.green[700],
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               if (displayUnpaid > 0.005)
                 Text(
                   'Unpaid: \$${displayUnpaid.toStringAsFixed(2)}${hasHiddenRemainder && _showActualUnpaid ? ' *' : ''}',
-                  style: const TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
             ],
           ),
@@ -428,55 +474,70 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
 
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: byType.entries.map((typeEntry) {
-        final grouped = _groupByMonth(typeEntry.value);
-        final typeTotal = typeEntry.value.fold(0.0, (s, b) => s + b.amount);
-        final typePaid = typeEntry.value.fold(0.0, (s, b) => s + _displayPaid(b));
-        final typeUnpaid = typeEntry.value.fold(0.0, (s, b) => s + _displayUnpaid(b));
+      children:
+          byType.entries.map((typeEntry) {
+            final grouped = _groupByMonth(typeEntry.value);
+            final typeTotal = typeEntry.value.fold(0.0, (s, b) => s + b.amount);
+            final typePaid = typeEntry.value.fold(
+              0.0,
+              (s, b) => s + _displayPaid(b),
+            );
+            final typeUnpaid = typeEntry.value.fold(
+              0.0,
+              (s, b) => s + _displayUnpaid(b),
+            );
 
-        return Card(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          child: ExpansionTile(
-            title: Text(typeEntry.key,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.bold)),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: _summaryRow(typeTotal, typePaid, typeUnpaid),
-            ),
-            children: [
-              const Divider(height: 1),
-              ...grouped.entries.map((monthEntry) {
-                final bills = monthEntry.value;
-                bills.sort((a, b) => b.dueDate.compareTo(a.dueDate));
-                final total = bills.fold(0.0, (s, b) => s + b.amount);
-                final paid = bills.fold(0.0, (s, b) => s + _displayPaid(b));
-                final unpaid = bills.fold(0.0, (s, b) => s + _displayUnpaid(b));
-
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(monthEntry.key,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                              )),
-                      const SizedBox(height: 6),
-                      _summaryRow(total, paid, unpaid),
-                      _buildRentorContributions(bills, compact: true),
-                      const Divider(height: 20),
-                    ],
+            return Card(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              child: ExpansionTile(
+                title: Text(
+                  typeEntry.key,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
-                );
-              }),
-              const SizedBox(height: 4),
-            ],
-          ),
-        );
-      }).toList(),
+                ),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: _summaryRow(typeTotal, typePaid, typeUnpaid),
+                ),
+                children: [
+                  const Divider(height: 1),
+                  ...grouped.entries.map((monthEntry) {
+                    final bills = monthEntry.value;
+                    bills.sort((a, b) => b.dueDate.compareTo(a.dueDate));
+                    final total = bills.fold(0.0, (s, b) => s + b.amount);
+                    final paid = bills.fold(0.0, (s, b) => s + _displayPaid(b));
+                    final unpaid = bills.fold(
+                      0.0,
+                      (s, b) => s + _displayUnpaid(b),
+                    );
+
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            monthEntry.key,
+                            style: Theme.of(
+                              context,
+                            ).textTheme.titleSmall?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          _summaryRow(total, paid, unpaid),
+                          _buildRentorContributions(bills, compact: true),
+                          const Divider(height: 20),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 4),
+                ],
+              ),
+            );
+          }).toList(),
     );
   }
 
@@ -487,7 +548,12 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     if (contributions.isEmpty) return const SizedBox.shrink();
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(compact ? 0 : 16, 8, compact ? 0 : 16, compact ? 0 : 4),
+      padding: EdgeInsets.fromLTRB(
+        compact ? 0 : 16,
+        8,
+        compact ? 0 : 16,
+        compact ? 0 : 4,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -502,13 +568,22 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
             ),
           ),
           const SizedBox(height: 4),
-          ...contributions.entries.map((e) => Row(
-                children: [
-                  Expanded(child: Text(e.key, style: const TextStyle(fontSize: 12))),
-                  Text('\$${e.value.toStringAsFixed(2)}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                ],
-              )),
+          ...contributions.entries.map(
+            (e) => Row(
+              children: [
+                Expanded(
+                  child: Text(e.key, style: const TextStyle(fontSize: 12)),
+                ),
+                Text(
+                  '\$${e.value.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -521,7 +596,11 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
         const SizedBox(width: 12),
         _statChip('Paid', paid, color: Colors.green[700]),
         const SizedBox(width: 12),
-        _statChip('Unpaid', unpaid, color: unpaid > 0.005 ? Colors.red : Colors.grey[600]),
+        _statChip(
+          'Unpaid',
+          unpaid,
+          color: unpaid > 0.005 ? Colors.red : Colors.grey[600],
+        ),
       ],
     );
   }
@@ -534,7 +613,11 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
         Text(label, style: TextStyle(fontSize: 10, color: Colors.grey[600])),
         Text(
           '\$${amount.toStringAsFixed(2)}',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: color),
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+            color: color,
+          ),
         ),
       ],
     );
@@ -546,12 +629,16 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
     if (_rentors.isEmpty) return const SizedBox.shrink();
 
     final now = DateTime.now();
-    final currentMonthBills = _bills
-        .where((b) =>
-            b.dueDate.year == now.year &&
-            b.dueDate.month == now.month &&
-            (b.status == PaymentStatus.unpaid || b.status == PaymentStatus.partial))
-        .toList();
+    final currentMonthBills =
+        _bills
+            .where(
+              (b) =>
+                  b.dueDate.year == now.year &&
+                  b.dueDate.month == now.month &&
+                  (b.status == PaymentStatus.unpaid ||
+                      b.status == PaymentStatus.partial),
+            )
+            .toList();
 
     // rentorId -> billId -> total already paid by that rentor
     final Map<String, Map<String, double>> rentorPaidPerBill = {};
@@ -572,7 +659,9 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
         initiallyExpanded: true,
         title: Text(
           'Rentors Owed – $monthLabel',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
         ),
         children: [
           const Divider(height: 1),
@@ -585,7 +674,13 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
               ),
             )
           else
-            ..._rentors.map((rentor) => _buildRentorOwedRow(rentor, currentMonthBills, rentorPaidPerBill)),
+            ..._rentors.map(
+              (rentor) => _buildRentorOwedRow(
+                rentor,
+                currentMonthBills,
+                rentorPaidPerBill,
+              ),
+            ),
           const SizedBox(height: 4),
         ],
       ),
@@ -613,32 +708,51 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(rentor.name,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+              Text(
+                rentor.name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
               total > 0
-                  ? Text('\$${total.toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))
-                  : Text('All settled',
-                      style: TextStyle(
-                          color: Colors.green[700],
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500)),
+                  ? Text(
+                    '\$${total.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  )
+                  : Text(
+                    'All settled',
+                    style: TextStyle(
+                      color: Colors.green[700],
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
             ],
           ),
           if (breakdown.isNotEmpty) ...[
             const SizedBox(height: 4),
-            ...breakdown.entries.map((e) => Padding(
-                  padding: const EdgeInsets.only(left: 8, top: 2),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(e.key.name,
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                      Text('\$${e.value.toStringAsFixed(2)}',
-                          style: const TextStyle(fontSize: 12)),
-                    ],
-                  ),
-                )),
+            ...breakdown.entries.map(
+              (e) => Padding(
+                padding: const EdgeInsets.only(left: 8, top: 2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      e.key.name,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                    Text(
+                      '\$${e.value.toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
           const Divider(height: 16),
         ],
@@ -655,74 +769,141 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
         title: const Text('Summary'),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Monthly'),
-            Tab(text: 'By Bill Type'),
-          ],
+          tabs: const [Tab(text: 'Monthly'), Tab(text: 'By Bill Type')],
         ),
         actions: [
           const NotificationBellIcon(),
           if (isGoogleSignInEnabled)
             googleAccountService.buildWebGoogleAction(authorizeGoogleAccount),
-          IconButton(
-            icon: const Icon(Icons.sync),
-            tooltip: 'Sync bills & payments',
-            onPressed: _loading ? null : _syncData,
-          ),
-          DropdownButton<String>(
-            value: _statusFilter,
-            underline: const SizedBox(),
-            onChanged: (value) => setState(() => _statusFilter = value!),
-            items: const [
-              DropdownMenuItem(value: 'All', child: Text('All')),
-              DropdownMenuItem(value: 'Paid', child: Text('Paid')),
-              DropdownMenuItem(value: 'Unpaid', child: Text('Unpaid')),
-            ],
-          ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: Icon(
-              _showActualUnpaid ? Icons.visibility : Icons.visibility_off,
-              color: _showActualUnpaid ? Theme.of(context).colorScheme.primary : null,
+              _statusFilter == 'All'
+                  ? Icons.filter_list
+                  : Icons.filter_list_alt,
             ),
-            tooltip: _showActualUnpaid ? 'Hide actual unpaid amounts' : 'Show actual unpaid amounts',
-            onPressed: () => setState(() => _showActualUnpaid = !_showActualUnpaid),
+            tooltip: 'Filter: $_statusFilter',
+            onSelected: (value) => setState(() => _statusFilter = value),
+            itemBuilder:
+                (context) =>
+                    ['All', 'Paid', 'Unpaid']
+                        .map(
+                          (value) => CheckedPopupMenuItem<String>(
+                            value: value,
+                            checked: _statusFilter == value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
           ),
-          IconButton(
-            icon: const Icon(Icons.table_chart_outlined),
-            tooltip: 'Export CSV',
-            onPressed: _exportToCSV,
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'More actions',
+            itemBuilder:
+                (context) => [
+                  PopupMenuItem(
+                    value: 'sync',
+                    enabled: !_loading,
+                    child: const ListTile(
+                      leading: Icon(Icons.sync),
+                      title: Text('Sync bills & payments'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'toggle_unpaid',
+                    child: ListTile(
+                      leading: Icon(
+                        _showActualUnpaid
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                      ),
+                      title: Text(
+                        _showActualUnpaid
+                            ? 'Hide actual unpaid amounts'
+                            : 'Show actual unpaid amounts',
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'export_csv',
+                    child: ListTile(
+                      leading: Icon(Icons.table_chart_outlined),
+                      title: Text('Export CSV'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'export_pdf',
+                    child: ListTile(
+                      leading: Icon(Icons.picture_as_pdf_outlined),
+                      title: Text('Export PDF'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  if (!AppBreakpoints.isWide(context))
+                    const PopupMenuItem(
+                      value: 'settings',
+                      child: ListTile(
+                        leading: Icon(Icons.settings_outlined),
+                        title: Text('Settings'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  const PopupMenuItem(
+                    value: 'delete_all',
+                    child: ListTile(
+                      leading: Icon(Icons.delete_forever, color: Colors.red),
+                      title: Text(
+                        'Delete All Data',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+            onSelected: (String value) {
+              if (value == 'sync') {
+                if (!_loading) _syncData();
+              } else if (value == 'toggle_unpaid') {
+                setState(() => _showActualUnpaid = !_showActualUnpaid);
+              } else if (value == 'export_csv') {
+                _exportToCSV();
+              } else if (value == 'export_pdf') {
+                _exportToPDF();
+              } else if (value == 'settings') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              } else if (value == 'delete_all') {
+                _deleteAllData();
+              }
+            },
           ),
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf_outlined),
-            tooltip: 'Export PDF',
-            onPressed: _exportToPDF,
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_forever, color: Colors.red),
-            tooltip: 'Delete All Data',
-            onPressed: _deleteAllData,
-          ),
-          const SizedBox(width: 16),
-          const SettingsIconButton(),
         ],
       ),
-      body: Column(
-        children: [
-          if (isGoogleSignInEnabled && googleAccountService.buildWebWarningBanner() != null)
-            googleAccountService.buildWebWarningBanner()!,
-          if (!_loading) _buildRentorOwedSection(),
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildMonthlySummary(),
-                      _buildBillTypeSummary(),
-                    ],
-                  ),
-          ),
-        ],
+      body: ResponsiveConstraint(
+        child: Column(
+          children: [
+            if (isGoogleSignInEnabled &&
+                googleAccountService.buildWebWarningBanner() != null)
+              googleAccountService.buildWebWarningBanner()!,
+            if (!_loading) _buildRentorOwedSection(),
+            Expanded(
+              child:
+                  _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildMonthlySummary(),
+                          _buildBillTypeSummary(),
+                        ],
+                      ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -730,23 +911,24 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
   Future<void> _deleteAllData() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete All Data'),
-        content: const Text(
-          'This will permanently delete all emails, bills, and payments from the database.\n\nThis action cannot be undone. Are you sure you want to continue?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text('Delete All Data'),
+            content: const Text(
+              'This will permanently delete all emails, bills, and payments from the database.\n\nThis action cannot be undone. Are you sure you want to continue?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: const Text('Delete All'),
+              ),
+            ],
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete All'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed != true) return;
@@ -759,13 +941,19 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
 
     final List<String> errors = [];
     if (emailDeleteResult.isError) {
-      errors.add(emailDeleteResult.errorMessage ?? 'Failed to delete all emails.');
+      errors.add(
+        emailDeleteResult.errorMessage ?? 'Failed to delete all emails.',
+      );
     }
     if (paymentsDeleteResult.isError) {
-      errors.add(paymentsDeleteResult.errorMessage ?? 'Failed to delete all payments.');
+      errors.add(
+        paymentsDeleteResult.errorMessage ?? 'Failed to delete all payments.',
+      );
     }
     if (billsDeleteResult.isError) {
-      errors.add(billsDeleteResult.errorMessage ?? 'Failed to delete all bills.');
+      errors.add(
+        billsDeleteResult.errorMessage ?? 'Failed to delete all bills.',
+      );
     }
 
     await _loadData();
@@ -774,7 +962,9 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen> with Si
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            errors.isEmpty ? 'All data has been deleted.' : 'Delete failed: ${errors.join(' | ')}',
+            errors.isEmpty
+                ? 'All data has been deleted.'
+                : 'Delete failed: ${errors.join(' | ')}',
           ),
           backgroundColor: errors.isEmpty ? null : Colors.red,
         ),
