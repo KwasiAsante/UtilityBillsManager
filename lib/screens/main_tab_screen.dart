@@ -12,11 +12,15 @@ import '../config/app_config.dart';
 import '../services/google/google_account_service_native.dart';
 import '../utils/app_breakpoints.dart';
 
-/// The root shell of the app containing a bottom navigation bar with five tabs:
-/// Bills (0), Rentors (1), Summary (2), Payments (3), and Emails (4).
+/// The root shell of the app.
+///
+/// On compact screens (< 600 dp) renders a [NavigationBar] at the bottom with
+/// five tabs: Bills (0), Rentors (1), Summary (2), Payments (3), and Emails (4).
+/// On wide screens (≥ 600 dp) renders an extended [NavigationRail] on the left
+/// with the same five tabs plus a Settings entry pinned at the bottom.
 ///
 /// Uses an [IndexedStack] so each tab's widget tree is preserved across
-/// navigation.  On web, also initialises [GoogleAccountService] for Gmail
+/// navigation. On web, also initialises [GoogleAccountService] for Gmail
 /// access.
 class MainTabScreen extends StatefulWidget {
   const MainTabScreen({super.key});
