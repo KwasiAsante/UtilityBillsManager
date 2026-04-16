@@ -10,9 +10,11 @@ import '../../data/models/email_data.dart';
 import '../../data/repositories/email_data_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
+import '../../utils/app_breakpoints.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../widgets/notification_bell_icon.dart';
-import '../../widgets/settings_icon_button.dart';
+import '../../widgets/responsive_constraint.dart';
+import '../settings/settings_screen.dart';
 
 /// Screen that displays the list of imported email records.
 ///
@@ -51,6 +53,7 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
   final EmailDataRepository _emailDataRepository = EmailDataRepository();
   final EmailDataHelper _emailDataHelper = EmailDataHelper();
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
 
   Future<List<EmailData>>? _emails;
   List<EmailData> _allEmails = [];
@@ -99,6 +102,7 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
     _emailDataRepository.removeListener(_onEmailsUpdated);
     _scrollController.removeListener(_checkScrollability);
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -159,22 +163,26 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
   Future<void> _deleteAllEmails() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete All Emails'),
-        content: const Text(
-          'Are you sure you want to delete all email records? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete All Emails'),
+            content: const Text(
+              'Are you sure you want to delete all email records? This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
@@ -188,14 +196,19 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
   }
 
   void _updateDisplayedEmails() {
-    var displayed = _allEmails.where((email) {
-      final matchesFilter = _selectedFilter == 'All' ||
-          (_selectedFilter == 'Processed' && email.processed) ||
-          (_selectedFilter == 'Unprocessed' && !email.processed);
-      final matchesSearch = _searchQuery.isEmpty ||
-          email.emailSubject.toLowerCase().contains(_searchQuery.toLowerCase());
-      return matchesFilter && matchesSearch;
-    }).toList();
+    var displayed =
+        _allEmails.where((email) {
+          final matchesFilter =
+              _selectedFilter == 'All' ||
+              (_selectedFilter == 'Processed' && email.processed) ||
+              (_selectedFilter == 'Unprocessed' && !email.processed);
+          final matchesSearch =
+              _searchQuery.isEmpty ||
+              email.emailSubject.toLowerCase().contains(
+                _searchQuery.toLowerCase(),
+              );
+          return matchesFilter && matchesSearch;
+        }).toList();
 
     switch (_selectedSort) {
       case 'Subject (A-Z)':
@@ -242,9 +255,23 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
           child: Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
+              controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search by subject...',
                 prefixIcon: const Icon(Icons.search),
+                suffixIcon:
+                    _searchQuery.isNotEmpty
+                        ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                            _updateDisplayedEmails();
+                          },
+                        )
+                        : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
@@ -265,138 +292,183 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
           const NotificationBellIcon(),
           if (isGoogleSignInEnabled)
             googleAccountService.buildWebGoogleAction(authorizeGoogleAccount),
-          if (_searchQuery.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: () {
-                setState(() {
-                  _searchQuery = '';
-                });
-                _updateDisplayedEmails();
-              },
+          PopupMenuButton<String>(
+            icon: Icon(
+              _selectedFilter == 'All'
+                  ? Icons.filter_list
+                  : Icons.filter_list_alt,
             ),
-          DropdownButton<String>(
-            value: _selectedFilter,
-            items: ['All', 'Processed', 'Unprocessed'].map((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value),
-              );
-            }).toList(),
-            onChanged: (String? newValue) {
-              if (newValue != null) {
-                setState(() {
-                  _selectedFilter = newValue;
-                });
-                _updateDisplayedEmails();
+            tooltip: 'Filter: $_selectedFilter',
+            onSelected: (value) {
+              setState(() => _selectedFilter = value);
+              _updateDisplayedEmails();
+            },
+            itemBuilder:
+                (context) =>
+                    ['All', 'Processed', 'Unprocessed']
+                        .map(
+                          (value) => CheckedPopupMenuItem<String>(
+                            value: value,
+                            checked: _selectedFilter == value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.sort),
+            tooltip: 'Sort: $_selectedSort',
+            onSelected: (value) {
+              setState(() => _selectedSort = value);
+              _updateDisplayedEmails();
+            },
+            itemBuilder:
+                (context) =>
+                    [
+                          'Default',
+                          'Subject (A-Z)',
+                          'Subject (Z-A)',
+                          'Processed First',
+                          'Unprocessed First',
+                        ]
+                        .map(
+                          (value) => CheckedPopupMenuItem<String>(
+                            value: value,
+                            checked: _selectedSort == value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'More actions',
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(
+                    value: 'refresh',
+                    child: ListTile(
+                      leading: Icon(Icons.refresh),
+                      title: Text('Sync emails'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  if (!AppBreakpoints.isWide(context))
+                    const PopupMenuItem(
+                      value: 'settings',
+                      child: ListTile(
+                        leading: Icon(Icons.settings_outlined),
+                        title: Text('Settings'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  const PopupMenuItem(
+                    value: 'delete_all',
+                    child: ListTile(
+                      leading: Icon(Icons.delete_sweep, color: Colors.red),
+                      title: Text(
+                        'Delete all email records',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+            onSelected: (String value) {
+              if (value == 'refresh') {
+                _syncEmails();
+              } else if (value == 'settings') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              } else if (value == 'delete_all') {
+                _deleteAllEmails();
               }
             },
           ),
-          const SizedBox(width: 8),
-          DropdownButton<String>(
-            value: _selectedSort,
-            items: [
-              'Default',
-              'Subject (A-Z)',
-              'Subject (Z-A)',
-              'Processed First',
-              'Unprocessed First',
-            ].map((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value),
-              );
-            }).toList(),
-            onChanged: (String? newValue) {
-              if (newValue != null) {
-                setState(() {
-                  _selectedSort = newValue;
-                });
-                _updateDisplayedEmails();
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Sync emails',
-            onPressed: _syncEmails,
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_sweep),
-            tooltip: 'Delete all email records',
-            onPressed: _deleteAllEmails,
-          ),
-          const SizedBox(width: 16),
-          const SettingsIconButton(),
         ],
       ),
-      body: Column(
-        children: [
-          if (isGoogleSignInEnabled && googleAccountService.buildWebWarningBanner() != null)
-            googleAccountService.buildWebWarningBanner()!,
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : FutureBuilder<List<EmailData>>(
-                    future: _emails,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      } else if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}'));
-                      } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        if (!isGoogleSignInEnabled ||
-                            (googleAccountService.isSignedIn &&
-                                googleAccountService.isAuthorized)) {
-                          return const Center(
-                            child: Text(
-                              'No emails found. Pull down or click the Refresh button to sync emails.',
-                            ),
-                          );
-                        } else {
-                          return const Center(
-                            child: Text(
-                              'Please sign in to your Google account to view emails.',
-                            ),
-                          );
-                        }
-                      }
+      body: ResponsiveConstraint(
+        child: Column(
+          children: [
+            if (isGoogleSignInEnabled &&
+                googleAccountService.buildWebWarningBanner() != null)
+              googleAccountService.buildWebWarningBanner()!,
+            Expanded(
+              child:
+                  _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : FutureBuilder<List<EmailData>>(
+                        future: _emails,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          } else if (snapshot.hasError) {
+                            return Center(
+                              child: Text('Error: ${snapshot.error}'),
+                            );
+                          } else if (!snapshot.hasData ||
+                              snapshot.data!.isEmpty) {
+                            if (!isGoogleSignInEnabled ||
+                                (googleAccountService.isSignedIn &&
+                                    googleAccountService.isAuthorized)) {
+                              return const Center(
+                                child: Text(
+                                  'No emails found. Pull down or click the Refresh button to sync emails.',
+                                ),
+                              );
+                            } else {
+                              return const Center(
+                                child: Text(
+                                  'Please sign in to your Google account to view emails.',
+                                ),
+                              );
+                            }
+                          }
 
-                      final emails = snapshot.data!;
-                      return RefreshIndicator(
-                        onRefresh: () async {
-                          await Future.delayed(const Duration(seconds: 2));
-                          await _syncEmails();
+                          final emails = snapshot.data!;
+                          return RefreshIndicator(
+                            onRefresh: () async {
+                              await Future.delayed(const Duration(seconds: 2));
+                              await _syncEmails();
+                            },
+                            child: ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(
+                                context,
+                              ).copyWith(
+                                dragDevices: {
+                                  PointerDeviceKind.touch,
+                                  PointerDeviceKind.mouse,
+                                },
+                              ),
+                              child: ListView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.only(bottom: 80),
+                                itemCount: emails.length,
+                                itemBuilder: (context, index) {
+                                  return _buildEmailCard(emails[index]);
+                                },
+                              ),
+                            ),
+                          );
                         },
-                        child: ScrollConfiguration(
-                          behavior: ScrollConfiguration.of(context).copyWith(
-                            dragDevices: {
-                              PointerDeviceKind.touch,
-                              PointerDeviceKind.mouse,
-                            },
-                          ),
-                          child: ListView.builder(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.only(bottom: 80),
-                            itemCount: emails.length,
-                            itemBuilder: (context, index) {
-                              return _buildEmailCard(emails[index]);
-                            },
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
+                      ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildEmailCard(EmailData email) {
-    final bodyPreview = email.emailBody.length > 100
-        ? '${email.emailBody.substring(0, 100)}...'
-        : email.emailBody;
+    final bodyPreview =
+        email.emailBody.length > 100
+            ? '${email.emailBody.substring(0, 100)}...'
+            : email.emailBody;
 
     return Card(
       child: ListTile(
@@ -423,9 +495,10 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
                     email.processed ? 'Processed' : 'Unprocessed',
                     style: const TextStyle(fontSize: 11),
                   ),
-                  backgroundColor: email.processed
-                      ? Colors.green.shade100
-                      : Colors.orange.shade100,
+                  backgroundColor:
+                      email.processed
+                          ? Colors.green.shade100
+                          : Colors.orange.shade100,
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
@@ -466,41 +539,40 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
             } else if (value == 'delete') {
               final confirmed = await showDialog<bool>(
                 context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Delete Email'),
-                  content: const Text(
-                    'Are you sure you want to delete this email record?',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text(
-                        'Delete',
-                        style: TextStyle(color: Colors.red),
+                builder:
+                    (context) => AlertDialog(
+                      title: const Text('Delete Email'),
+                      content: const Text(
+                        'Are you sure you want to delete this email record?',
                       ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text(
+                            'Delete',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
               );
               if (confirmed == true) {
                 await _emailDataRepository.delete(email.emailDataId!);
               }
             }
           },
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: Text('Edit'),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Text('Delete', style: TextStyle(color: Colors.red)),
-            ),
-          ],
+          itemBuilder:
+              (context) => [
+                const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Delete', style: TextStyle(color: Colors.red)),
+                ),
+              ],
         ),
         onTap: () async {
           await Navigator.push(
