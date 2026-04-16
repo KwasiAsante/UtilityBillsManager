@@ -15,8 +15,10 @@ import '../../screens/base/google_sign_in_screen_state.dart';
 import '../../utils/constants.dart';
 import '../../utils/dialogs/due_date_filter_sheet.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
+import '../../utils/app_breakpoints.dart';
 import '../../widgets/notification_bell_icon.dart';
-import '../../widgets/settings_icon_button.dart';
+import '../../widgets/responsive_constraint.dart';
+import '../settings/settings_screen.dart';
 
 /// Screen that displays the list of utility bills.
 ///
@@ -382,87 +384,102 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
             ),
             onPressed: _openDueDateFilterSheet,
           ),
-          if (_hasActiveDueDateFilter)
-            IconButton(
-              tooltip: 'Clear due date filters',
-              icon: const Icon(Icons.filter_alt_off),
-              onPressed: () {
-                setState(() {
-                  _selectedDueYear = null;
-                  _selectedDueMonth = null;
-                  _dateRangeStart = null;
-                  _dateRangeEnd = null;
-                });
-                _updateDisplayedBills();
-              },
-            ),
-          if (_searchQuery.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: () {
-                setState(() {
-                  _searchQuery = '';
-                });
-                _updateDisplayedBills();
-              },
-            ),
-          DropdownButton<String>(
-            value: _selectedFilter,
-            items:
-                ['All', 'Paid', 'Unpaid'].map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-            onChanged: (String? newValue) {
-              if (newValue != null) {
-                setState(() {
-                  _selectedFilter = newValue;
-                });
-                _updateDisplayedBills();
+          PopupMenuButton<String>(
+            tooltip: 'Filter',
+            icon: const Icon(Icons.filter_list),
+            onSelected: (String newValue) {
+              setState(() {
+                _selectedFilter = newValue;
+              });
+              _updateDisplayedBills();
+            },
+            itemBuilder:
+                (context) =>
+                    ['All', 'Paid', 'Unpaid']
+                        .map(
+                          (value) => PopupMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Sort',
+            icon: const Icon(Icons.sort),
+            onSelected: (String newValue) {
+              setState(() {
+                _selectedSort = newValue;
+              });
+              _updateDisplayedBills();
+            },
+            itemBuilder:
+                (context) =>
+                    [
+                      'Due Date (Earliest)',
+                      'Due Date (Latest)',
+                      'Amount (Lowest)',
+                      'Amount (Highest)',
+                    ]
+                        .map(
+                          (value) => PopupMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+          ),
+          PopupMenuButton<Object>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'More actions',
+            onSelected: (value) {
+              if (value == 'refresh') {
+                if (!_loading) _syncBills();
+              } else if (value == 'settings') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SettingsScreen(),
+                  ),
+                );
+              } else if (value == 'delete_all') {
+                _deleteAllBills();
               }
             },
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem<Object>(
+                    value: 'refresh',
+                    child: ListTile(
+                      leading: Icon(Icons.refresh),
+                      title: Text('Refresh'),
+                    ),
+                  ),
+                  if (!AppBreakpoints.isWide(context))
+                    const PopupMenuItem<Object>(
+                      value: 'settings',
+                      child: ListTile(
+                        leading: Icon(Icons.settings_outlined),
+                        title: Text('Settings'),
+                      ),
+                    ),
+                  const PopupMenuItem<Object>(
+                    value: 'delete_all',
+                    child: ListTile(
+                      leading: Icon(Icons.delete_sweep, color: Colors.red),
+                      title: Text(
+                        'Delete All',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ),
+                ],
           ),
-          const SizedBox(width: 16),
-          DropdownButton<String>(
-            value: _selectedSort,
-            items:
-                [
-                  'Due Date (Earliest)',
-                  'Due Date (Latest)',
-                  'Amount (Lowest)',
-                  'Amount (Highest)',
-                ].map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-            onChanged: (String? newValue) {
-              if (newValue != null) {
-                setState(() {
-                  _selectedSort = newValue;
-                });
-                _updateDisplayedBills();
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loading ? null : _syncBills,
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_sweep),
-            tooltip: 'Delete all bills',
-            onPressed: _deleteAllBills,
-          ),
-          const SizedBox(width: 16),
-          const SettingsIconButton(),
         ],
       ),
-      body: Column(
-        children: [
+      body: ResponsiveConstraint(
+        child: Column(
+          children: [
           if (isGoogleSignInEnabled &&
               googleAccountService.buildWebWarningBanner() != null)
             googleAccountService.buildWebWarningBanner()!,
@@ -627,6 +644,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                     ),
           ),
         ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'bill_list_fab',
