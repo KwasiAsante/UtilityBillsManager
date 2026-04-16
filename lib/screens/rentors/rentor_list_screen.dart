@@ -8,8 +8,10 @@ import '../../data/models/rentor.dart';
 import '../../data/repositories/rentors_repository.dart';
 import '../../helpers/rentors/rentors_helper.dart';
 import '../../utils/comparable_utils.dart';
+import '../../utils/app_breakpoints.dart';
 import '../../widgets/notification_bell_icon.dart';
-import '../../widgets/settings_icon_button.dart';
+import '../../widgets/responsive_constraint.dart';
+import '../settings/settings_screen.dart';
 
 /// Screen that displays the list of rentors (tenants).
 ///
@@ -27,6 +29,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
   final RentorsHelper _rentorsHelper = RentorsHelper();
   final RentorsRepository _rentorsRepository = RentorsRepository();
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
 
   Future<List<Rentor>>? _rentors;
   List<Rentor> _allRentors = [];
@@ -48,6 +51,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
     _rentorsRepository.removeListener(_onRentorsUpdated);
     _scrollController.removeListener(_checkScrollability);
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -146,6 +150,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
           child: Padding(
             padding: const EdgeInsets.all(8.0),
             child: TextField(
+              controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Search by name...',
                 prefixIcon: const Icon(Icons.search),
@@ -155,6 +160,18 @@ class _RentorListScreenState extends State<RentorListScreen> {
                 filled: true,
                 fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            _searchQuery = '';
+                          });
+                          _updateDisplayedRentors();
+                        },
+                      )
+                    : null,
               ),
               onChanged: (query) {
                 setState(() {
@@ -167,57 +184,75 @@ class _RentorListScreenState extends State<RentorListScreen> {
         ),
         actions: [
           const NotificationBellIcon(),
-          if (_searchQuery.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: () {
-                setState(() {
-                  _searchQuery = '';
-                });
-                _updateDisplayedRentors();
-              },
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () async {
-              await _rentorsRepository.reload();
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.sort),
+            tooltip: 'Sort: $_selectedSort',
+            onSelected: (value) {
+              setState(() => _selectedSort = value);
+              _updateDisplayedRentors();
             },
+            itemBuilder: (context) => [
+              'Percentage',
+              'Last Payment Date (Asc)',
+              'Last Payment Date (Desc)',
+            ]
+                .map((value) => CheckedPopupMenuItem<String>(
+                      value: value,
+                      checked: _selectedSort == value,
+                      child: Text(value),
+                    ))
+                .toList(),
           ),
-          IconButton(
-            icon: const Icon(Icons.delete_sweep),
-            tooltip: 'Delete all rentors',
-            onPressed: _deleteAllRentors,
-          ),
-          const SizedBox(width: 16),
-          DropdownButton<String>(
-            value: _selectedSort,
-            items:
-                [
-                  'Percentage',
-                  'Last Payment Date (Asc)',
-                  'Last Payment Date (Desc)',
-                ].map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-            onChanged: (String? newValue) {
-              if (newValue != null) {
-                setState(() {
-                  _selectedSort = newValue;
-                });
-                _updateDisplayedRentors();
+          PopupMenuButton<Object>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'More actions',
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'refresh',
+                child: ListTile(
+                  leading: Icon(Icons.refresh),
+                  title: Text('Refresh'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              if (!AppBreakpoints.isWide(context))
+                const PopupMenuItem(
+                  value: 'settings',
+                  child: ListTile(
+                    leading: Icon(Icons.settings_outlined),
+                    title: Text('Settings'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              const PopupMenuItem(
+                value: 'delete_all',
+                child: ListTile(
+                  leading: Icon(Icons.delete_sweep, color: Colors.red),
+                  title: Text('Delete all rentors',
+                      style: TextStyle(color: Colors.red)),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+            onSelected: (value) async {
+              if (value == 'refresh') {
+                await _rentorsRepository.reload();
+              } else if (value == 'settings') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              } else if (value == 'delete_all') {
+                _deleteAllRentors();
               }
             },
           ),
-          const SizedBox(width: 16),
-          const SettingsIconButton(),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          :FutureBuilder<List<Rentor>>(
+      body: ResponsiveConstraint(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : FutureBuilder<List<Rentor>>(
         future: _rentors,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -333,6 +368,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
             ),
           );
         },
+      ),
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'rentor_list_fab',
