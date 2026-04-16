@@ -8,12 +8,14 @@ import '../../data/models/payment.dart';
 import '../../data/repositories/payments_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
+import '../../utils/app_breakpoints.dart';
 import '../../utils/comparable_utils.dart';
 import '../../utils/constants.dart';
 import '../../utils/dialogs/due_date_filter_sheet.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../widgets/notification_bell_icon.dart';
-import '../../widgets/settings_icon_button.dart';
+import '../../widgets/responsive_constraint.dart';
+import '../settings/settings_screen.dart';
 
 import 'add_edit_payment_screen.dart';
 
@@ -60,6 +62,7 @@ class _PaymentListScreenState
   final PaymentsRepository _paymentsRepository = PaymentsRepository();
   final EmailDataHelper _emailDataHelper = EmailDataHelper();
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
 
   Future<List<Payment>>? _payments;
   List<Payment> _allPayments = [];
@@ -112,6 +115,7 @@ class _PaymentListScreenState
     _paymentsRepository.removeListener(_onPaymentsUpdated);
     _scrollController.removeListener(_checkScrollability);
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -213,8 +217,7 @@ class _PaymentListScreenState
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(
-            const SnackBar(content: Text('All payments deleted.')));
+        ).showSnackBar(const SnackBar(content: Text('All payments deleted.')));
       }
     }
   }
@@ -347,6 +350,43 @@ class _PaymentListScreenState
     return Scaffold(
       appBar: AppBar(
         title: const Text('Payments'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search payments...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                filled: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                suffixIcon:
+                    _searchQuery.isNotEmpty
+                        ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                            _updateDisplayedPayments();
+                          },
+                        )
+                        : null,
+              ),
+              onChanged: (query) {
+                setState(() {
+                  _searchQuery = query;
+                });
+                _updateDisplayedPayments();
+              },
+            ),
+          ),
+        ),
         actions: [
           const NotificationBellIcon(),
           if (isGoogleSignInEnabled)
@@ -360,257 +400,274 @@ class _PaymentListScreenState
             ),
             onPressed: _openPaymentDateFilterSheet,
           ),
-          if (_hasActivePaymentDateFilter)
-            IconButton(
-              tooltip: 'Clear payment date filters',
-              icon: const Icon(Icons.filter_alt_off),
-              onPressed: () {
-                setState(() {
-                  _selectedPaymentYear = null;
-                  _selectedPaymentMonth = null;
-                  _dateRangeStart = null;
-                  _dateRangeEnd = null;
-                });
-                _updateDisplayedPayments();
-              },
-            ),
-          if (_searchQuery.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: () {
-                setState(() {
-                  _searchQuery = '';
-                });
-                _updateDisplayedPayments();
-              },
-            ),
-          const SizedBox(width: 16),
-          DropdownButton<String>(
-            value: _selectedSort,
-            items:
-                [
-                  'Payment Date (Earliest)',
-                  'Payment Date (Latest)',
-                  'Amount Paid (Lowest)',
-                  'Amount Paid (Highest)',
-                ].map((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-            onChanged: (String? newValue) {
-              if (newValue != null) {
-                setState(() {
-                  _selectedSort = newValue;
-                });
-                _updateDisplayedPayments();
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.sort),
+            tooltip: 'Sort: $_selectedSort',
+            onSelected: (value) {
+              setState(() => _selectedSort = value);
+              _updateDisplayedPayments();
+            },
+            itemBuilder:
+                (context) =>
+                    [
+                          'Payment Date (Earliest)',
+                          'Payment Date (Latest)',
+                          'Amount Paid (Lowest)',
+                          'Amount Paid (Highest)',
+                        ]
+                        .map(
+                          (value) => CheckedPopupMenuItem<String>(
+                            value: value,
+                            checked: _selectedSort == value,
+                            child: Text(value),
+                          ),
+                        )
+                        .toList(),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'More actions',
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(
+                    value: 'refresh',
+                    child: ListTile(
+                      leading: Icon(Icons.refresh),
+                      title: Text('Refresh'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  if (!AppBreakpoints.isWide(context))
+                    const PopupMenuItem(
+                      value: 'settings',
+                      child: ListTile(
+                        leading: Icon(Icons.settings_outlined),
+                        title: Text('Settings'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  const PopupMenuItem(
+                    value: 'delete_all',
+                    child: ListTile(
+                      leading: Icon(Icons.delete_sweep, color: Colors.red),
+                      title: Text(
+                        'Delete all payments',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+            onSelected: (String value) async {
+              if (value == 'refresh') {
+                await _syncPayments();
+              } else if (value == 'settings') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                );
+              } else if (value == 'delete_all') {
+                _deleteAllPayments();
               }
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () async {
-              await _syncPayments();
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_sweep),
-            tooltip: 'Delete all payments',
-            onPressed: _deleteAllPayments,
-          ),
-          const SizedBox(width: 16),
-          const SettingsIconButton(),
         ],
       ),
-      body: Column(
-        children: [
-          if (isGoogleSignInEnabled &&
-              googleAccountService.buildWebWarningBanner() != null)
-            googleAccountService.buildWebWarningBanner()!,
-          Expanded(
-            child:
-                _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : FutureBuilder<List<Payment>>(
-                      future: _payments,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
-                        } else if (snapshot.hasError) {
-                          return Center(
-                            child: Text('Error: ${snapshot.error}'),
-                          );
-                        } else if (!snapshot.hasData ||
-                            snapshot.data!.isEmpty) {
-                          if (!isGoogleSignInEnabled ||
-                              (googleAccountService.isSignedIn &&
-                                  googleAccountService.isAuthorized)) {
-                            return Center(
-                              child: Text(
-                                'No payments found. Pull down or click on the Refresh button to sync with Gmail or click the + button to add a payment.',
-                              ),
+      body: ResponsiveConstraint(
+        child: Column(
+          children: [
+            if (isGoogleSignInEnabled &&
+                googleAccountService.buildWebWarningBanner() != null)
+              googleAccountService.buildWebWarningBanner()!,
+            Expanded(
+              child:
+                  _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : FutureBuilder<List<Payment>>(
+                        future: _payments,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
                             );
-                          } else {
+                          } else if (snapshot.hasError) {
                             return Center(
-                              child: Text(
-                                'Please sign in to your Google account to view payments.',
-                              ),
+                              child: Text('Error: ${snapshot.error}'),
                             );
+                          } else if (!snapshot.hasData ||
+                              snapshot.data!.isEmpty) {
+                            if (!isGoogleSignInEnabled ||
+                                (googleAccountService.isSignedIn &&
+                                    googleAccountService.isAuthorized)) {
+                              return Center(
+                                child: Text(
+                                  'No payments found. Pull down or click on the Refresh button to sync with Gmail or click the + button to add a payment.',
+                                ),
+                              );
+                            } else {
+                              return Center(
+                                child: Text(
+                                  'Please sign in to your Google account to view payments.',
+                                ),
+                              );
+                            }
                           }
-                        }
 
-                        final payments = snapshot.data!;
-                        return RefreshIndicator(
-                          onRefresh: () async {
-                            await Future.delayed(Duration(seconds: 2));
-                            await _syncPayments();
-                          },
-                          child: ScrollConfiguration(
-                            behavior: ScrollConfiguration.of(context).copyWith(
-                              dragDevices: {
-                                PointerDeviceKind.touch,
-                                PointerDeviceKind.mouse,
-                              },
-                            ),
-                            child: ListView.builder(
-                              controller: _scrollController,
-                              padding: const EdgeInsets.only(bottom: 80),
-                              itemCount: payments.length,
-                              itemBuilder: (context, index) {
-                                final payment = payments[index];
-                                final hasBills =
-                                    payment.bills != null &&
-                                    payment.bills!.isNotEmpty;
-                                return Card(
-                                  child: ListTile(
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 8,
-                                    ),
-                                    isThreeLine:
-                                        hasBills &&
-                                        payment.rentorName != "Unknown Rentor",
-                                    onTap: () async {
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) => AddEditPaymentScreen(
-                                                payment: payment,
-                                              ),
-                                        ),
-                                      );
-                                    },
-                                    title: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            hasBills
-                                                ? payment.billNames(
-                                                  newLine: false,
-                                                )
-                                                : payment.rentorName !=
-                                                    "Unknown Rentor"
-                                                ? payment.rentorName
-                                                : 'Payment',
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.titleSmall?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
+                          final payments = snapshot.data!;
+                          return RefreshIndicator(
+                            onRefresh: () async {
+                              await Future.delayed(Duration(seconds: 2));
+                              await _syncPayments();
+                            },
+                            child: ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(
+                                context,
+                              ).copyWith(
+                                dragDevices: {
+                                  PointerDeviceKind.touch,
+                                  PointerDeviceKind.mouse,
+                                },
+                              ),
+                              child: ListView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.only(bottom: 80),
+                                itemCount: payments.length,
+                                itemBuilder: (context, index) {
+                                  final payment = payments[index];
+                                  final hasBills =
+                                      payment.bills != null &&
+                                      payment.bills!.isNotEmpty;
+                                  return Card(
+                                    child: ListTile(
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 8,
                                           ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          '\$${payment.amountPaid.toStringAsFixed(2)}',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 14,
-                                            color: Colors.green[700],
+                                      isThreeLine:
+                                          hasBills &&
+                                          payment.rentorName !=
+                                              "Unknown Rentor",
+                                      onTap: () async {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) =>
+                                                    AddEditPaymentScreen(
+                                                      payment: payment,
+                                                    ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                    subtitle: Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Column(
+                                        );
+                                      },
+                                      title: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(
-                                            'Paid: ${DateFormat('MMM d, yyyy').format(payment.paymentDate)}',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[600],
+                                          Expanded(
+                                            child: Text(
+                                              hasBills
+                                                  ? payment.billNames(
+                                                    newLine: false,
+                                                  )
+                                                  : payment.rentorName !=
+                                                      "Unknown Rentor"
+                                                  ? payment.rentorName
+                                                  : 'Payment',
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.titleSmall?.copyWith(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                          if (hasBills &&
-                                              payment.rentorName !=
-                                                  "Unknown Rentor")
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '\$${payment.amountPaid.toStringAsFixed(2)}',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                              color: Colors.green[700],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      subtitle: Padding(
+                                        padding: const EdgeInsets.only(top: 4),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
                                             Text(
-                                              'By: ${payment.rentorName}',
+                                              'Paid: ${DateFormat('MMM d, yyyy').format(payment.paymentDate)}',
                                               style: TextStyle(
                                                 fontSize: 12,
                                                 color: Colors.grey[600],
                                               ),
                                             ),
-                                        ],
+                                            if (hasBills &&
+                                                payment.rentorName !=
+                                                    "Unknown Rentor")
+                                              Text(
+                                                'By: ${payment.rentorName}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      trailing: PopupMenuButton<String>(
+                                        onSelected: (value) async {
+                                          if (value == 'edit') {
+                                            await Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder:
+                                                    (context) =>
+                                                        AddEditPaymentScreen(
+                                                          payment: payment,
+                                                        ),
+                                              ),
+                                            );
+                                          } else if (value == 'delete') {
+                                            await _paymentsRepository.delete(
+                                              payment.paymentId!,
+                                            );
+                                          }
+                                        },
+                                        itemBuilder:
+                                            (context) => [
+                                              const PopupMenuItem(
+                                                value: 'edit',
+                                                child: Text('Edit'),
+                                              ),
+                                              const PopupMenuItem(
+                                                value: 'delete',
+                                                textStyle: TextStyle(
+                                                  color: Colors.red,
+                                                ),
+                                                child: Text('Delete'),
+                                              ),
+                                            ],
                                       ),
                                     ),
-                                    trailing: PopupMenuButton<String>(
-                                      onSelected: (value) async {
-                                        if (value == 'edit') {
-                                          await Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder:
-                                                  (context) =>
-                                                      AddEditPaymentScreen(
-                                                        payment: payment,
-                                                      ),
-                                            ),
-                                          );
-                                        } else if (value == 'delete') {
-                                          await _paymentsRepository.delete(
-                                            payment.paymentId!,
-                                          );
-                                        }
-                                      },
-                                      itemBuilder:
-                                          (context) => [
-                                            const PopupMenuItem(
-                                              value: 'edit',
-                                              child: Text('Edit'),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: 'delete',
-                                              textStyle: TextStyle(
-                                                color: Colors.red,
-                                              ),
-                                              child: Text('Delete'),
-                                            ),
-                                          ],
-                                    ),
-                                  ),
-                                );
-                              },
+                                  );
+                                },
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    ),
-          ),
-        ],
+                          );
+                        },
+                      ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'payment_list_fab',
