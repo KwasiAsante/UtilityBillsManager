@@ -144,6 +144,23 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
 
     if (!mounted) return;
 
+    final content = _RentorPickerContent(
+      currentSelectedRentor: _selectedRentor,
+      allRentors: _allRentors,
+      rentorsHelper: _rentorsHelper,
+      onAdd: (Rentor? selectedRentor, List<Rentor> allRentors) {
+        setState(() {
+          _allRentors = allRentors;
+          _selectedRentor = selectedRentor;
+          if (_selectedRentor == null) {
+            _clearRentorSelection();
+          } else {
+            _rentorController.text = selectedRentor?.name ?? '';
+          }
+        });
+      },
+    );
+
     if (AppBreakpoints.isWide(context)) {
       showDialog(
         context: context,
@@ -151,22 +168,7 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
             (context) => Dialog(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
-                child: _RentorPickerContent(
-                  currentSelectedRentor: _selectedRentor,
-                  allRentors: _allRentors,
-                  rentorsHelper: _rentorsHelper,
-                  onAdd: (Rentor? selectedRentor, List<Rentor> allRentors) {
-                    setState(() {
-                      _allRentors = allRentors;
-                      _selectedRentor = selectedRentor;
-                      if (_selectedRentor == null) {
-                        _clearRentorSelection();
-                      } else {
-                        _rentorController.text = selectedRentor?.name ?? '';
-                      }
-                    });
-                  },
-                ),
+                child: content,
               ),
             ),
       );
@@ -180,22 +182,7 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-              child: _RentorPickerContent(
-                currentSelectedRentor: _selectedRentor,
-                allRentors: _allRentors,
-                rentorsHelper: _rentorsHelper,
-                onAdd: (Rentor? selectedRentor, List<Rentor> allRentors) {
-                  setState(() {
-                    _allRentors = allRentors;
-                    _selectedRentor = selectedRentor;
-                    if (_selectedRentor == null) {
-                      _clearRentorSelection();
-                    } else {
-                      _rentorController.text = selectedRentor?.name ?? '';
-                    }
-                  });
-                },
-              ),
+              child: content,
             ),
       );
     }
@@ -246,6 +233,27 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
   void _showBillSelectionDialog() {
     final paymentDate = _parsePaymentDateForBillFilter();
 
+    final content = _BillSelectionContent(
+      currentSelectedBills: _selectedBills,
+      allBills: _allBills,
+      billsHelper: _billsHelper,
+      excludedBillTypes: _selectedRentor?.excludedBillTypes,
+      initialDueYear: paymentDate?.year,
+      initialDueMonth: paymentDate?.month,
+      onAdd: (selectedBills, allBills) {
+        setState(() {
+          _removeAllBills();
+
+          _selectedBills = selectedBills;
+          _allBills = allBills;
+
+          if (_selectedBills.isNotEmpty) {
+            _addBills();
+          }
+        });
+      },
+    );
+
     if (AppBreakpoints.isWide(context)) {
       showDialog(
         context: context,
@@ -253,26 +261,7 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
             (context) => Dialog(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
-                child: _BillSelectionContent(
-                  currentSelectedBills: _selectedBills,
-                  allBills: _allBills,
-                  billsHelper: _billsHelper,
-                  excludedBillTypes: _selectedRentor?.excludedBillTypes,
-                  initialDueYear: paymentDate?.year,
-                  initialDueMonth: paymentDate?.month,
-                  onAdd: (selectedBills, allBills) {
-                    setState(() {
-                      _removeAllBills();
-
-                      _selectedBills = selectedBills;
-                      _allBills = allBills;
-
-                      if (_selectedBills.isNotEmpty) {
-                        _addBills();
-                      }
-                    });
-                  },
-                ),
+                child: content,
               ),
             ),
       );
@@ -286,26 +275,7 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
               ),
-              child: _BillSelectionContent(
-                currentSelectedBills: _selectedBills,
-                allBills: _allBills,
-                billsHelper: _billsHelper,
-                excludedBillTypes: _selectedRentor?.excludedBillTypes,
-                initialDueYear: paymentDate?.year,
-                initialDueMonth: paymentDate?.month,
-                onAdd: (selectedBills, allBills) {
-                  setState(() {
-                    _removeAllBills();
-
-                    _selectedBills = selectedBills;
-                    _allBills = allBills;
-
-                    if (_selectedBills.isNotEmpty) {
-                      _addBills();
-                    }
-                  });
-                },
-              ),
+              child: content,
             ),
       );
     }
