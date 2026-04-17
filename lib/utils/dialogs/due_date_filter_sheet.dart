@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app_breakpoints.dart';
 import '../../utils/constants.dart';
 
 /// Holds the values selected in [DueDateFilterSheet].
@@ -65,18 +66,33 @@ class DueDateFilterSheet {
     required List<int> availableYears,
     DueDateFilterResult current = const DueDateFilterResult(),
   }) {
+    final content = _DueDateFilterSheetContent(
+      availableYears: availableYears,
+      current: current,
+      monthNames: AppConstants.monthNames,
+      formatDate: formatDate,
+      constrainedFirst: _constrainedFirst,
+      constrainedLast: _constrainedLast,
+    );
+
+    if (AppBreakpoints.isWide(context)) {
+      return showDialog<DueDateFilterResult>(
+        context: context,
+        builder:
+            (context) => Dialog(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: SingleChildScrollView(child: content),
+              ),
+            ),
+      );
+    }
+
     return showModalBottomSheet<DueDateFilterResult>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (context) => _DueDateFilterSheetContent(
-        availableYears: availableYears,
-        current: current,
-        monthNames: AppConstants.monthNames,
-        formatDate: formatDate,
-        constrainedFirst: _constrainedFirst,
-        constrainedLast: _constrainedLast,
-      ),
+      builder: (context) => content,
     );
   }
 }
@@ -141,11 +157,12 @@ class _DueDateFilterSheetContentState
   Future<void> _pickStartDate() async {
     final first = widget.constrainedFirst(_tempYear, _tempMonth);
     final last = widget.constrainedLast(_tempYear, _tempMonth);
-    final initial = (_tempStart != null &&
-            !_tempStart!.isBefore(first) &&
-            !_tempStart!.isAfter(last))
-        ? _tempStart!
-        : first;
+    final initial =
+        (_tempStart != null &&
+                !_tempStart!.isBefore(first) &&
+                !_tempStart!.isAfter(last))
+            ? _tempStart!
+            : first;
 
     final picked = await showDatePicker(
       context: context,
@@ -165,16 +182,18 @@ class _DueDateFilterSheetContentState
   Future<void> _pickEndDate() async {
     final first = widget.constrainedFirst(_tempYear, _tempMonth);
     final last = widget.constrainedLast(_tempYear, _tempMonth);
-    final rangeStart = (_tempStart != null &&
-            !_tempStart!.isBefore(first) &&
-            !_tempStart!.isAfter(last))
-        ? _tempStart!
-        : first;
-    final initial = (_tempEnd != null &&
-            !_tempEnd!.isBefore(rangeStart) &&
-            !_tempEnd!.isAfter(last))
-        ? _tempEnd!
-        : rangeStart;
+    final rangeStart =
+        (_tempStart != null &&
+                !_tempStart!.isBefore(first) &&
+                !_tempStart!.isAfter(last))
+            ? _tempStart!
+            : first;
+    final initial =
+        (_tempEnd != null &&
+                !_tempEnd!.isBefore(rangeStart) &&
+                !_tempEnd!.isAfter(last))
+            ? _tempEnd!
+            : rangeStart;
 
     final picked = await showDatePicker(
       context: context,
@@ -188,9 +207,10 @@ class _DueDateFilterSheetContentState
 
   @override
   Widget build(BuildContext context) {
-    final safeYear = (_tempYear != null && widget.availableYears.contains(_tempYear))
-        ? _tempYear
-        : null;
+    final safeYear =
+        (_tempYear != null && widget.availableYears.contains(_tempYear))
+            ? _tempYear
+            : null;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -216,22 +236,30 @@ class _DueDateFilterSheetContentState
             initialValue: safeYear,
             decoration: const InputDecoration(labelText: 'Year'),
             items: [
-              const DropdownMenuItem<int?>(value: null, child: Text('All years')),
+              const DropdownMenuItem<int?>(
+                value: null,
+                child: Text('All years'),
+              ),
               ...widget.availableYears.map(
-                (y) => DropdownMenuItem<int?>(value: y, child: Text(y.toString())),
+                (y) =>
+                    DropdownMenuItem<int?>(value: y, child: Text(y.toString())),
               ),
             ],
-            onChanged: (value) => setState(() {
-              _tempYear = value;
-              _clampRangeToBounds();
-            }),
+            onChanged:
+                (value) => setState(() {
+                  _tempYear = value;
+                  _clampRangeToBounds();
+                }),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<int?>(
             initialValue: _tempMonth,
             decoration: const InputDecoration(labelText: 'Month'),
             items: [
-              const DropdownMenuItem<int?>(value: null, child: Text('All months')),
+              const DropdownMenuItem<int?>(
+                value: null,
+                child: Text('All months'),
+              ),
               ...List.generate(
                 12,
                 (i) => DropdownMenuItem<int?>(
@@ -240,10 +268,11 @@ class _DueDateFilterSheetContentState
                 ),
               ),
             ],
-            onChanged: (value) => setState(() {
-              _tempMonth = value;
-              _clampRangeToBounds();
-            }),
+            onChanged:
+                (value) => setState(() {
+                  _tempMonth = value;
+                  _clampRangeToBounds();
+                }),
           ),
 
           const SizedBox(height: 20),
@@ -256,14 +285,20 @@ class _DueDateFilterSheetContentState
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.info_outline,
-                    size: 13,
-                    color: Theme.of(context).colorScheme.secondary),
+                Icon(
+                  Icons.info_outline,
+                  size: 13,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     'Picker is limited to: '
-                    '${_tempYear != null && _tempMonth != null ? '${widget.monthNames[_tempMonth! - 1]} $_tempYear' : _tempYear != null ? 'year $_tempYear' : widget.monthNames[_tempMonth! - 1]}',
+                    '${_tempYear != null && _tempMonth != null
+                        ? '${widget.monthNames[_tempMonth! - 1]} $_tempYear'
+                        : _tempYear != null
+                        ? 'year $_tempYear'
+                        : widget.monthNames[_tempMonth! - 1]}',
                     style: TextStyle(
                       fontSize: 12,
                       color: Theme.of(context).colorScheme.secondary,
@@ -295,9 +330,7 @@ class _DueDateFilterSheetContentState
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.event, size: 18),
                   label: Text(
-                    _tempEnd != null
-                        ? widget.formatDate(_tempEnd!)
-                        : 'To date',
+                    _tempEnd != null ? widget.formatDate(_tempEnd!) : 'To date',
                     overflow: TextOverflow.ellipsis,
                   ),
                   onPressed: _pickEndDate,
@@ -311,10 +344,11 @@ class _DueDateFilterSheetContentState
               child: TextButton.icon(
                 icon: const Icon(Icons.clear, size: 16),
                 label: const Text('Clear range'),
-                onPressed: () => setState(() {
-                  _tempStart = null;
-                  _tempEnd = null;
-                }),
+                onPressed:
+                    () => setState(() {
+                      _tempStart = null;
+                      _tempEnd = null;
+                    }),
               ),
             ),
 
@@ -323,24 +357,26 @@ class _DueDateFilterSheetContentState
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
-                onPressed: () => setState(() {
-                  _tempYear = null;
-                  _tempMonth = null;
-                  _tempStart = null;
-                  _tempEnd = null;
-                }),
+                onPressed:
+                    () => setState(() {
+                      _tempYear = null;
+                      _tempMonth = null;
+                      _tempStart = null;
+                      _tempEnd = null;
+                    }),
                 child: const Text('Clear All'),
               ),
               const SizedBox(width: 8),
               ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(
-                  DueDateFilterResult(
-                    selectedYear: _tempYear,
-                    selectedMonth: _tempMonth,
-                    dateRangeStart: _tempStart,
-                    dateRangeEnd: _tempEnd,
-                  ),
-                ),
+                onPressed:
+                    () => Navigator.of(context).pop(
+                      DueDateFilterResult(
+                        selectedYear: _tempYear,
+                        selectedMonth: _tempMonth,
+                        dateRangeStart: _tempStart,
+                        dateRangeEnd: _tempEnd,
+                      ),
+                    ),
                 child: const Text('Apply'),
               ),
             ],
@@ -351,7 +387,10 @@ class _DueDateFilterSheetContentState
   }
 
   static Widget _sectionHeader(
-      BuildContext context, IconData icon, String label) {
+    BuildContext context,
+    IconData icon,
+    String label,
+  ) {
     return Row(
       children: [
         Icon(icon, size: 16),
@@ -367,6 +406,3 @@ class _DueDateFilterSheetContentState
     );
   }
 }
-
-
-
