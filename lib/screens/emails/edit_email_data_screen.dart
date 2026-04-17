@@ -8,6 +8,7 @@ import '../../data/repositories/email_data_repository.dart';
 import '../../data/repositories/payments_repository.dart';
 import '../bills/add_edit_bill_screen.dart';
 import '../payments/add_edit_payment_screen.dart';
+import '../../widgets/responsive_constraint.dart';
 
 /// Screen for reviewing and editing an [EmailData] record.
 ///
@@ -15,7 +16,6 @@ import '../payments/add_edit_payment_screen.dart';
 /// user link or re-link the email to a [Bill] or [Payment] from dropdowns,
 /// and allows toggling the `processed` flag.  Changes are persisted via
 /// [EmailDataRepository].
-import '../../widgets/responsive_constraint.dart';
 
 class EditEmailDataScreen extends StatefulWidget {
   /// The email record to display and optionally edit.
@@ -103,12 +103,12 @@ class _EditEmailDataScreenState extends State<EditEmailDataScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Email')),
-      body:
-          _loading
-              ? const Center(child: CircularProgressIndicator())
-              : ResponsiveConstraint(
-                maxWidth: 560,
-                child: Padding(
+      body: ResponsiveConstraint(
+        maxWidth: 560,
+        child:
+            _loading
+                ? const Center(child: CircularProgressIndicator())
+                : Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     children: [
@@ -341,7 +341,7 @@ class _EditEmailDataScreenState extends State<EditEmailDataScreen> {
                     ],
                   ),
                 ),
-              ),
+      ),
     );
   }
 }

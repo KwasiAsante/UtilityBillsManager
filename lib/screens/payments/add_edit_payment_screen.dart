@@ -15,6 +15,7 @@ import '../../utils/constants.dart';
 import '../../utils/dialogs/due_date_filter_sheet.dart';
 import '../bills/add_edit_bill_screen.dart';
 import '../rentors/add_edit_rentor_screen.dart';
+import '../../widgets/responsive_constraint.dart';
 
 /// Form screen for creating a new payment or editing an existing one.
 ///
@@ -22,7 +23,6 @@ import '../rentors/add_edit_rentor_screen.dart';
 /// payment.  On save the screen persists via [PaymentsHelper], applies
 /// bill-status side-effects through [BillsHelper], and updates the rentor's
 /// `lastPaymentDate` via [RentorsHelper].
-import '../../widgets/responsive_constraint.dart';
 
 class AddEditPaymentScreen extends StatefulWidget {
   /// The payment to edit, or `null` when creating a new one.
