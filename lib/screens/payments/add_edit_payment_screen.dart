@@ -22,6 +22,8 @@ import '../rentors/add_edit_rentor_screen.dart';
 /// payment.  On save the screen persists via [PaymentsHelper], applies
 /// bill-status side-effects through [BillsHelper], and updates the rentor's
 /// `lastPaymentDate` via [RentorsHelper].
+import '../../widgets/responsive_constraint.dart';
+
 class AddEditPaymentScreen extends StatefulWidget {
   /// The payment to edit, or `null` when creating a new one.
   final Payment? payment;
@@ -34,8 +36,7 @@ class AddEditPaymentScreen extends StatefulWidget {
   }
 }
 
-class _AddEditPaymentScreenState extends
-State<AddEditPaymentScreen> {
+class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
   final _formKey = GlobalKey<FormState>();
   final _amountPaidController = TextEditingController();
   final _paymentDateController = TextEditingController();
@@ -58,7 +59,9 @@ State<AddEditPaymentScreen> {
     if (widget.payment != null) {
       final payment = widget.payment!;
       _amountPaidController.text = payment.amountPaid.toString();
-      _paymentDateController.text = DateFormat('yyyy-MM-dd').format(payment.paymentDate);
+      _paymentDateController.text = DateFormat(
+        'yyyy-MM-dd',
+      ).format(payment.paymentDate);
 
       if (payment.rentor == null && payment.rentorId != null) {
         _rentorsHelper.readRentor(payment.rentorId!).then((result) {
@@ -69,34 +72,41 @@ State<AddEditPaymentScreen> {
             });
           }
         });
-      }
-      else {
+      } else {
         _selectedRentor = payment.rentor;
         _rentorController.text = _selectedRentor?.name ?? '';
       }
 
-      if (payment.billIds != null && payment.billIds!.isNotEmpty && (payment.bills == null || payment.bills!.isEmpty || payment.bills!.length < payment.billIds!.length)) {
+      if (payment.billIds != null &&
+          payment.billIds!.isNotEmpty &&
+          (payment.bills == null ||
+              payment.bills!.isEmpty ||
+              payment.bills!.length < payment.billIds!.length)) {
         _billsHelper.readAllBills().then((result) {
           if (result.isSuccess) {
             final bills = result.data!;
-            final paymentBills = bills.where((bill) => payment.billIds!.contains(bill.billId)).toList();
+            final paymentBills =
+                bills
+                    .where((bill) => payment.billIds!.contains(bill.billId))
+                    .toList();
             setState(() {
               _allBills = bills;
               _selectedBills = paymentBills;
               for (var bill in _selectedBills) {
                 _billControllers[bill.billId] = TextEditingController(
-                  text: '${bill.type.name}: ${bill.companyName} - ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}',
+                  text:
+                      '${bill.type.name}: ${bill.companyName} - ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}',
                 );
               }
             });
           }
         });
-      }
-      else {
+      } else {
         _selectedBills = payment.bills ?? [];
         for (var bill in _selectedBills) {
           _billControllers[bill.billId] = TextEditingController(
-            text: '${bill.type.name}: ${bill.companyName} - ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}',
+            text:
+                '${bill.type.name}: ${bill.companyName} - ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}',
           );
         }
       }
@@ -125,30 +135,31 @@ State<AddEditPaymentScreen> {
   Future<void> _showRentorPickerDialog() async {
     if (_allRentors.isEmpty) {
       final result = await _rentorsHelper.readAllRentors();
-      if (!mounted) return;                // ← correct guard after async gap
+      if (!mounted) return; // ← correct guard after async gap
       if (result.isSuccess) {
         setState(() => _allRentors = result.data!);
       }
     }
 
-    showDialog(context: context,
-        builder: (context) => _RentorPickerDialog(
-          currentSelectedRentor: _selectedRentor,
-          allRentors: _allRentors,
-          rentorsHelper: _rentorsHelper,
-          onAdd: (Rentor? selectedRentor, List<Rentor> allRentors) {
-            setState(() {
-              _allRentors = allRentors;
-              _selectedRentor = selectedRentor;
-              if (_selectedRentor == null) {
-                _clearRentorSelection();
-              }
-              else {
-                _rentorController.text = selectedRentor?.name ?? '';
-              }
-            });
-          },
-        )
+    showDialog(
+      context: context,
+      builder:
+          (context) => _RentorPickerDialog(
+            currentSelectedRentor: _selectedRentor,
+            allRentors: _allRentors,
+            rentorsHelper: _rentorsHelper,
+            onAdd: (Rentor? selectedRentor, List<Rentor> allRentors) {
+              setState(() {
+                _allRentors = allRentors;
+                _selectedRentor = selectedRentor;
+                if (_selectedRentor == null) {
+                  _clearRentorSelection();
+                } else {
+                  _rentorController.text = selectedRentor?.name ?? '';
+                }
+              });
+            },
+          ),
     );
   }
   //endregion
@@ -159,7 +170,8 @@ State<AddEditPaymentScreen> {
       for (var bill in _selectedBills) {
         if (!_billControllers.containsKey(bill.billId)) {
           _billControllers[bill.billId] = TextEditingController(
-            text: '${bill.type.name}: ${bill.companyName} - ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}',
+            text:
+                '${bill.type.name}: ${bill.companyName} - ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}',
           );
         }
       }
@@ -192,32 +204,33 @@ State<AddEditPaymentScreen> {
 
     return DateTime.tryParse(paymentDateText);
   }
-  
+
   void _showBillSelectionDialog() {
     final paymentDate = _parsePaymentDateForBillFilter();
 
     showDialog(
       context: context,
-      builder: (context) => _BillSelectionDialog(
-        currentSelectedBills: _selectedBills,
-        allBills: _allBills,
-        billsHelper: _billsHelper,
-        excludedBillTypes: _selectedRentor?.excludedBillTypes,
-        initialDueYear: paymentDate?.year,
-        initialDueMonth: paymentDate?.month,
-        onAdd: (selectedBills, allBills) {
-          setState(() {
-            _removeAllBills();
+      builder:
+          (context) => _BillSelectionDialog(
+            currentSelectedBills: _selectedBills,
+            allBills: _allBills,
+            billsHelper: _billsHelper,
+            excludedBillTypes: _selectedRentor?.excludedBillTypes,
+            initialDueYear: paymentDate?.year,
+            initialDueMonth: paymentDate?.month,
+            onAdd: (selectedBills, allBills) {
+              setState(() {
+                _removeAllBills();
 
-            _selectedBills = selectedBills;
-            _allBills = allBills;
+                _selectedBills = selectedBills;
+                _allBills = allBills;
 
-            if (_selectedBills.isNotEmpty) {
-              _addBills();
-            }
-          });
-        },
-      ),
+                if (_selectedBills.isNotEmpty) {
+                  _addBills();
+                }
+              });
+            },
+          ),
     );
   }
 
@@ -254,23 +267,24 @@ State<AddEditPaymentScreen> {
             itemBuilder: (context, index) {
               final bill = _selectedBills[index];
               final controller = _billControllers[bill.billId]!;
-              final displayName = '${bill.type.name}: ${bill.companyName} - ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}';
+              final displayName =
+                  '${bill.type.name}: ${bill.companyName} - ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}';
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12.0),
                 child: Row(
                   children: [
                     Expanded(
-                        child: TextFormField(
-                          controller: controller,
-                          readOnly: true,
-                          decoration: InputDecoration(
-                            labelText: displayName,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8)
-                            )
+                      child: TextFormField(
+                        controller: controller,
+                        readOnly: true,
+                        decoration: InputDecoration(
+                          labelText: displayName,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                        )
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
@@ -288,7 +302,9 @@ State<AddEditPaymentScreen> {
                           orElse: () => bill,
                         );
                         setState(() {
-                          final idx = _selectedBills.indexWhere((b) => b.billId == bill.billId);
+                          final idx = _selectedBills.indexWhere(
+                            (b) => b.billId == bill.billId,
+                          );
                           if (idx != -1) {
                             _selectedBills[idx] = updatedBill;
                             _billControllers[bill.billId]?.text =
@@ -305,11 +321,11 @@ State<AddEditPaymentScreen> {
                       icon: const Icon(Icons.close, color: Colors.red),
                       tooltip: 'Remove',
                     ),
-                  ]
-                )
+                  ],
+                ),
               );
-            }
-          )
+            },
+          ),
       ],
     );
   }
@@ -328,7 +344,7 @@ State<AddEditPaymentScreen> {
       amountPaid: double.parse(_amountPaidController.text),
       paymentDate: DateTime.parse(_paymentDateController.text),
       rentor: _selectedRentor,
-      bills: _selectedBills
+      bills: _selectedBills,
     );
 
     final oldBillIds = Set<String>.from(widget.payment?.billIds ?? []);
@@ -338,7 +354,10 @@ State<AddEditPaymentScreen> {
 
     // Reverse removed bills before saving (payment_bills rows must still exist to read appliedAmount)
     if (removedBillIds.isNotEmpty && widget.payment != null) {
-      await _billsHelper.reversePaymentStatusForBills(widget.payment!, removedBillIds);
+      await _billsHelper.reversePaymentStatusForBills(
+        widget.payment!,
+        removedBillIds,
+      );
     }
 
     if (widget.payment == null) {
@@ -352,15 +371,26 @@ State<AddEditPaymentScreen> {
 
     // Apply only newly added bills
     if (addedBillIds.isNotEmpty) {
-      final addedBills = _selectedBills.where((b) => addedBillIds.contains(b.billId)).toList();
-      await _billsHelper.updatePaymentStatuses(payment, bills: addedBills, rentor: payment.rentor, rentorId: payment.rentorId);
+      final addedBills =
+          _selectedBills.where((b) => addedBillIds.contains(b.billId)).toList();
+      await _billsHelper.updatePaymentStatuses(
+        payment,
+        bills: addedBills,
+        rentor: payment.rentor,
+        rentorId: payment.rentorId,
+      );
       await BillsRepository().reload();
     } else if (removedBillIds.isNotEmpty) {
       await BillsRepository().reload();
     }
 
-    if (payment.rentorId != null && payment.rentorId!.isNotEmpty || payment.rentor != null) {
-      await _rentorsHelper.updateRentorPaymentInfo(payment, rentorId: payment.rentorId, rentor: payment.rentor);
+    if (payment.rentorId != null && payment.rentorId!.isNotEmpty ||
+        payment.rentor != null) {
+      await _rentorsHelper.updateRentorPaymentInfo(
+        payment,
+        rentorId: payment.rentorId,
+        rentor: payment.rentor,
+      );
       await RentorsRepository().reload();
     }
 
@@ -375,93 +405,111 @@ State<AddEditPaymentScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(isEditing ? 'Edit Payment' : 'Add Payment')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-              TextFormField(
-                controller: _amountPaidController,
-                decoration: const InputDecoration(labelText: 'Amount '),
-                keyboardType: TextInputType.number,
-                validator: (value) => value!.isEmpty ? 'Enter amount' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _paymentDateController,
-                decoration: const InputDecoration(
-                  labelText: 'Payment Date (YYYY-MM-DD)',
-                ),
-                keyboardType: TextInputType.datetime,
-                validator:
-                    (value) => value!.isEmpty ? 'Enter payment date' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _rentorController,
-                readOnly: true,
-                onTap: _showRentorPickerDialog,
-                decoration: InputDecoration(
-                  labelText: 'Assigned Rentor',
-                  hintText: 'Select a rentor',
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_selectedRentor != null) ...[
-                        IconButton(
-                          tooltip: 'Edit rentor',
-                          onPressed: () async {
-                            final _ = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AddEditRentorScreen(rentor: _selectedRentor),
-                              ),
-                            );
-                            // RentorsRepository was updated by AddEditRentorScreen
-                            if (_selectedRentor != null) {
-                              final updatedRentor = RentorsRepository().rentors.firstWhere(
-                                (r) => r.rentorId == _selectedRentor!.rentorId,
-                                orElse: () => _selectedRentor!,
-                              );
-                              setState(() {
-                                _selectedRentor = updatedRentor;
-                                _rentorController.text = _selectedRentor?.name ?? '';
-                              });
-                            }
-                          },
-                          icon: const Icon(Icons.edit_outlined),
+      body: ResponsiveConstraint(
+        maxWidth: 560,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _amountPaidController,
+                          decoration: const InputDecoration(
+                            labelText: 'Amount ',
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator:
+                              (value) => value!.isEmpty ? 'Enter amount' : null,
                         ),
-                        IconButton(
-                          tooltip: 'De-assign rentor',
-                          onPressed: _clearRentorSelection,
-                          icon: const Icon(Icons.cancel_outlined),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _paymentDateController,
+                          decoration: const InputDecoration(
+                            labelText: 'Payment Date (YYYY-MM-DD)',
+                          ),
+                          keyboardType: TextInputType.datetime,
+                          validator:
+                              (value) =>
+                                  value!.isEmpty ? 'Enter payment date' : null,
                         ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _rentorController,
+                          readOnly: true,
+                          onTap: _showRentorPickerDialog,
+                          decoration: InputDecoration(
+                            labelText: 'Assigned Rentor',
+                            hintText: 'Select a rentor',
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_selectedRentor != null) ...[
+                                  IconButton(
+                                    tooltip: 'Edit rentor',
+                                    onPressed: () async {
+                                      final _ = await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (context) => AddEditRentorScreen(
+                                                rentor: _selectedRentor,
+                                              ),
+                                        ),
+                                      );
+                                      // RentorsRepository was updated by AddEditRentorScreen
+                                      if (_selectedRentor != null) {
+                                        final updatedRentor =
+                                            RentorsRepository().rentors
+                                                .firstWhere(
+                                                  (r) =>
+                                                      r.rentorId ==
+                                                      _selectedRentor!.rentorId,
+                                                  orElse:
+                                                      () => _selectedRentor!,
+                                                );
+                                        setState(() {
+                                          _selectedRentor = updatedRentor;
+                                          _rentorController.text =
+                                              _selectedRentor?.name ?? '';
+                                        });
+                                      }
+                                    },
+                                    icon: const Icon(Icons.edit_outlined),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'De-assign rentor',
+                                    onPressed: _clearRentorSelection,
+                                    icon: const Icon(Icons.cancel_outlined),
+                                  ),
+                                ],
+                                IconButton(
+                                  tooltip: 'Search rentors',
+                                  onPressed: _showRentorPickerDialog,
+                                  icon: const Icon(
+                                    Icons.arrow_drop_down_circle_outlined,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        _buildBillFields(),
                       ],
-                      IconButton(
-                        tooltip: 'Search rentors',
-                        onPressed: _showRentorPickerDialog,
-                        icon: const Icon(Icons.arrow_drop_down_circle_outlined),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-              _buildBillFields(),
-                    ],
-                  ),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: _savePayment,
+                  child: const Text('Save Payment'),
                 ),
-              ),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _savePayment,
-                child: const Text('Save Payment'),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -510,14 +558,17 @@ class _RentorPickerDialogState extends State<_RentorPickerDialog> {
         setState(() {
           if (!result.isSuccess) {
             errorMessage = result.errorMessage ?? 'Failed to load rentors.';
-          }
-          else {
+          } else {
             allRentors = result.data!;
           }
 
           if (allRentors.isEmpty && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(errorMessage.isEmpty ? 'No rentors available.' : errorMessage)),
+              SnackBar(
+                content: Text(
+                  errorMessage.isEmpty ? 'No rentors available.' : errorMessage,
+                ),
+              ),
             );
           }
 
@@ -536,10 +587,16 @@ class _RentorPickerDialogState extends State<_RentorPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredRentors = allRentors
-        .where((rentor) => rentor.name.toLowerCase().contains(searchQuery.toLowerCase()))
-        .toList()
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final filteredRentors =
+        allRentors
+            .where(
+              (rentor) =>
+                  rentor.name.toLowerCase().contains(searchQuery.toLowerCase()),
+            )
+            .toList()
+          ..sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+          );
 
     Rentor? selectedFilteredRentor;
     if (selectedRentor != null) {
@@ -586,11 +643,12 @@ class _RentorPickerDialogState extends State<_RentorPickerDialog> {
                   onPressed: () async {
                     String errorMessage = '';
                     if (allRentors.isEmpty) {
-                      Result<List<Rentor>> result = await rentorsHelper.readAllRentors();
+                      Result<List<Rentor>> result =
+                          await rentorsHelper.readAllRentors();
                       if (!result.isSuccess) {
-                        errorMessage = result.errorMessage ?? 'Failed to load rentors.';
-                      }
-                      else {
+                        errorMessage =
+                            result.errorMessage ?? 'Failed to load rentors.';
+                      } else {
                         allRentors = result.data!;
                       }
                     }
@@ -599,7 +657,11 @@ class _RentorPickerDialogState extends State<_RentorPickerDialog> {
                       if (allRentors.isEmpty && context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(errorMessage.isEmpty ? 'No rentors available.' : errorMessage),
+                            content: Text(
+                              errorMessage.isEmpty
+                                  ? 'No rentors available.'
+                                  : errorMessage,
+                            ),
                           ),
                         );
                       }
@@ -612,24 +674,28 @@ class _RentorPickerDialogState extends State<_RentorPickerDialog> {
               ],
             ),
             _loading
-                ? const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: CircularProgressIndicator())
+                ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16.0),
+                  child: CircularProgressIndicator(),
+                )
                 : RadioGroup<Rentor>(
-              groupValue: selectedFilteredRentor,
-              onChanged: (rentor) {
-                setState(() {
-                  selectedRentor = rentor;
-                });
-              },
-              child: Column(
-                children: filteredRentors.map((rentor) {
-                  return RadioListTile<Rentor>(
-                    title: Text(rentor.name),
-                    value: rentor
-                  );
-                }).toList(),
-              ),
-            ),
-            const SizedBox(height: 20)
+                  groupValue: selectedFilteredRentor,
+                  onChanged: (rentor) {
+                    setState(() {
+                      selectedRentor = rentor;
+                    });
+                  },
+                  child: Column(
+                    children:
+                        filteredRentors.map((rentor) {
+                          return RadioListTile<Rentor>(
+                            title: Text(rentor.name),
+                            value: rentor,
+                          );
+                        }).toList(),
+                  ),
+                ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -723,14 +789,17 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
         setState(() {
           if (!result.isSuccess) {
             errorMessage = result.errorMessage ?? 'Failed to load rentors.';
-          }
-          else {
+          } else {
             allBills = result.data!;
           }
 
           if (allBills.isEmpty && context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(errorMessage.isEmpty ? 'No bills available.' : errorMessage)),
+              SnackBar(
+                content: Text(
+                  errorMessage.isEmpty ? 'No bills available.' : errorMessage,
+                ),
+              ),
             );
           }
 
@@ -752,17 +821,23 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
   void _toggleSelectAll(List<Bill> filteredBills) {
     setState(() {
       final allFiltered = filteredBills.every(
-              (bill) => selectedBills.any((selected) => selected.billId == bill.billId));
+        (bill) =>
+            selectedBills.any((selected) => selected.billId == bill.billId),
+      );
 
       if (allFiltered) {
         // Deselect all filtered bills
         for (final bill in filteredBills) {
-          selectedBills.removeWhere((selected) => selected.billId == bill.billId);
+          selectedBills.removeWhere(
+            (selected) => selected.billId == bill.billId,
+          );
         }
       } else {
         // Select all filtered bills
         for (final bill in filteredBills) {
-          if (!selectedBills.any((selected) => selected.billId == bill.billId)) {
+          if (!selectedBills.any(
+            (selected) => selected.billId == bill.billId,
+          )) {
             selectedBills.add(bill);
           }
         }
@@ -771,33 +846,44 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
   }
 
   void _updateDisplayedBills() {
-    filteredBills = allBills
-        .where((bill) {
-      final excluded = widget.excludedBillTypes?.contains(bill.type) ?? false;
-      if (excluded) return false;
-      final matchesSearch = searchQuery.isEmpty ||
-          bill.company.toLowerCase().contains(searchQuery.toLowerCase()) ||
-          bill.companyName.toLowerCase().contains(searchQuery.toLowerCase());
-      final dueDate = bill.dueDate;
-      final matchesYear =
-          _selectedDueYear == null ||
-              (dueDate.year == _selectedDueYear);
-      final matchesMonth =
-          _selectedDueMonth == null ||
-              (dueDate.month == _selectedDueMonth);
-      final matchesDateRange =
-          (_dateRangeStart == null && _dateRangeEnd == null) ||
-              ((_dateRangeStart == null ||
-                      !dueDate.isBefore(_dateRangeStart!)) &&
-                  (_dateRangeEnd == null || !dueDate.isAfter(_dateRangeEnd!)));
-      return matchesSearch && matchesYear && matchesMonth && matchesDateRange;
-    })
-        .toList()
-      ..sort((a, b) => b.dueDate.compareTo(a.dueDate));
+    filteredBills =
+        allBills.where((bill) {
+            final excluded =
+                widget.excludedBillTypes?.contains(bill.type) ?? false;
+            if (excluded) return false;
+            final matchesSearch =
+                searchQuery.isEmpty ||
+                bill.company.toLowerCase().contains(
+                  searchQuery.toLowerCase(),
+                ) ||
+                bill.companyName.toLowerCase().contains(
+                  searchQuery.toLowerCase(),
+                );
+            final dueDate = bill.dueDate;
+            final matchesYear =
+                _selectedDueYear == null || (dueDate.year == _selectedDueYear);
+            final matchesMonth =
+                _selectedDueMonth == null ||
+                (dueDate.month == _selectedDueMonth);
+            final matchesDateRange =
+                (_dateRangeStart == null && _dateRangeEnd == null) ||
+                ((_dateRangeStart == null ||
+                        !dueDate.isBefore(_dateRangeStart!)) &&
+                    (_dateRangeEnd == null ||
+                        !dueDate.isAfter(_dateRangeEnd!)));
+            return matchesSearch &&
+                matchesYear &&
+                matchesMonth &&
+                matchesDateRange;
+          }).toList()
+          ..sort((a, b) => b.dueDate.compareTo(a.dueDate));
 
-    allFilteredSelected = filteredBills.isNotEmpty &&
+    allFilteredSelected =
+        filteredBills.isNotEmpty &&
         filteredBills.every(
-                (bill) => selectedBills.any((selected) => selected.billId == bill.billId));
+          (bill) =>
+              selectedBills.any((selected) => selected.billId == bill.billId),
+        );
   }
 
   List<int> _getAvailableDueYears() {
@@ -816,20 +902,20 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
 
   bool get _hasActiveDueDateFilter =>
       _selectedDueYear != null ||
-          _selectedDueMonth != null ||
-          _dateRangeStart != null ||
-          _dateRangeEnd != null;
+      _selectedDueMonth != null ||
+      _dateRangeStart != null ||
+      _dateRangeEnd != null;
 
   String _buildDueDateFilterTooltip() {
     if (_dateRangeStart != null || _dateRangeEnd != null) {
       final start =
-      _dateRangeStart != null
-          ? DueDateFilterSheet.formatDate(_dateRangeStart!)
-          : 'Any';
+          _dateRangeStart != null
+              ? DueDateFilterSheet.formatDate(_dateRangeStart!)
+              : 'Any';
       final end =
-      _dateRangeEnd != null
-          ? DueDateFilterSheet.formatDate(_dateRangeEnd!)
-          : 'Any';
+          _dateRangeEnd != null
+              ? DueDateFilterSheet.formatDate(_dateRangeEnd!)
+              : 'Any';
       return 'Date range: $start – $end';
     }
     final yearLabel = _selectedDueYear?.toString() ?? 'All years';
@@ -932,11 +1018,12 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
                   onPressed: () async {
                     String errorMessage = '';
                     if (allBills.isEmpty) {
-                      Result<List<Bill>> result = await billsHelper.readAllBills();
+                      Result<List<Bill>> result =
+                          await billsHelper.readAllBills();
                       if (!result.isSuccess) {
-                        errorMessage = result.errorMessage ?? 'Failed to load bills.';
-                      }
-                      else {
+                        errorMessage =
+                            result.errorMessage ?? 'Failed to load bills.';
+                      } else {
                         allBills = result.data!;
                       }
                     }
@@ -944,7 +1031,11 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
                     if (allBills.isEmpty && context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(errorMessage.isEmpty ? 'No bills available.' : errorMessage),
+                          content: Text(
+                            errorMessage.isEmpty
+                                ? 'No bills available.'
+                                : errorMessage,
+                          ),
                         ),
                       );
                     }
@@ -957,43 +1048,62 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
                 ),
               ],
             ),
-            if (widget.excludedBillTypes != null && widget.excludedBillTypes!.isNotEmpty)
+            if (widget.excludedBillTypes != null &&
+                widget.excludedBillTypes!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline, size: 16, color: Colors.orange),
+                    const Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: Colors.orange,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         'Excluded: ${widget.excludedBillTypes!.map((t) => t.name).join(', ')}',
-                        style: const TextStyle(fontSize: 12, color: Colors.orange),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.orange,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
             _loading
-                ? const Padding(padding: EdgeInsets.symmetric(vertical: 16.0), child: CircularProgressIndicator())
-                : Column(children: filteredBills.map((bill) {
-                  final isSelected = selectedBills.any((selected) => selected.billId == bill.billId);
-                  return CheckboxListTile(
-                    title: Text(bill.companyName),
-                    subtitle: Text('Type: ${bill.type.name}\nAmount: \$${bill.amount.toStringAsFixed(2)}\nDue Date: ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}\nStatus: ${PaymentStatusExtension.getName(bill.status)}'),
-                    value: isSelected,
-                    onChanged: (value) {
-                      setState(() {
-                        if (value == true) {
-                          selectedBills.add(bill);
-                        } else {
-                          selectedBills.removeWhere((selected) => selected.billId == bill.billId);
-                        }
-                      });
-                    },
-                  );
-                }).toList(),
-            ),
-            const SizedBox(height: 20)
+                ? const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16.0),
+                  child: CircularProgressIndicator(),
+                )
+                : Column(
+                  children:
+                      filteredBills.map((bill) {
+                        final isSelected = selectedBills.any(
+                          (selected) => selected.billId == bill.billId,
+                        );
+                        return CheckboxListTile(
+                          title: Text(bill.companyName),
+                          subtitle: Text(
+                            'Type: ${bill.type.name}\nAmount: \$${bill.amount.toStringAsFixed(2)}\nDue Date: ${DateFormat('yyyy-MM-dd').format(bill.dueDate)}\nStatus: ${PaymentStatusExtension.getName(bill.status)}',
+                          ),
+                          value: isSelected,
+                          onChanged: (value) {
+                            setState(() {
+                              if (value == true) {
+                                selectedBills.add(bill);
+                              } else {
+                                selectedBills.removeWhere(
+                                  (selected) => selected.billId == bill.billId,
+                                );
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
@@ -1023,4 +1133,5 @@ class _BillSelectionDialogState extends State<_BillSelectionDialog> {
     );
   }
 }
+
 //endregion

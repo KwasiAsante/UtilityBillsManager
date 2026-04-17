@@ -14,6 +14,8 @@ import '../../data/repositories/rentors_repository.dart';
 /// rentor.  On save the screen delegates to [RentorsRepository].  Supports
 /// configuring a default split percentage, per-[BillType] overrides, and
 /// bill types to exclude from the rentor's calculation.
+import '../../widgets/responsive_constraint.dart';
+
 class AddEditRentorScreen extends StatefulWidget {
   /// The rentor to edit, or `null` when creating a new one.
   final Rentor? rentor;
@@ -54,7 +56,9 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
       _phoneController.text = rentor.phone ?? '';
       _percentageController.text = rentor.defaultPercentage.toStringAsFixed(2);
       if (rentor.lastPaymentDate != null) {
-        _lastPaymentDateController.text = DateFormat('yyyy-MM-dd').format(widget.rentor!.lastPaymentDate!);
+        _lastPaymentDateController.text = DateFormat(
+          'yyyy-MM-dd',
+        ).format(widget.rentor!.lastPaymentDate!);
         _lastPaymentDate = rentor.lastPaymentDate;
       }
 
@@ -98,7 +102,9 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     if (picked != null) {
       setState(() {
         _lastPaymentDate = picked;
-        _lastPaymentDateController.text = DateFormat('yyyy-MM-dd').format(picked);
+        _lastPaymentDateController.text = DateFormat(
+          'yyyy-MM-dd',
+        ).format(picked);
       });
     }
   }
@@ -119,9 +125,14 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
       await _paymentsRepository.reload();
     }
 
-    final eligibleBills = _billsRepository.bills
-        .where((b) => b.status == PaymentStatus.unpaid || b.status == PaymentStatus.partial)
-        .toList();
+    final eligibleBills =
+        _billsRepository.bills
+            .where(
+              (b) =>
+                  b.status == PaymentStatus.unpaid ||
+                  b.status == PaymentStatus.partial,
+            )
+            .toList();
 
     if (eligibleBills.isEmpty) {
       if (mounted) {
@@ -147,9 +158,14 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
 
     if (selectedPeriod == null || !mounted) return;
 
-    final periodBills = eligibleBills
-        .where((b) => b.dueDate.year == selectedPeriod.year && b.dueDate.month == selectedPeriod.month)
-        .toList();
+    final periodBills =
+        eligibleBills
+            .where(
+              (b) =>
+                  b.dueDate.year == selectedPeriod.year &&
+                  b.dueDate.month == selectedPeriod.month,
+            )
+            .toList();
 
     // Sum payments already made by this rentor, keyed by billId.
     // For a new rentor (widget.rentor == null), rentorId is null so no payments
@@ -160,7 +176,8 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
       for (final payment in _paymentsRepository.payments) {
         if (payment.rentorId == rentorId && payment.billIds != null) {
           for (final billId in payment.billIds!) {
-            rentorPaidPerBill[billId] = (rentorPaidPerBill[billId] ?? 0.0) + payment.amountPaid;
+            rentorPaidPerBill[billId] =
+                (rentorPaidPerBill[billId] ?? 0.0) + payment.amountPaid;
           }
         }
       }
@@ -174,7 +191,8 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     // silently produce incorrect results.
     final tempRentor = Rentor(
       name: '',
-      defaultPercentage: double.tryParse(_percentageController.text.trim()) ?? 0.0,
+      defaultPercentage:
+          double.tryParse(_percentageController.text.trim()) ?? 0.0,
       billPercentages: const {},
       excludedBillTypes: _excludedBillTypes,
     );
@@ -188,17 +206,19 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
 
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => _AmountOwedResultDialog(
-        period: selectedPeriod,
-        breakdown: breakdown,
-      ),
+      builder:
+          (context) => _AmountOwedResultDialog(
+            period: selectedPeriod,
+            breakdown: breakdown,
+          ),
     );
 
     if (confirmed == true) {
       final total = breakdown.values.fold(0.0, (sum, v) => sum + v);
       final periodLabel = DateFormat('MMMM yyyy').format(selectedPeriod);
       setState(() {
-        _amountOwedController.text = '$periodLabel – \$${total.toStringAsFixed(2)}';
+        _amountOwedController.text =
+            '$periodLabel – \$${total.toStringAsFixed(2)}';
       });
     }
   }
@@ -206,18 +226,18 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
   void _showAddBillPercentageDialog() {
     showDialog(
       context: context,
-      builder: (context) => _AddBillPercentageDialog(
-        selectedBillTypes: _selectedBillTypes,
-        defaultPercentage: _percentageController.text,
-        onAdd: (selectedType, percentage) {
-          setState(() {
-            _selectedBillTypes.add(selectedType);
-            _billPercentageControllers[selectedType] = TextEditingController(
-              text: percentage.toStringAsFixed(2),
-            );
-          });
-        },
-      ),
+      builder:
+          (context) => _AddBillPercentageDialog(
+            selectedBillTypes: _selectedBillTypes,
+            defaultPercentage: _percentageController.text,
+            onAdd: (selectedType, percentage) {
+              setState(() {
+                _selectedBillTypes.add(selectedType);
+                _billPercentageControllers[selectedType] =
+                    TextEditingController(text: percentage.toStringAsFixed(2));
+              });
+            },
+          ),
     );
   }
 
@@ -237,11 +257,15 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Bill-Specific Percentages', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Bill-Specific Percentages',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             ElevatedButton.icon(
-              onPressed: _selectedBillTypes.length < BillType.values.length
-                  ? _showAddBillPercentageDialog
-                  : null,
+              onPressed:
+                  _selectedBillTypes.length < BillType.values.length
+                      ? _showAddBillPercentageDialog
+                      : null,
               icon: const Icon(Icons.add),
               label: const Text('Add'),
             ),
@@ -264,7 +288,8 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
             itemBuilder: (context, index) {
               final type = _selectedBillTypes[index];
               final controller = _billPercentageControllers[type]!;
-              final displayName = '${type.name[0].toUpperCase()}${type.name.substring(1)}';
+              final displayName =
+                  '${type.name[0].toUpperCase()}${type.name.substring(1)}';
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12.0),
@@ -311,7 +336,10 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 20),
-        const Text('Excluded Bill Types', style: TextStyle(fontWeight: FontWeight.bold)),
+        const Text(
+          'Excluded Bill Types',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 4),
         const Text(
           'Payments for this rentor cannot be applied to bills of these types.',
@@ -381,88 +409,97 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     final isEditing = widget.rentor != null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(isEditing ? 'Edit Rentor' : 'Add Rentor'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      TextFormField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(labelText: 'Name'),
-                        validator:
-                            (value) => value!.isEmpty ? 'Enter name' : null,
-                      ),
-                      TextFormField(
-                        controller: _emailController,
-                        decoration: const InputDecoration(labelText: 'Email'),
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      TextFormField(
-                        controller: _phoneController,
-                        decoration: const InputDecoration(labelText: 'Phone Number'),
-                        keyboardType: TextInputType.phone,
-                      ),
-                      TextFormField(
-                        controller: _percentageController,
-                        decoration: const InputDecoration(labelText: 'Percentage %'),
-                        keyboardType: TextInputType.number,
-                        validator: (value) => value!.isEmpty ? 'Enter percentage' : null,
-                      ),
-                      _buildBillTypeFields(),
-                      _buildExclusionListSection(),
-                      GestureDetector(
-                        onTap: _pickDate,
-                        child: AbsorbPointer(
-                          child: TextFormField(
-                            controller: _lastPaymentDateController,
-                            decoration: const InputDecoration(labelText: 'Last Payment Date'),
-                            keyboardType: TextInputType.datetime,
+      appBar: AppBar(title: Text(isEditing ? 'Edit Rentor' : 'Add Rentor')),
+      body: ResponsiveConstraint(
+        maxWidth: 560,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _nameController,
+                          decoration: const InputDecoration(labelText: 'Name'),
+                          validator:
+                              (value) => value!.isEmpty ? 'Enter name' : null,
+                        ),
+                        TextFormField(
+                          controller: _emailController,
+                          decoration: const InputDecoration(labelText: 'Email'),
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                        TextFormField(
+                          controller: _phoneController,
+                          decoration: const InputDecoration(
+                            labelText: 'Phone Number',
+                          ),
+                          keyboardType: TextInputType.phone,
+                        ),
+                        TextFormField(
+                          controller: _percentageController,
+                          decoration: const InputDecoration(
+                            labelText: 'Percentage %',
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator:
+                              (value) =>
+                                  value!.isEmpty ? 'Enter percentage' : null,
+                        ),
+                        _buildBillTypeFields(),
+                        _buildExclusionListSection(),
+                        GestureDetector(
+                          onTap: _pickDate,
+                          child: AbsorbPointer(
+                            child: TextFormField(
+                              controller: _lastPaymentDateController,
+                              decoration: const InputDecoration(
+                                labelText: 'Last Payment Date',
+                              ),
+                              keyboardType: TextInputType.datetime,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: _showCalculateAmountOwedDialog,
-                            icon: const Icon(Icons.calculate),
-                            label: const Text('Calculate Amount Owed'),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: _amountOwedController,
-                              readOnly: true,
-                              decoration: InputDecoration(
-                                labelText: 'Amount Owed',
-                                hintText: '—',
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                        const SizedBox(height: 20),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: _showCalculateAmountOwedDialog,
+                              icon: const Icon(Icons.calculate),
+                              label: const Text('Calculate Amount Owed'),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextField(
+                                controller: _amountOwedController,
+                                readOnly: true,
+                                decoration: InputDecoration(
+                                  labelText: 'Amount Owed',
+                                  hintText: '—',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 25),
-              FilledButton(
-                onPressed: _saveRentor,
-                child: const Text('Save Rentor'),
-              ),
-            ],
+                const SizedBox(height: 25),
+                FilledButton(
+                  onPressed: _saveRentor,
+                  child: const Text('Save Rentor'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -476,7 +513,8 @@ class _MonthYearSelectionDialog extends StatefulWidget {
   const _MonthYearSelectionDialog({required this.periods});
 
   @override
-  State<_MonthYearSelectionDialog> createState() => _MonthYearSelectionDialogState();
+  State<_MonthYearSelectionDialog> createState() =>
+      _MonthYearSelectionDialogState();
 }
 
 class _MonthYearSelectionDialogState extends State<_MonthYearSelectionDialog> {
@@ -495,10 +533,11 @@ class _MonthYearSelectionDialogState extends State<_MonthYearSelectionDialog> {
       content: DropdownButton<DateTime>(
         value: _selected,
         isExpanded: true,
-        items: widget.periods.map((period) {
-          final label = DateFormat('MMMM yyyy').format(period);
-          return DropdownMenuItem(value: period, child: Text(label));
-        }).toList(),
+        items:
+            widget.periods.map((period) {
+              final label = DateFormat('MMMM yyyy').format(period);
+              return DropdownMenuItem(value: period, child: Text(label));
+            }).toList(),
         onChanged: (value) {
           if (value != null) setState(() => _selected = value);
         },
@@ -541,21 +580,26 @@ class _AmountOwedResultDialog extends StatelessWidget {
             if (breakdown.isEmpty)
               const Text('No applicable bills for this period.')
             else
-              ...breakdown.entries.map((entry) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(entry.key.name),
-                        Text('\$${entry.value.toStringAsFixed(2)}'),
-                      ],
-                    ),
-                  )),
+              ...breakdown.entries.map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(entry.key.name),
+                      Text('\$${entry.value.toStringAsFixed(2)}'),
+                    ],
+                  ),
+                ),
+              ),
             const Divider(),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text(
+                  'Total',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
                 Text(
                   '\$${total.toStringAsFixed(2)}',
                   style: const TextStyle(fontWeight: FontWeight.bold),
@@ -591,7 +635,8 @@ class _AddBillPercentageDialog extends StatefulWidget {
   });
 
   @override
-  State<_AddBillPercentageDialog> createState() => _AddBillPercentageDialogState();
+  State<_AddBillPercentageDialog> createState() =>
+      _AddBillPercentageDialogState();
 }
 
 class _AddBillPercentageDialogState extends State<_AddBillPercentageDialog> {
@@ -618,7 +663,10 @@ class _AddBillPercentageDialogState extends State<_AddBillPercentageDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Select Bill Type:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text(
+              'Select Bill Type:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 12),
             RadioGroup<BillType>(
               groupValue: selectedType,
@@ -628,14 +676,21 @@ class _AddBillPercentageDialogState extends State<_AddBillPercentageDialog> {
                 });
               },
               child: Column(
-                children: BillType.values
-                    .where((type) => !widget.selectedBillTypes.contains(type))
-                    .map((type) => RadioListTile<BillType>(
-                          title: Text('${type.name[0].toUpperCase()}${type.name.substring(1)}'),
-                          value: type,
-                        ))
-                    .toList(),
-              )
+                children:
+                    BillType.values
+                        .where(
+                          (type) => !widget.selectedBillTypes.contains(type),
+                        )
+                        .map(
+                          (type) => RadioListTile<BillType>(
+                            title: Text(
+                              '${type.name[0].toUpperCase()}${type.name.substring(1)}',
+                            ),
+                            value: type,
+                          ),
+                        )
+                        .toList(),
+              ),
             ),
             const SizedBox(height: 20),
             TextField(
@@ -667,7 +722,9 @@ class _AddBillPercentageDialogState extends State<_AddBillPercentageDialog> {
             final percent = double.tryParse(percentageController.text.trim());
             if (percent == null || percent < 0 || percent > 100) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please enter a valid percentage (0-100)')),
+                const SnackBar(
+                  content: Text('Please enter a valid percentage (0-100)'),
+                ),
               );
               return;
             }
@@ -681,4 +738,3 @@ class _AddBillPercentageDialogState extends State<_AddBillPercentageDialog> {
     );
   }
 }
-
