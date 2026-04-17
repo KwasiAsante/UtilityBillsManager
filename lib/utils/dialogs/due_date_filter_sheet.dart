@@ -66,15 +66,6 @@ class DueDateFilterSheet {
     required List<int> availableYears,
     DueDateFilterResult current = const DueDateFilterResult(),
   }) {
-    final content = _DueDateFilterSheetContent(
-      availableYears: availableYears,
-      current: current,
-      monthNames: AppConstants.monthNames,
-      formatDate: formatDate,
-      constrainedFirst: _constrainedFirst,
-      constrainedLast: _constrainedLast,
-    );
-
     if (AppBreakpoints.isWide(context)) {
       return showDialog<DueDateFilterResult>(
         context: context,
@@ -82,7 +73,17 @@ class DueDateFilterSheet {
             (context) => Dialog(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
-                child: SingleChildScrollView(child: content),
+                child: SingleChildScrollView(
+                  child: _DueDateFilterSheetContent(
+                    availableYears: availableYears,
+                    current: current,
+                    monthNames: AppConstants.monthNames,
+                    formatDate: formatDate,
+                    constrainedFirst: _constrainedFirst,
+                    constrainedLast: _constrainedLast,
+                    isDialog: true,
+                  ),
+                ),
               ),
             ),
       );
@@ -92,7 +93,15 @@ class DueDateFilterSheet {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (context) => content,
+      builder:
+          (context) => _DueDateFilterSheetContent(
+            availableYears: availableYears,
+            current: current,
+            monthNames: AppConstants.monthNames,
+            formatDate: formatDate,
+            constrainedFirst: _constrainedFirst,
+            constrainedLast: _constrainedLast,
+          ),
     );
   }
 }
@@ -109,6 +118,7 @@ class _DueDateFilterSheetContent extends StatefulWidget {
     required this.formatDate,
     required this.constrainedFirst,
     required this.constrainedLast,
+    this.isDialog = false,
   });
 
   final List<int> availableYears;
@@ -117,6 +127,7 @@ class _DueDateFilterSheetContent extends StatefulWidget {
   final String Function(DateTime) formatDate;
   final DateTime Function(int?, int?) constrainedFirst;
   final DateTime Function(int?, int?) constrainedLast;
+  final bool isDialog;
 
   @override
   State<_DueDateFilterSheetContent> createState() =>
@@ -217,7 +228,10 @@ class _DueDateFilterSheetContentState
         left: 16,
         right: 16,
         top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        bottom:
+            widget.isDialog
+                ? 16
+                : MediaQuery.of(context).viewInsets.bottom + 16,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
