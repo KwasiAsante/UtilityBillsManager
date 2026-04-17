@@ -401,7 +401,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
             onPressed: _openDueDateFilterSheet,
           ),
           PopupMenuButton<String>(
-            tooltip: 'Filter',
+            tooltip: 'Filter: $_selectedFilter',
             icon: const Icon(Icons.filter_list),
             onSelected: (String newValue) {
               setState(() {
@@ -413,15 +413,16 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                 (context) =>
                     ['All', 'Paid', 'Unpaid']
                         .map(
-                          (value) => PopupMenuItem<String>(
+                          (value) => CheckedPopupMenuItem<String>(
                             value: value,
+                            checked: _selectedFilter == value,
                             child: Text(value),
                           ),
                         )
                         .toList(),
           ),
           PopupMenuButton<String>(
-            tooltip: 'Sort',
+            tooltip: 'Sort: $_selectedSort',
             icon: const Icon(Icons.sort),
             onSelected: (String newValue) {
               setState(() {
@@ -438,8 +439,9 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                           'Amount (Highest)',
                         ]
                         .map(
-                          (value) => PopupMenuItem<String>(
+                          (value) => CheckedPopupMenuItem<String>(
                             value: value,
+                            checked: _selectedSort == value,
                             child: Text(value),
                           ),
                         )
@@ -467,6 +469,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                     child: ListTile(
                       leading: Icon(Icons.refresh),
                       title: Text('Refresh'),
+                      contentPadding: EdgeInsets.zero,
                     ),
                   ),
                   if (!AppBreakpoints.isWide(context))
@@ -475,6 +478,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                       child: ListTile(
                         leading: Icon(Icons.settings_outlined),
                         title: Text('Settings'),
+                        contentPadding: EdgeInsets.zero,
                       ),
                     ),
                   const PopupMenuItem<String>(
@@ -485,6 +489,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                         'Delete All',
                         style: TextStyle(color: Colors.red),
                       ),
+                      contentPadding: EdgeInsets.zero,
                     ),
                   ),
                 ],
