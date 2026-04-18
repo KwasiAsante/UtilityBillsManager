@@ -6,6 +6,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+_No unreleased changes yet._
+
+## [1.1.0] — 2026-04-17
+
 ### Changed
 - **Notification service factory pattern** — `notification_service.dart` is now an abstract `interface class NotificationService` instead of a conditional-export shim. A new `lib/factory/notification/` directory holds the factory entry point (`notification_service_factory.dart`) and platform-specific factory implementations (`notification_service_factory_native.dart`, `notification_service_factory_web.dart`). `main.dart` calls `createNotificationService()` at startup to obtain the correct concrete instance. `notification_service_base.dart` removed — its shared state and helpers have been absorbed into the platform implementations.
 - **Android build configuration** — `build.gradle.kts`, `settings.gradle.kts`, and `gradle-wrapper.properties` updated to align with the latest AGP and Kotlin plugin versions; added a second Android run configuration (`.run_android/Utility Bills (Android) My Phone.run.xml`).
@@ -78,14 +82,23 @@ All notable changes to this project are documented here.
 - `EmailDataRepository`: `deleteEmailData` and `deleteAllEmailData` now call `sync()` after deletion so the in-memory list stays consistent with the local database.
 - `SummaryScreen._isConsideredPaid`: bills with `PaymentStatus.paid` are now always treated as paid regardless of threshold calculation.
 
-### Added (prior entries)
+### Added — API and email query helpers
 - `Payment.toJson`: optional `include` map parameter — passing `{'bill': true}` appends `billIds` and `{'rentor': true}` ensures `rentorId` is present in the serialized output.
 - `DatabaseHelper.readEmail` / `EmailDataHelper.readEmail`: new `queryByEmailId` flag to query email records by `emailId` (IMAP message ID) instead of the default `emailDataId` primary key.
 - `SummaryScreen`: `fetchPaymentEmails()` is now called alongside `fetchBillEmails()` during Gmail sync so payment-related emails are also fetched.
 
+### Added — Responsive layout, adaptive chrome, and platform assets
+- **`AppBreakpoints` and `ResponsiveConstraint`** — 600dp breakpoint; max-width centering on wide screens; widget tests assert `ConstrainedBox` max width in wide layouts.
+- **`MainTabScreen`** — `NavigationRail` when `AppBreakpoints.isWide`; adaptive navigation doc comments.
+- **List and form screens** — Consolidated `AppBar` actions on Bill, Rentor, Payment, Email, and Summary screens; `ResponsiveConstraint` (max width 560) on settings and form flows; `EditEmailDataScreen` `ResponsiveConstraint` import/placement fix.
+- **Adaptive dialogs** — `DueDateFilterSheet` chooses dialog vs bottom sheet by width; dialog mode guards `viewInsets` bottom padding. Assign Bills / Assign Rentor in `AddEditPaymentScreen` share an extracted adaptive content widget.
+- **List screen polish** — `BillListScreen` overflow menu aligned with other lists (`CheckedPopupMenuItem`, tooltips, `contentPadding`); search clear control restored; `PopupMenuButton<String>` standardization; removed unintended `PaymentListScreen` search field; `RentorListScreen` menu typing and formatting fixes.
+- **Icons and manifests** — Web, Windows, macOS, and iOS app icons/resources; Android adaptive launcher icons; Android manifest updates; Android launcher icon assets.
+- **Tooling** — Dependency and Gradle/build configuration updates; responsive layout design spec; TODO doc and project icon asset; `.worktrees/` added to `.gitignore`.
+
 ---
 
-## [1.0.0] — Current
+## [1.0.0]
 
 ### Added — Logging
 - Introduced `AppLogger` utility with structured log levels, replacing verbose inline logging across `api_service`, email helpers, parsers, and related utilities. (`refactor: introduce AppLogger utility`)
