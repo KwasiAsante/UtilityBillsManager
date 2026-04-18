@@ -19,7 +19,11 @@ import '../settings/settings_screen.dart';
 /// Supports sorting by percentage, name, and last-payment date, as well as
 /// full-text search.
 class RentorListScreen extends StatefulWidget {
-  const RentorListScreen({super.key});
+  const RentorListScreen({super.key, required this.isVisible});
+
+  /// Controls visibility — passed from the [IndexedStack] in [MainTabScreen]
+  /// to avoid unnecessary background work when the tab is not active.
+  final bool isVisible;
 
   @override
   State<RentorListScreen> createState() => _RentorListScreenState();
@@ -33,7 +37,8 @@ class _RentorListScreenState extends State<RentorListScreen> {
 
   Future<List<Rentor>>? _rentors;
   List<Rentor> _allRentors = [];
-  bool _loading = true;
+  bool _loading = false;
+  bool _deferLoading = false; // used to defer loading until screen becomes visible
   bool _isListScrollable = false;
   String _selectedSort = 'Percentage';
   String _searchQuery = '';
@@ -42,8 +47,25 @@ class _RentorListScreenState extends State<RentorListScreen> {
   void initState() {
     super.initState();
     _rentorsRepository.addListener(_onRentorsUpdated);
-    _rentorsRepository.reload();
     _scrollController.addListener(_checkScrollability);
+    if (widget.isVisible) {
+      setState(() => _loading = true);
+      _rentorsRepository.reload();
+    }
+    else {
+      _deferLoading = true;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant RentorListScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    bool isVisibleNow = !oldWidget.isVisible && widget.isVisible;
+
+    if (isVisibleNow && _deferLoading) {
+      setState(() => _loading = true);
+      _rentorsRepository.reload();
+    }
   }
 
   @override
@@ -66,6 +88,8 @@ class _RentorListScreenState extends State<RentorListScreen> {
       _allRentors = _rentorsRepository.rentors;
       _updateDisplayedRentors();
     }
+
+    _deferLoading = false;
   }
 
   void _updateDisplayedRentors() {

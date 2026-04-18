@@ -22,7 +22,7 @@ class EmailService {
 
   Future<List<MimeMessage>> fetchRecentEmails(
       EmailType type, {
-        int maxEmails = 50,
+        int? maxEmails,
         DateTime? earliestEmailDate,
       }) async =>
       [];

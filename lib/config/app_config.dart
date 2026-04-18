@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../utils/preferences.dart';
@@ -56,7 +57,7 @@ class AppConfig {
     await Preferences.setString('APP_MODE', newMode.name);
   }
 
-  static const String _defaultApiBaseUrl = 'http://192.168.2.172:8080';
+  static const String _defaultApiBaseUrl = 'https://kwasi-utilitybills.duckdns.org';
 
   /// Base URL used by the app when it needs to call the API.
   ///
@@ -68,16 +69,28 @@ class AppConfig {
     }
 
     String? apiUrl = Preferences.getString('API_BASE_URL');
+
     if (apiUrl != null && apiUrl.isNotEmpty) {
+      if (apiUrl == 'http://192.168.2.172:8080' &&
+          (defaultTargetPlatform != TargetPlatform.android ||
+              defaultTargetPlatform != TargetPlatform.iOS)) {
+        apiUrl = 'http://127.0.0.1:8080';
+      }
       return apiUrl;
     }
 
-    String url = const String.fromEnvironment(
+    apiUrl = const String.fromEnvironment(
       'API_BASE_URL',
       defaultValue: _defaultApiBaseUrl,
     );
 
-    return url;
+    if (apiUrl == 'http://192.168.2.172:8080' &&
+        (defaultTargetPlatform != TargetPlatform.android ||
+        defaultTargetPlatform != TargetPlatform.iOS)) {
+      apiUrl = 'http://127.0.0.1:8080';
+    }
+
+    return apiUrl;
   }
   static Future<void> setApiBaseUrl(String newUrl) async {
     await Preferences.setString('API_BASE_URL', newUrl);

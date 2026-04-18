@@ -218,7 +218,7 @@ class EmailDataHelper {
   /// successfully parsed, whether freshly inserted or already existing in the DB.
   Future<Map<MimeMessage, EmailData>> _fetchEmails(
     EmailType type, {
-    int maxEmails = 50,
+    int? maxEmails,
     DateTime? earliestEmailDate,
   }) async {
     Map<MimeMessage, EmailData> finalMessages = {};
@@ -256,7 +256,7 @@ class EmailDataHelper {
   }
 
   Future<Result<Map<String, dynamic>>> syncEmails({
-    int maxEmails = 50,
+    int? maxEmails,
     DateTime? earliestEmailDate,
   }) async {
     Map<String, dynamic>? map = {};
@@ -457,7 +457,7 @@ class EmailDataHelper {
   /// `processed = true`).  If a bill is already stored (by `billId`), the
   /// email record is simply linked to the existing bill.
   Future<void> syncBillEmails({
-    int maxEmails = 50,
+    int? maxEmails,
     DateTime? earliestEmailDate,
   }) async {
     if (AppConfig.mode == AppMode.server) {
@@ -552,7 +552,7 @@ class EmailDataHelper {
   /// both the payment and the updated [EmailData].  If a payment is already
   /// stored (by `paymentId`), the email is simply linked to the existing record.
   Future<void> syncPaymentEmails({
-    int maxEmails = 50,
+    int? maxEmails,
     DateTime? earliestEmailDate,
   }) async {
     if (AppConfig.mode == AppMode.server) {
@@ -651,6 +651,5 @@ class EmailDataHelper {
       }
     }
   }
-
   // endregion
 }

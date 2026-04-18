@@ -65,7 +65,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
   Widget build(BuildContext context) {
     final screens = <Widget>[
       BillListScreen(isVisible: _selectedIndex == 0),
-      const RentorListScreen(),
+      RentorListScreen(isVisible: _selectedIndex == 1),
       SummaryScreen(isVisible: _selectedIndex == 2,),
       PaymentListScreen(isVisible: _selectedIndex == 3),
       EmailListScreen(isVisible: _selectedIndex == 4),

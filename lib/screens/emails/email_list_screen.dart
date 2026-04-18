@@ -57,7 +57,8 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
 
   Future<List<EmailData>>? _emails;
   List<EmailData> _allEmails = [];
-  bool _loading = true;
+  bool _loading = false;
+  bool _deferLoading = false; // used to defer loading until after Google sign-in if needed or when screen becomes visible
   bool _isListScrollable = false;
   String _selectedFilter = 'All';
   String _selectedSort = 'Default';
@@ -73,11 +74,16 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
       }
 
       initGoogleSignInForWeb();
-    } else if (widget.isVisible) {
-      _loadEmails(
-        syncEmails: !kIsWeb && AppConfig.mode == AppMode.server,
-        earliestEmailDate: ServerConfiguration.emailEarliestDate,
-      );
+    } else {
+      if (widget.isVisible) {
+        _loadEmails(
+          syncEmails: !kIsWeb && AppConfig.mode == AppMode.server,
+          earliestEmailDate: ServerConfiguration.emailEarliestDate,
+        );
+      }
+      else {
+        _deferLoading = true;
+      }
     }
 
     _scrollController.addListener(_checkScrollability);
@@ -87,12 +93,21 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
   @override
   void didUpdateWidget(covariant EmailListScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    bool isVisibleNow = !oldWidget.isVisible && widget.isVisible;
+
     if (isGoogleSignInEnabled) {
-      if (!oldWidget.isVisible && widget.isVisible) {
+      if (isVisibleNow) {
         subscribeToSignedInEvents();
-      } else if (oldWidget.isVisible && !widget.isVisible) {
+      } else if (!isVisibleNow) {
         unsubscribeFromSignedInEvents();
       }
+    }
+
+    if (isVisibleNow && _deferLoading) {
+      _loadEmails(
+        syncEmails: !kIsWeb && AppConfig.mode == AppMode.server,
+        earliestEmailDate: ServerConfiguration.emailEarliestDate,
+      );
     }
   }
 
@@ -117,6 +132,8 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
       _allEmails = _emailDataRepository.emails;
       _updateDisplayedEmails();
     }
+
+    _deferLoading = false;
   }
   //endregion
 
@@ -140,7 +157,7 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
   Future<void> _loadEmails({
     bool syncEmails = false,
     DateTime? earliestEmailDate,
-    int maxEmails = 50,
+    int? maxEmails,
   }) async {
     setState(() => _loading = true);
 

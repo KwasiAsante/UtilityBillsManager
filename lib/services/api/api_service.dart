@@ -222,12 +222,13 @@ class BillsApiService {
   /// fetch scope.  Returns `null` when the server responds with HTTP 409
   /// (sync already in progress).
   Future<List<Bill>?> getSyncedBills({
-    int maxEmails = 50,
+    int? maxEmails,
     DateTime? earliestEmailDate,
   }) async {
     try {
       final queryParams = <String, String>{
-        'maxEmails': '$maxEmails',
+        if (maxEmails != null)
+          'maxEmails': '$maxEmails',
         if (earliestEmailDate != null)
           'earliestEmailDate': earliestEmailDate.toIso8601String(),
       };
@@ -566,7 +567,7 @@ class PaymentsApiService {
   Future<List<Payment>?> getSyncedPayments({
     Map<String, bool>? include,
     List<String>? ids,
-    int maxEmails = 50,
+    int? maxEmails,
     DateTime? earliestEmailDate,
   }) async {
     try {
@@ -575,7 +576,8 @@ class PaymentsApiService {
           for (final entry in include.entries)
             if (entry.value) entry.key: 'true',
         if (ids != null) 'payment_ids': ids.join(','),
-        'maxEmails': '$maxEmails',
+        if (maxEmails != null)
+          'maxEmails': '$maxEmails',
         if (earliestEmailDate != null)
           'earliestEmailDate': earliestEmailDate.toIso8601String(),
       };
@@ -827,12 +829,13 @@ class EmailDataApiService {
   /// Returns `null` when the server responds with HTTP 409 (sync already in
   /// progress).
   Future<Map<String, dynamic>?> getSyncedEmail({
-    int maxEmails = 50,
+    int? maxEmails,
     DateTime? earliestEmailDate,
   }) async {
     try {
       final queryParams = <String, String>{
-        'maxEmails': '$maxEmails',
+        if (maxEmails != null)
+          'maxEmails': '$maxEmails',
         if (earliestEmailDate != null)
           'earliestEmailDate': earliestEmailDate.toIso8601String(),
       };

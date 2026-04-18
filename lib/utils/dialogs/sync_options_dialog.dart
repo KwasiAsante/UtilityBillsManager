@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 /// emails and the maximum number of emails to retrieve.
 class SyncOptions {
   final DateTime? earliestDate;
-  final int maxEmails;
+  final int? maxEmails;
 
-  const SyncOptions({this.earliestDate, this.maxEmails = 50});
+  const SyncOptions({this.earliestDate, this.maxEmails});
 }
 
 /// Static-only utility that shows a dialog for configuring email sync options.
@@ -90,7 +90,7 @@ class SyncOptionsDialog {
                     context,
                     SyncOptions(
                       earliestDate: fetchLast50 ? null : selectedDate,
-                      maxEmails: fetchLast50 ? 50 : 100,
+                      maxEmails: fetchLast50 ? 50 : null,
                     ),
                   ),
                   child: const Text('Sync'),

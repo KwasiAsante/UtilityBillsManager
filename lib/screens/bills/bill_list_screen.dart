@@ -63,7 +63,8 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
 
   Future<List<Bill>>? _bills;
   List<Bill> _allBills = [];
-  bool _loading = true;
+  bool _loading = false;
+  bool _deferLoading = false; // used to defer loading until after Google sign-in if needed or when screen becomes visible
   bool _isListScrollable = false;
   String _selectedFilter = 'All';
   String _selectedSort = 'Due Date (Latest)';
@@ -87,23 +88,37 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
       }
 
       initGoogleSignInForWeb();
-    } else if (widget.isVisible) {
-      _loadBills(
-        syncEmails: !kIsWeb && AppConfig.mode == AppMode.server,
-        earliestEmailDate: ServerConfiguration.emailEarliestDate,
-      );
+    } else {
+      if (widget.isVisible) {
+        _loadBills(
+          syncEmails: !kIsWeb && AppConfig.mode == AppMode.server,
+          earliestEmailDate: ServerConfiguration.emailEarliestDate,
+        );
+      }
+      else {
+        _deferLoading = true;
+      }
     }
   }
 
   @override
   void didUpdateWidget(covariant BillListScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    bool isVisibleNow = !oldWidget.isVisible && widget.isVisible;
+
     if (isGoogleSignInEnabled) {
-      if (!oldWidget.isVisible && widget.isVisible) {
+      if (isVisibleNow) {
         subscribeToSignedInEvents();
-      } else if (oldWidget.isVisible && !widget.isVisible) {
+      } else if (!isVisibleNow) {
         unsubscribeFromSignedInEvents();
       }
+    }
+
+    if (isVisibleNow && _deferLoading) {
+      _loadBills(
+        syncEmails: !kIsWeb && AppConfig.mode == AppMode.server,
+        earliestEmailDate: ServerConfiguration.emailEarliestDate,
+      );
     }
   }
 
@@ -128,6 +143,8 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
       _allBills = _billsRepository.bills;
       _updateDisplayedBills();
     }
+
+    _deferLoading = false;
   }
   //endregion
 
@@ -151,7 +168,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   Future<void> _loadBills({
     bool syncEmails = false,
     DateTime? earliestEmailDate,
-    int maxEmails = 50,
+    int? maxEmails,
   }) async {
     setState(() => _loading = true);
 

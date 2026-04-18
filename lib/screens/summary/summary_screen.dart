@@ -60,6 +60,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
   }
 
   late TabController _tabController;
+  final ScrollController _scrollController = ScrollController();
 
   final BillsRepository _billsRepo = BillsRepository();
   final RentorsRepository _rentorsRepo = RentorsRepository();
@@ -74,7 +75,9 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
   Map<String, List<Payment>> _billPaymentIndex = {};
 
   String _statusFilter = 'All';
-  bool _loading = true;
+  bool _loading = false;
+  bool _deferLoading = false; // used to defer loading until after Google sign-in if needed or when screen becomes visible
+  bool _isListScrollable = false;
 
   /// When false (default): bills within the "considered paid" threshold show
   /// $0 unpaid. When true: actual unpaid amounts are always shown.
@@ -127,6 +130,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
     super.initState();
 
     _tabController = TabController(length: 2, vsync: this);
+    _scrollController.addListener(_checkScrollability);
     _billsRepo.addListener(_onDataChanged);
     _rentorsRepo.addListener(_onDataChanged);
     _paymentsRepo.addListener(_onDataChanged);
@@ -138,23 +142,37 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
       }
 
       initGoogleSignInForWeb();
-    } else if (widget.isVisible) {
-      _loadData(
-        syncEmails: true,
-        earliestEmailDate: ServerConfiguration.emailEarliestDate,
-      );
+    } else {
+      if (widget.isVisible) {
+        _loadData(
+          syncEmails: true,
+          earliestEmailDate: ServerConfiguration.emailEarliestDate,
+        );
+      }
+      else {
+        _deferLoading = true;
+      }
     }
   }
 
   @override
   void didUpdateWidget(covariant SummaryScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    bool isVisibleNow = !oldWidget.isVisible && widget.isVisible;
+
     if (isGoogleSignInEnabled) {
-      if (!oldWidget.isVisible && widget.isVisible) {
+      if (isVisibleNow) {
         subscribeToSignedInEvents();
-      } else if (oldWidget.isVisible && !widget.isVisible) {
+      } else if (!isVisibleNow) {
         unsubscribeFromSignedInEvents();
       }
+    }
+
+    if (isVisibleNow && _deferLoading) {
+      _loadData(
+        syncEmails: true,
+        earliestEmailDate: ServerConfiguration.emailEarliestDate,
+      );
     }
   }
 
@@ -166,6 +184,8 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
     _emailDataRepo.removeListener(_onDataChanged);
     unsubscribeFromSignedInEvents();
     _tabController.dispose();
+    _scrollController.removeListener(_checkScrollability);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -183,6 +203,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
         _payments = _paymentsRepo.payments;
         _billPaymentIndex = _buildBillPaymentIndex(_payments);
       });
+      _deferLoading = false;
     });
   }
 
@@ -205,7 +226,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
   Future<void> _loadData({
     bool syncEmails = false,
     DateTime? earliestEmailDate,
-    int maxEmails = 50,
+    int? maxEmails,
   }) async {
     setState(() => _loading = true);
 
@@ -336,6 +357,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
     if (grouped.isEmpty) return const Center(child: Text('No bills found.'));
     return ListView(
       padding: const EdgeInsets.all(16),
+      controller: _scrollController,
       children:
           grouped.entries.map((e) => _buildMonthCard(e.key, e.value)).toList(),
     );
@@ -760,6 +782,20 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
     );
   }
 
+
+  //region Scroll
+  void _checkScrollability() {
+    if (_scrollController.hasClients) {
+      final isScrollable = _scrollController.position.maxScrollExtent > 0;
+      if (isScrollable != _isListScrollable) {
+        setState(() {
+          _isListScrollable = isScrollable;
+        });
+      }
+    }
+  }
+  //endregion
+
   // ── Build ────────────────────────────────────────────────────────────────────
 
   @override
@@ -884,28 +920,60 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
         ],
       ),
       body: ResponsiveConstraint(
-        child: Column(
-          children: [
-            if (isGoogleSignInEnabled &&
-                googleAccountService.buildWebWarningBanner() != null)
-              googleAccountService.buildWebWarningBanner()!,
-            if (!_loading) _buildRentorOwedSection(),
-            Expanded(
-              child:
-                  _loading
-                      ? const Center(child: CircularProgressIndicator())
-                      : TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildMonthlySummary(),
-                          _buildBillTypeSummary(),
-                        ],
-                      ),
-            ),
-          ],
-        ),
+        child: _buildBody(),
       ),
     );
+  }
+
+  Widget _buildBody() {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    final content = Column(
+      children: [
+        if (isGoogleSignInEnabled &&
+            googleAccountService.buildWebWarningBanner() != null)
+          googleAccountService.buildWebWarningBanner()!,
+        if (!_loading) _buildRentorOwedSection(),
+        Expanded(
+          child:
+              _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildMonthlySummary(),
+                      _buildBillTypeSummary(),
+                    ],
+                  ),
+        ),
+      ],
+    );
+
+    // In landscape, allow TabBarView to expand and fill available space
+    if (isLandscape) {
+      return Column(
+        children: [
+          if (isGoogleSignInEnabled &&
+              googleAccountService.buildWebWarningBanner() != null)
+            googleAccountService.buildWebWarningBanner()!,
+          if (!_loading) _buildRentorOwedSection(),
+          Expanded(
+            child:
+                _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildMonthlySummary(),
+                        _buildBillTypeSummary(),
+                      ],
+                    ),
+          ),
+        ],
+      );
+    }
+
+    return content;
   }
 
   Future<void> _deleteAllData() async {

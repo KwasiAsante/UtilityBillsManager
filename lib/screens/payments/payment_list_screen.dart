@@ -65,7 +65,8 @@ class _PaymentListScreenState
 
   Future<List<Payment>>? _payments;
   List<Payment> _allPayments = [];
-  bool _loading = true;
+  bool _loading = false;
+  bool _deferLoading = false; // used to defer loading until after Google sign-in if needed or when screen becomes visible
   bool _isListScrollable = false;
   String _selectedSort = 'Payment Date (Latest)';
   int? _selectedPaymentYear;
@@ -87,23 +88,37 @@ class _PaymentListScreenState
       }
 
       initGoogleSignInForWeb();
-    } else if (widget.isVisible) {
-      _loadPayments(
-        syncEmails: true,
-        earliestEmailDate: ServerConfiguration.emailEarliestDate,
-      );
+    } else {
+      if (widget.isVisible) {
+        _loadPayments(
+          syncEmails: true,
+          earliestEmailDate: ServerConfiguration.emailEarliestDate,
+        );
+      }
+      else {
+        _deferLoading = true;
+      }
     }
   }
 
   @override
   void didUpdateWidget(covariant PaymentListScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    bool isVisibleNow = !oldWidget.isVisible && widget.isVisible;
+
     if (isGoogleSignInEnabled) {
-      if (!oldWidget.isVisible && widget.isVisible) {
+      if (isVisibleNow) {
         subscribeToSignedInEvents();
-      } else if (oldWidget.isVisible && !widget.isVisible) {
+      } else if (!isVisibleNow) {
         unsubscribeFromSignedInEvents();
       }
+    }
+
+    if (isVisibleNow && _deferLoading) {
+      _loadPayments(
+        syncEmails: true,
+        earliestEmailDate: ServerConfiguration.emailEarliestDate,
+      );
     }
   }
 
@@ -127,6 +142,8 @@ class _PaymentListScreenState
       _allPayments = _paymentsRepository.payments;
       _updateDisplayedPayments();
     }
+
+    _deferLoading = false;
   }
   //endregion
 
@@ -150,7 +167,7 @@ class _PaymentListScreenState
   Future<void> _loadPayments({
     bool syncEmails = false,
     DateTime? earliestEmailDate,
-    int maxEmails = 50,
+    int? maxEmails,
   }) async {
     setState(() {
       _loading = true;
@@ -462,7 +479,9 @@ class _PaymentListScreenState
                                     googleAccountService.isAuthorized)) {
                               return Center(
                                 child: Text(
-                                  'No payments found. Pull down or click on the Refresh button to sync with Gmail or click the + button to add a payment.',
+                                  isGoogleSignInEnabled
+                                      ? 'No payments found. Pull down or click on the Refresh button to sync with Gmail or click the + button to add a payment.'
+                                      : 'No payments found. Pull down or click on the Refresh button to get fresh payments or click the + button to add a payment.',
                                 ),
                               );
                             } else {

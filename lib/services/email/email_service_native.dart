@@ -29,7 +29,7 @@ class EmailService {
   /// query is used to limit results before fetching.
   Future<List<MimeMessage>> fetchRecentEmails(
     EmailType type, {
-    int maxEmails = 50,
+    int? maxEmails,
     DateTime? earliestEmailDate,
   }) async {
     final client = ImapClient(isLogEnabled: false);
@@ -79,8 +79,9 @@ class EmailService {
               !matchingSequence.isNil) {
             // Get message IDs and limit to maxEmails (newest ones)
             final allIds = matchingSequence.toList();
-            final startIdx =
-                allIds.length > maxEmails ? allIds.length - maxEmails : 0;
+            final startIdx = maxEmails != null && allIds.length > maxEmails
+                ? allIds.length - maxEmails
+                : 0;
             final limitedIds = allIds.sublist(startIdx);
 
             // Fetch the limited set of messages
@@ -96,7 +97,7 @@ class EmailService {
         }
       } else {
         fetchResult = await client.fetchRecentMessages(
-          messageCount: maxEmails,
+          messageCount: maxEmails ?? 50,
           criteria: 'BODY[]',
         );
       }

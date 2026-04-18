@@ -36,7 +36,7 @@ class EmailService {
   /// operators are used to limit the result set.
   Future<List<MimeMessage>> fetchRecentEmails(
       EmailType type, {
-        int maxEmails = 50,
+        int? maxEmails,
         DateTime? earliestEmailDate,
       }) async {
     try {
@@ -86,7 +86,7 @@ class EmailService {
       }
       final listResponse = await gmailApi.users.messages.list(
         'me',
-        maxResults: maxEmails,
+        maxResults: earliestEmailDate == null && maxEmails == null ? 50 : maxEmails,
         q: query,
       );
 
