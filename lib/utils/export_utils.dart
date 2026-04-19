@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
@@ -14,9 +16,9 @@ import '../../data/models/summary_item.dart';
 
 /// Utility class for exporting bill data to CSV or PDF files.
 ///
-/// Both [exportBillsToCSV] and [exportBillsToPDF] group bills by calendar
-/// month, compute totals / paid / unpaid breakdowns, include per-rentor
-/// payment contributions, and share the resulting files via [SharePlus.instance.share()].
+/// On desktop (Windows, macOS, Linux), exports use a native Save As dialog
+/// via [file_selector].  On mobile and web, files are shared via the system
+/// share sheet.
 ///
 /// All methods are static; no instance state is needed.
 class ExportUtils {
@@ -27,6 +29,12 @@ class ExportUtils {
       'Note: Electric/Gas/Water bills with ≤30% unpaid (or within \$1.00 of that threshold), '
       'and Internet bills with ≤50% unpaid (or within \$1.00 of that threshold), '
       'are considered paid. Amounts in this export reflect actual values.';
+
+  /// True when running natively on a desktop OS (not web, not mobile).
+  static bool get _isDesktop {
+    if (kIsWeb) return false;
+    return Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+  }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -49,7 +57,11 @@ class ExportUtils {
       grouped.putIfAbsent(month, () => []).add(bill);
     }
     final sorted = grouped.entries.toList()
-      ..sort((a, b) => b.value.first.dueDate.compareTo(a.value.first.dueDate));
+      ..sort((a, b) {
+        final dateA = _monthFmt.parse(a.key);
+        final dateB = _monthFmt.parse(b.key);
+        return dateB.compareTo(dateA);
+      });
     return Map.fromEntries(sorted);
   }
 
@@ -93,11 +105,63 @@ class ExportUtils {
     return value;
   }
 
+  /// Builds the CSV string for a single month.
+  static String _buildCsvContent(
+    String month,
+    List<Bill> monthBills,
+    Map<String, List<Payment>> index,
+  ) {
+    final total = monthBills.fold(0.0, (s, b) => s + b.amount);
+    final paid = monthBills.fold(0.0, (s, b) => s + _paidAmount(b));
+    final unpaid = total - paid;
+    final contributions = _rentorPayments(monthBills, index);
+
+    final buffer = StringBuffer();
+
+    buffer.writeln('Month,Total,Paid,Unpaid');
+    buffer.writeln(
+        '${_csv(month)},${total.toStringAsFixed(2)},${paid.toStringAsFixed(2)},${unpaid.toStringAsFixed(2)}');
+    buffer.writeln();
+
+    buffer.writeln('Bill Type,Company,Due Date,Amount,Paid,Unpaid,Status');
+    for (final bill in monthBills) {
+      final billPaid = _paidAmount(bill);
+      final billUnpaid = bill.amount - billPaid;
+      buffer.writeln([
+        _csv(bill.type.name),
+        _csv(bill.company),
+        _dateFmt.format(bill.dueDate),
+        bill.amount.toStringAsFixed(2),
+        billPaid.toStringAsFixed(2),
+        billUnpaid.toStringAsFixed(2),
+        _csv(bill.status.name),
+      ].join(','));
+    }
+
+    if (contributions.isNotEmpty) {
+      buffer.writeln();
+      buffer.writeln('Rentor Contributions');
+      buffer.writeln('Rentor,Amount Paid');
+      for (final e in contributions.entries) {
+        buffer.writeln('${_csv(e.key)},${e.value.toStringAsFixed(2)}');
+      }
+    }
+
+    buffer.writeln();
+    buffer.writeln(_csv(_thresholdNote));
+
+    return buffer.toString();
+  }
+
   // ── CSV Export ───────────────────────────────────────────────────────────────
 
-  /// Generates one CSV file per calendar month and shares them via the system
-  /// share sheet.  Each file contains a month-summary row, a per-bill table,
-  /// and an optional rentor-contributions section.
+  /// Generates one CSV file per calendar month.
+  ///
+  /// On desktop, calls [desktopSaveFn] to get a save path and writes with
+  /// dart:io.  On mobile/web, shares via [SharePlus].
+  ///
+  /// [desktopSaveFn] receives the suggested filename and returns the chosen
+  /// path, or null if the user cancelled.  Defaults to [_defaultCsvSave].
   static Future<void> exportBillsToCSV(
     List<Bill> bills,
     List<Rentor> rentors,
@@ -106,83 +170,58 @@ class ExportUtils {
   }) async {
     final grouped = _groupByMonth(bills);
     final index = _buildIndex(payments);
-    final List<XFile> files = [];
 
+    if (_isDesktop) {
+      final saveFn = desktopSaveFn ?? _defaultCsvSave;
+      for (final entry in grouped.entries) {
+        final month = entry.key;
+        final monthBills = entry.value;
+        final csv = _buildCsvContent(month, monthBills, index);
+        final safeName = month.replaceAll(' ', '_');
+        final path = await saveFn('bills_$safeName.csv');
+        if (path == null) continue;
+        await File(path).writeAsBytes(utf8.encode(csv));
+      }
+      return;
+    }
+
+    // Mobile / web: share via system share sheet
+    final List<XFile> files = [];
     for (final entry in grouped.entries) {
       final month = entry.key;
       final monthBills = entry.value;
-      final total = monthBills.fold(0.0, (s, b) => s + b.amount);
-      final paid = monthBills.fold(0.0, (s, b) => s + _paidAmount(b));
-      final unpaid = total - paid;
-      final contributions = _rentorPayments(monthBills, index);
-
-      final buffer = StringBuffer();
-
-      // Month summary
-      buffer.writeln('Month,Total,Paid,Unpaid');
-      buffer.writeln('${_csv(month)},${total.toStringAsFixed(2)},${paid.toStringAsFixed(2)},${unpaid.toStringAsFixed(2)}');
-      buffer.writeln();
-
-      // Bills table
-      buffer.writeln('Bill Type,Company,Due Date,Amount,Paid,Unpaid,Status');
-      for (final bill in monthBills) {
-        final billPaid = _paidAmount(bill);
-        final billUnpaid = bill.amount - billPaid;
-        buffer.writeln([
-          _csv(bill.type.name),
-          _csv(bill.company),
-          _dateFmt.format(bill.dueDate),
-          bill.amount.toStringAsFixed(2),
-          billPaid.toStringAsFixed(2),
-          billUnpaid.toStringAsFixed(2),
-          _csv(bill.status.name),
-        ].join(','));
-      }
-
-      // Rentor contributions
-      if (contributions.isNotEmpty) {
-        buffer.writeln();
-        buffer.writeln('Rentor Contributions');
-        buffer.writeln('Rentor,Amount Paid');
-        for (final e in contributions.entries) {
-          buffer.writeln('${_csv(e.key)},${e.value.toStringAsFixed(2)}');
-        }
-      }
-
-      // Threshold note
-      buffer.writeln();
-      buffer.writeln(_csv(_thresholdNote));
-
+      final csv = _buildCsvContent(month, monthBills, index);
       final safeName = month.replaceAll(' ', '_');
-      final fileName = 'bills_$safeName.csv';
-      final csvData = utf8.encode(buffer.toString());
-
-      // For testing: use desktopSaveFn if provided
-      if (desktopSaveFn != null) {
-        final filePath = await desktopSaveFn(fileName);
-        if (filePath != null) {
-          await File(filePath).writeAsBytes(csvData);
-        }
-      } else {
-        files.add(XFile.fromData(
-          csvData,
-          name: fileName,
-          mimeType: 'text/csv',
-        ));
-      }
+      files.add(XFile.fromData(
+        utf8.encode(csv),
+        name: 'bills_$safeName.csv',
+        mimeType: 'text/csv',
+      ));
     }
-
     if (files.isNotEmpty) {
-      await SharePlus.instance.share(ShareParams(files: files, subject: 'Bills Export by Month'));
+      await SharePlus.instance.share(
+        ShareParams(files: files, subject: 'Bills Export by Month'),
+      );
     }
+  }
+
+  /// Default desktop save function — opens the native Save As dialog for CSV.
+  static Future<String?> _defaultCsvSave(String suggestedName) async {
+    final location = await getSaveLocation(
+      suggestedName: suggestedName,
+      acceptedTypeGroups: [
+        const XTypeGroup(label: 'CSV', extensions: ['csv']),
+      ],
+    );
+    return location?.path;
   }
 
   // ── PDF Export ───────────────────────────────────────────────────────────────
 
-  /// Generates a multi-page PDF (one page per calendar month) and shares it via
-  /// the system share sheet.  Each page includes a month-totals summary, a
-  /// styled bill table, optional rentor-contributions table, and a footer note
-  /// explaining the "paid" threshold logic.
+  /// Generates a multi-page PDF (one page per calendar month).
+  ///
+  /// On desktop, calls [desktopSaveFn] to get a save path and writes with
+  /// dart:io.  On mobile/web, shares via [SharePlus].
   static Future<void> exportBillsToPDF(
     List<Bill> bills,
     List<Rentor> rentors,
@@ -211,12 +250,14 @@ class ExportUtils {
               children: [
                 // Heading
                 pw.Text(month,
-                    style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold)),
+                    style: pw.TextStyle(
+                        fontSize: 22, fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 8),
 
                 // Month totals
                 pw.Container(
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: pw.BoxDecoration(
                     color: PdfColors.grey200,
                     borderRadius: pw.BorderRadius.circular(4),
@@ -235,7 +276,8 @@ class ExportUtils {
 
                 // Bills table
                 pw.Table(
-                  border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+                  border:
+                      pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
                   columnWidths: {
                     0: const pw.FlexColumnWidth(2),
                     1: const pw.FlexColumnWidth(2.5),
@@ -247,7 +289,8 @@ class ExportUtils {
                   },
                   children: [
                     pw.TableRow(
-                      decoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+                      decoration:
+                          const pw.BoxDecoration(color: PdfColors.blueGrey800),
                       children: [
                         _pdfCell('Bill Type', header: true),
                         _pdfCell('Company', header: true),
@@ -275,7 +318,8 @@ class ExportUtils {
                           _pdfCell('\$${billPaid.toStringAsFixed(2)}',
                               color: PdfColors.green700),
                           _pdfCell('\$${billUnpaid.toStringAsFixed(2)}',
-                              color: billUnpaid > 0.005 ? PdfColors.red700 : null),
+                              color:
+                                  billUnpaid > 0.005 ? PdfColors.red700 : null),
                           _pdfCell(bill.status.name),
                         ],
                       );
@@ -291,14 +335,16 @@ class ExportUtils {
                           fontSize: 12, fontWeight: pw.FontWeight.bold)),
                   pw.SizedBox(height: 6),
                   pw.Table(
-                    border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+                    border: pw.TableBorder.all(
+                        color: PdfColors.grey400, width: 0.5),
                     columnWidths: {
                       0: const pw.FlexColumnWidth(3),
                       1: const pw.FlexColumnWidth(2),
                     },
                     children: [
                       pw.TableRow(
-                        decoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+                        decoration: const pw.BoxDecoration(
+                            color: PdfColors.blueGrey800),
                         children: [
                           _pdfCell('Rentor', header: true),
                           _pdfCell('Amount Paid', header: true),
@@ -320,12 +366,14 @@ class ExportUtils {
                 pw.Divider(color: PdfColors.grey400),
                 pw.Text(
                   '* $_thresholdNote',
-                  style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
+                  style: const pw.TextStyle(
+                      fontSize: 8, color: PdfColors.grey600),
                 ),
                 pw.SizedBox(height: 2),
                 pw.Text(
                   'Generated ${_dateFmt.format(DateTime.now())}',
-                  style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
+                  style: const pw.TextStyle(
+                      fontSize: 9, color: PdfColors.grey600),
                 ),
               ],
             );
@@ -335,26 +383,41 @@ class ExportUtils {
     }
 
     final pdfBytes = await doc.save();
-    const fileName = 'bills_export.pdf';
 
-    if (desktopSaveFn != null) {
-      final filePath = await desktopSaveFn(fileName);
-      if (filePath != null) {
-        await File(filePath).writeAsBytes(pdfBytes);
-      }
-    } else {
-      await SharePlus.instance.share(ShareParams(
-          files: [XFile.fromData(pdfBytes, name: fileName, mimeType: 'application/pdf')],
-          subject: 'Bills Export'),
-      );
+    if (_isDesktop) {
+      final saveFn = desktopSaveFn ?? _defaultPdfSave;
+      final path = await saveFn('bills_export.pdf');
+      if (path == null) return;
+      await File(path).writeAsBytes(pdfBytes);
+      return;
     }
+
+    await SharePlus.instance.share(ShareParams(
+      files: [
+        XFile.fromData(pdfBytes,
+            name: 'bills_export.pdf', mimeType: 'application/pdf')
+      ],
+      subject: 'Bills Export',
+    ));
+  }
+
+  /// Default desktop save function — opens the native Save As dialog for PDF.
+  static Future<String?> _defaultPdfSave(String suggestedName) async {
+    final location = await getSaveLocation(
+      suggestedName: suggestedName,
+      acceptedTypeGroups: [
+        const XTypeGroup(label: 'PDF', extensions: ['pdf']),
+      ],
+    );
+    return location?.path;
   }
 
   // ── PDF widget helpers ───────────────────────────────────────────────────────
 
   /// Builds a single table cell widget for the PDF output.  Header cells are
   /// bold white; body cells use the optional [color] override.
-  static pw.Widget _pdfCell(String text, {bool header = false, PdfColor? color}) {
+  static pw.Widget _pdfCell(String text,
+      {bool header = false, PdfColor? color}) {
     return pw.Padding(
       padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
       child: pw.Text(
@@ -374,10 +437,13 @@ class ExportUtils {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
-        pw.Text(label, style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+        pw.Text(label,
+            style:
+                const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
         pw.Text(
           '\$${amount.toStringAsFixed(2)}',
-          style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: color),
+          style: pw.TextStyle(
+              fontSize: 13, fontWeight: pw.FontWeight.bold, color: color),
         ),
       ],
     );
