@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -100,8 +101,9 @@ class ExportUtils {
   static Future<void> exportBillsToCSV(
     List<Bill> bills,
     List<Rentor> rentors,
-    List<Payment> payments,
-  ) async {
+    List<Payment> payments, {
+    Future<String?> Function(String suggestedName)? desktopSaveFn,
+  }) async {
     final grouped = _groupByMonth(bills);
     final index = _buildIndex(payments);
     final List<XFile> files = [];
@@ -152,11 +154,22 @@ class ExportUtils {
       buffer.writeln(_csv(_thresholdNote));
 
       final safeName = month.replaceAll(' ', '_');
-      files.add(XFile.fromData(
-        utf8.encode(buffer.toString()),
-        name: 'bills_$safeName.csv',
-        mimeType: 'text/csv',
-      ));
+      final fileName = 'bills_$safeName.csv';
+      final csvData = utf8.encode(buffer.toString());
+
+      // For testing: use desktopSaveFn if provided
+      if (desktopSaveFn != null) {
+        final filePath = await desktopSaveFn(fileName);
+        if (filePath != null) {
+          await File(filePath).writeAsBytes(csvData);
+        }
+      } else {
+        files.add(XFile.fromData(
+          csvData,
+          name: fileName,
+          mimeType: 'text/csv',
+        ));
+      }
     }
 
     if (files.isNotEmpty) {
@@ -173,8 +186,9 @@ class ExportUtils {
   static Future<void> exportBillsToPDF(
     List<Bill> bills,
     List<Rentor> rentors,
-    List<Payment> payments,
-  ) async {
+    List<Payment> payments, {
+    Future<String?> Function(String suggestedName)? desktopSaveFn,
+  }) async {
     final grouped = _groupByMonth(bills);
     final index = _buildIndex(payments);
     final doc = pw.Document();
@@ -320,10 +334,20 @@ class ExportUtils {
       );
     }
 
-    await SharePlus.instance.share(ShareParams(
-        files: [XFile.fromData(await doc.save(), name: 'bills_export.pdf', mimeType: 'application/pdf')],
-        subject: 'Bills Export'),
-    );
+    final pdfBytes = await doc.save();
+    const fileName = 'bills_export.pdf';
+
+    if (desktopSaveFn != null) {
+      final filePath = await desktopSaveFn(fileName);
+      if (filePath != null) {
+        await File(filePath).writeAsBytes(pdfBytes);
+      }
+    } else {
+      await SharePlus.instance.share(ShareParams(
+          files: [XFile.fromData(pdfBytes, name: fileName, mimeType: 'application/pdf')],
+          subject: 'Bills Export'),
+      );
+    }
   }
 
   // ── PDF widget helpers ───────────────────────────────────────────────────────
