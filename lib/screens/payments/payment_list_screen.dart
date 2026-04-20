@@ -160,6 +160,7 @@ class _PaymentListScreenState
     await _loadPayments(
       syncEmails: true,
       earliestEmailDate: options.earliestDate,
+      latestEmailDate: options.latestDate,
       maxEmails: options.maxEmails,
     );
   }
@@ -167,6 +168,7 @@ class _PaymentListScreenState
   Future<void> _loadPayments({
     bool syncEmails = false,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
     int? maxEmails,
   }) async {
     setState(() {
@@ -181,6 +183,7 @@ class _PaymentListScreenState
 
       await _emailDataHelper.syncPaymentEmails(
         earliestEmailDate: earliestEmailDate,
+        latestEmailDate: latestEmailDate,
         maxEmails: maxEmails,
       );
     }
