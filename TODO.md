@@ -12,7 +12,7 @@
 - [ ] Update sync/refresh date selection UI
   - [ ] Add optional end/latest date field to `SyncOptionsDialog`
   - [ ] End/latest date field is only enabled when earliest email date is selected
-  - [ ] Reorganize `SettingsScreen` to clearly distinguish between:
+  - [x] Reorganize `SettingsScreen` to clearly distinguish between:
     - Manual sync default earliest email date setting
     - Sync interval / background polling configuration
 
@@ -55,17 +55,17 @@
 
 ## File Export
 
-- [ ] Fix export of CSV and PDF files on Windows
-  - [ ] Investigate Windows file permission and path handling issues
-  - [ ] Ensure exported files are properly saved and accessible
-  - [ ] Test CSV export on Windows
-  - [ ] Test PDF export on Windows
-  - [ ] Add error handling and user feedback for export failures
+- [x] Fix export of CSV and PDF files on Windows
+  - [x] Investigate Windows file permission and path handling issues
+  - [x] Ensure exported files are properly saved and accessible
+  - [x] Test CSV export on Windows
+  - [x] Test PDF export on Windows
+  - [x] Add error handling and user feedback for export failures
 
 ## UI/UX Improvements
 
-- [ ] Reorganize Settings & Config Screen
-  - [ ] Clearly separate manual sync email date settings from sync interval configuration
-  - [ ] Improve visual hierarchy to reduce user confusion
-  - [ ] Add informative labels and tooltips explaining each setting's purpose
+- [x] Reorganize Settings & Config Screen
+  - [x] Clearly separate manual sync email date settings from sync interval configuration
+  - [x] Improve visual hierarchy to reduce user confusion
+  - [x] Add informative labels and tooltips explaining each setting's purpose
 
