@@ -11,7 +11,7 @@ import '../../data/models/server_config.dart';
 
 /// Singleton low-level SQLite helper built on top of `sqflite`.
 ///
-/// Owns the full database schema (currently version 14) and exposes raw CRUD
+/// Owns the full database schema (currently version 16) and exposes raw CRUD
 /// methods for all four tables: `bills`, `rentors`, `payments`, and
 /// `email_data`.  Higher-level helpers (`BillsHelper`, `PaymentsHelper`, etc.)
 /// delegate here for all local-DB operations.
