@@ -66,6 +66,7 @@ class _BillSelectionScreenState extends State<BillSelectionScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Select Bills')),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
             child: ListView.builder(
