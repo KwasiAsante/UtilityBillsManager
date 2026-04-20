@@ -55,6 +55,8 @@ void main() async {
   // Initialize local database on all platforms (including web with FFI web)
   await DatabaseHelper().database;
 
+  await AppConfig.load();
+
   ApiService.configure(baseUrl: AppConfig.apiBaseUrl);
 
   await ServerConfiguration.init();
