@@ -18,7 +18,8 @@ class BillSummaryService {
   /// summary this month (as determined by [now], defaulting to [DateTime.now]).
   ///
   /// A bill is eligible when ALL of the following are true:
-  /// 1. [bill.status] is not [PaymentStatus.paid].
+  /// 1. [bill.status] is not [PaymentStatus.paid] — `unpaid`, `partial`, and
+  ///    `unknown` statuses all count as eligible.
   /// 2. [bill.type] is not in [rentor.excludedBillTypes].
   /// 3. [bill.dueDate] falls in the current calendar month — OR, for
   ///    [BillType.water] only, in the following month (water bills arrive
@@ -71,6 +72,8 @@ class BillSummaryService {
     final ref = now ?? DateTime.now();
     final greeting = _greeting(ref.hour);
     final firstName = rentor.name.split(' ').first;
+
+    if (selectedBills.isEmpty) return '';
 
     final waterBills =
         selectedBills.where((b) => b.type == BillType.water).toList();

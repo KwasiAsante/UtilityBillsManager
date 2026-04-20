@@ -101,6 +101,19 @@ void main() {
       expect(result, hasLength(1));
     });
 
+    test('includes unknown-status bill due this month', () {
+      final rentor = makeRentor();
+      final bill = makeBill(
+        type: BillType.electric,
+        amount: 100.0,
+        dueDate: DateTime(2026, 4, 15),
+        status: PaymentStatus.unknown,
+      );
+      final result = service.getEligibleBills(rentor, [bill],
+          now: DateTime(2026, 4, 1));
+      expect(result, hasLength(1));
+    });
+
     test('includes water bill due next month', () {
       final rentor = makeRentor();
       final waterBill = makeBill(
@@ -188,6 +201,11 @@ void main() {
   });
 
   group('generateMessage — format', () {
+    test('returns empty string for empty bill list', () {
+      final rentor = makeRentor();
+      expect(service.generateMessage(rentor, []), equals(''));
+    });
+
     test('uses first name only', () {
       final rentor = makeRentor(name: 'Alex Johnson');
       final bill = makeBill(
