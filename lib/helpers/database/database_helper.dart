@@ -6,11 +6,12 @@ import '../../data/models/bill.dart';
 import '../../data/models/email_data.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
+import '../../data/models/app_configuration.dart';
 import '../../data/models/server_config.dart';
 
 /// Singleton low-level SQLite helper built on top of `sqflite`.
 ///
-/// Owns the full database schema (currently version 14) and exposes raw CRUD
+/// Owns the full database schema (currently version 16) and exposes raw CRUD
 /// methods for all four tables: `bills`, `rentors`, `payments`, and
 /// `email_data`.  Higher-level helpers (`BillsHelper`, `PaymentsHelper`, etc.)
 /// delegate here for all local-DB operations.
@@ -25,7 +26,7 @@ class DatabaseHelper {
 
   /// Current schema version.  Bump this and add a corresponding
   /// `if (oldVersion < N)` block in [_onUpgrade] for every schema change.
-  static const _databaseVersion = 15;
+  static const _databaseVersion = 16;
 
   static final DatabaseHelper _instance = DatabaseHelper._internal();
 
@@ -180,6 +181,14 @@ class DatabaseHelper {
         emailEarliestDate TEXT,
         emailSyncDelayDuration INTEGER,
         emailSyncInterval INTEGER
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE app_configuration (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        configId TEXT,
+        baseWebAPI TEXT
       )
     ''');
   }
@@ -564,6 +573,16 @@ class DatabaseHelper {
           emailEarliestDate TEXT,
           emailSyncDelayDuration INTEGER,
           emailSyncInterval INTEGER
+        )
+      ''');
+    }
+
+    if (oldVersion < 16) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS app_configuration (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          configId TEXT,
+          baseWebAPI TEXT
         )
       ''');
     }
@@ -1463,6 +1482,30 @@ class DatabaseHelper {
     return await db.delete('email_data');
   }
   //endregion
+  //endregion
+
+  //region App Configuration
+  /// Clears the `app_configuration` table and inserts [config] as the single
+  /// row. Returns the new row id.
+  Future<int> saveAppConfiguration(AppConfiguration config) async {
+    final db = await database;
+    await db.delete('app_configuration');
+    return await db.insert('app_configuration', config.toJson());
+  }
+
+  /// Returns the stored [AppConfiguration], or `null` if none exists.
+  Future<AppConfiguration?> readAppConfiguration() async {
+    final db = await database;
+    final result = await db.query('app_configuration', limit: 1);
+    if (result.isEmpty) return null;
+    return AppConfiguration.fromJson(result.first);
+  }
+
+  /// Deletes all rows from `app_configuration`. Returns deleted row count.
+  Future<int> deleteAppConfiguration() async {
+    final db = await database;
+    return await db.delete('app_configuration');
+  }
   //endregion
 
   //region Configuration

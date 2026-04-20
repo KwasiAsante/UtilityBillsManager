@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../data/models/app_configuration.dart';
+import '../helpers/configuration/app_config_helper.dart';
 import '../utils/preferences.dart';
 
 /// Indicates whether the app should host its own SQLite server (`server`) or
@@ -26,12 +28,28 @@ extension AppModeExtension on AppMode {
 ///
 /// Provides [mode], [apiBaseUrl], and all email credential getters.
 class AppConfig {
+  /// In-memory cache populated by [load]. All synchronous getters read from
+  /// this cache after startup so the DB is never hit on the hot path.
+  static AppConfiguration? _appConfig;
+
   /// Loads optional local secrets from a bundled asset and pre-warms
   /// the SharedPreferences instance.
   ///
   /// Call this once during startup (before reading any config).
   static Future<void> init() async {
     await Future.wait([Preferences.sharedPrefs]);
+  }
+
+  /// Reads [AppConfiguration] from SQLite into [_appConfig].
+  ///
+  /// Must be called after the database is open and before [apiBaseUrl] is
+  /// first read. In `main.dart` this runs immediately after
+  /// `await DatabaseHelper().database`.
+  static Future<void> load() async {
+    final result = await AppConfigHelper().readConfiguration();
+    if (result.isSuccess) {
+      _appConfig = result.data;
+    }
   }
 
   /// Parses the `APP_MODE` dart-define string into an [AppMode] enum value,
@@ -61,13 +79,25 @@ class AppConfig {
 
   /// Base URL used by the app when it needs to call the API.
   ///
-  /// - Server mode: defaults to localhost (self-hosted API)
-  /// - Client mode: defaults to `API_BASE_URL` (connect to another host)
+  /// Resolution order (highest priority first):
+  /// 1. [_appConfig.baseWebAPI] — SQLite-backed, reliable across sessions
+  /// 2. SharedPreferences `API_BASE_URL` — legacy fallback
+  /// 3. `dart-define` `API_BASE_URL`
+  /// 4. Hardcoded default ([_defaultApiBaseUrl])
+  ///
+  /// - Server mode always returns localhost regardless of stored value.
   static String get apiBaseUrl {
     if (mode == AppMode.server) {
       return 'http://127.0.0.1:8080';
     }
 
+    // 1. SQLite-backed cache (survives browser/app restarts on all platforms)
+    if (_appConfig?.baseWebAPI != null &&
+        _appConfig!.baseWebAPI!.isNotEmpty) {
+      return _appConfig!.baseWebAPI!;
+    }
+
+    // 2. SharedPreferences fallback (legacy)
     String? apiUrl = Preferences.getString('API_BASE_URL');
 
     if (apiUrl != null && apiUrl.isNotEmpty) {
@@ -79,6 +109,7 @@ class AppConfig {
       return apiUrl;
     }
 
+    // 3. dart-define / hardcoded default
     apiUrl = const String.fromEnvironment(
       'API_BASE_URL',
       defaultValue: _defaultApiBaseUrl,
@@ -93,6 +124,13 @@ class AppConfig {
     return apiUrl;
   }
   static Future<void> setApiBaseUrl(String newUrl) async {
+    final config = AppConfiguration(
+      configId: _appConfig?.configId ?? const Uuid().v4(),
+      baseWebAPI: newUrl,
+    );
+    await AppConfigHelper().saveConfiguration(config);
+    _appConfig = config;
+    // Keep SharedPreferences in sync for any legacy consumers.
     await Preferences.setString('API_BASE_URL', newUrl);
   }
 
