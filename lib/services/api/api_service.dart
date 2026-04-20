@@ -224,6 +224,7 @@ class BillsApiService {
   Future<List<Bill>?> getSyncedBills({
     int? maxEmails,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
   }) async {
     try {
       final queryParams = <String, String>{
@@ -231,6 +232,8 @@ class BillsApiService {
           'maxEmails': '$maxEmails',
         if (earliestEmailDate != null)
           'earliestEmailDate': earliestEmailDate.toIso8601String(),
+        if (latestEmailDate != null)
+          'latestEmailDate': latestEmailDate.toIso8601String(),
       };
       final uri = Uri.parse('$baseUrl/bill/list/sync')
           .replace(queryParameters: queryParams);
@@ -569,6 +572,7 @@ class PaymentsApiService {
     List<String>? ids,
     int? maxEmails,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
   }) async {
     try {
       final queryParams = <String, String>{
@@ -580,6 +584,8 @@ class PaymentsApiService {
           'maxEmails': '$maxEmails',
         if (earliestEmailDate != null)
           'earliestEmailDate': earliestEmailDate.toIso8601String(),
+        if (latestEmailDate != null)
+          'latestEmailDate': latestEmailDate.toIso8601String(),
       };
       final uri = Uri.parse('$baseUrl/payment/list/sync')
           .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
@@ -831,6 +837,7 @@ class EmailDataApiService {
   Future<Map<String, dynamic>?> getSyncedEmail({
     int? maxEmails,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
   }) async {
     try {
       final queryParams = <String, String>{
@@ -838,6 +845,8 @@ class EmailDataApiService {
           'maxEmails': '$maxEmails',
         if (earliestEmailDate != null)
           'earliestEmailDate': earliestEmailDate.toIso8601String(),
+        if (latestEmailDate != null)
+          'latestEmailDate': latestEmailDate.toIso8601String(),
       };
       final uri = Uri.parse('$baseUrl/email/list/sync')
           .replace(queryParameters: queryParams);

@@ -161,6 +161,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
     await _loadBills(
       syncEmails: true,
       earliestEmailDate: options.earliestDate,
+      latestEmailDate: options.latestDate,
       maxEmails: options.maxEmails,
     );
   }
@@ -168,6 +169,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   Future<void> _loadBills({
     bool syncEmails = false,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
     int? maxEmails,
   }) async {
     setState(() => _loading = true);
@@ -180,6 +182,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
 
       await _emailDataHelper.syncBillEmails(
         earliestEmailDate: earliestEmailDate,
+        latestEmailDate: latestEmailDate,
         maxEmails: maxEmails,
       );
     }

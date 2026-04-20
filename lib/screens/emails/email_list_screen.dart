@@ -150,6 +150,7 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
     await _loadEmails(
       syncEmails: true,
       earliestEmailDate: options.earliestDate,
+      latestEmailDate: options.latestDate,
       maxEmails: options.maxEmails,
     );
   }
@@ -157,6 +158,7 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
   Future<void> _loadEmails({
     bool syncEmails = false,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
     int? maxEmails,
   }) async {
     setState(() => _loading = true);
@@ -169,6 +171,7 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
 
       await _emailDataHelper.syncEmails(
         earliestEmailDate: earliestEmailDate,
+        latestEmailDate: latestEmailDate,
         maxEmails: maxEmails,
       );
     }

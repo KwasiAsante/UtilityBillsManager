@@ -219,6 +219,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
     await _loadData(
       syncEmails: true,
       earliestEmailDate: options.earliestDate,
+      latestEmailDate: options.latestDate,
       maxEmails: options.maxEmails,
     );
   }
@@ -226,6 +227,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
   Future<void> _loadData({
     bool syncEmails = false,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
     int? maxEmails,
   }) async {
     setState(() => _loading = true);
@@ -238,6 +240,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
 
       await _emailDataHelper.syncEmails(
         earliestEmailDate: earliestEmailDate,
+        latestEmailDate: latestEmailDate,
         maxEmails: maxEmails,
       );
     }

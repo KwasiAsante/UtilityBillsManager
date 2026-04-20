@@ -220,12 +220,14 @@ class EmailDataHelper {
     EmailType type, {
     int? maxEmails,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
   }) async {
     Map<MimeMessage, EmailData> finalMessages = {};
     final messages = await emailService.fetchRecentEmails(
       type,
       maxEmails: maxEmails,
       earliestEmailDate: earliestEmailDate,
+      latestEmailDate: latestEmailDate,
     );
     for (MimeMessage message in messages) {
       AppLogger().d(
@@ -258,6 +260,7 @@ class EmailDataHelper {
   Future<Result<Map<String, dynamic>>> syncEmails({
     int? maxEmails,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
   }) async {
     Map<String, dynamic>? map = {};
 
@@ -270,6 +273,7 @@ class EmailDataHelper {
           EmailType.bill,
           maxEmails: maxEmails,
           earliestEmailDate: earliestEmailDate,
+          latestEmailDate: latestEmailDate,
         );
         if (billEmails.isNotEmpty) {
           for (MimeMessage message in billEmails.keys) {
@@ -347,6 +351,7 @@ class EmailDataHelper {
           EmailType.payment,
           maxEmails: maxEmails,
           earliestEmailDate: earliestEmailDate,
+          latestEmailDate: latestEmailDate,
         );
         if (paymentEmails.isNotEmpty) {
           List<Rentor> rentors = [];
@@ -444,6 +449,7 @@ class EmailDataHelper {
         map = await ApiService.emails().getSyncedEmail(
           maxEmails: maxEmails,
           earliestEmailDate: earliestEmailDate,
+          latestEmailDate: latestEmailDate,
         );
         return Result.success(data: map);
       } on Exception catch (e) {
@@ -459,12 +465,14 @@ class EmailDataHelper {
   Future<void> syncBillEmails({
     int? maxEmails,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
   }) async {
     if (AppConfig.mode == AppMode.server) {
       final messages = await _fetchEmails(
         EmailType.bill,
         maxEmails: maxEmails,
         earliestEmailDate: earliestEmailDate,
+        latestEmailDate: latestEmailDate,
       );
       if (messages.isNotEmpty) {
         for (MimeMessage message in messages.keys) {
@@ -537,6 +545,7 @@ class EmailDataHelper {
       final bills = await ApiService.bills().getSyncedBills(
         maxEmails: maxEmails,
         earliestEmailDate: earliestEmailDate,
+        latestEmailDate: latestEmailDate,
       );
 
       if (bills == null) {
@@ -554,12 +563,14 @@ class EmailDataHelper {
   Future<void> syncPaymentEmails({
     int? maxEmails,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
   }) async {
     if (AppConfig.mode == AppMode.server) {
       final messages = await _fetchEmails(
         EmailType.payment,
         maxEmails: maxEmails,
         earliestEmailDate: earliestEmailDate,
+        latestEmailDate: latestEmailDate,
       );
       if (messages.isNotEmpty) {
         List<Rentor> rentors = [];
@@ -642,6 +653,7 @@ class EmailDataHelper {
       final payments = await ApiService.payments().getSyncedPayments(
         maxEmails: maxEmails,
         earliestEmailDate: earliestEmailDate,
+        latestEmailDate: latestEmailDate,
       );
 
       if (payments == null) {

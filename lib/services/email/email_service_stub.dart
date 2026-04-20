@@ -24,6 +24,7 @@ class EmailService {
       EmailType type, {
         int? maxEmails,
         DateTime? earliestEmailDate,
+        DateTime? latestEmailDate,
       }) async =>
       [];
 }
