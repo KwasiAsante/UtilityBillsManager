@@ -4,14 +4,14 @@
 
 ## Email & Sync
 
-- [ ] Add additional argument `latestEmailDate` to email sync methods and API request calls
-  - [ ] Update `EmailDataHelper.syncEmails()` to accept optional `latestEmailDate` parameter
-  - [ ] Pass `latestEmailDate` to server sync endpoints (`/bill/list/sync`, `/payment/list/sync`, `/email/list/sync`)
+- [x] Add additional argument `latestEmailDate` to email sync methods and API request calls
+  - [x] Update `EmailDataHelper.syncEmails()` to accept optional `latestEmailDate` parameter
+  - [x] Pass `latestEmailDate` to server sync endpoints (`/bill/list/sync`, `/payment/list/sync`, `/email/list/sync`)
   - [ ] Server tracks and uses `latestEmailDate` for incremental syncs to improve performance
 
-- [ ] Update sync/refresh date selection UI
-  - [ ] Add optional end/latest date field to `SyncOptionsDialog`
-  - [ ] End/latest date field is only enabled when earliest email date is selected
+- [x] Update sync/refresh date selection UI
+  - [x] Add optional end/latest date field to `SyncOptionsDialog`
+  - [x] End/latest date field is only enabled when earliest email date is selected
   - [x] Reorganize `SettingsScreen` to clearly distinguish between:
     - Manual sync default earliest email date setting
     - Sync interval / background polling configuration
