@@ -18,18 +18,17 @@
 
 ## App Configuration
 
-- [ ] Create app configuration model
-  - [ ] Define `AppConfiguration` class with app-specific settings
+- [x] Create app configuration model
+  - [x] Define `AppConfiguration` class with app-specific settings (`baseWebAPI`)
   - [ ] Include fields for sync intervals, notification preferences, user preferences, etc.
 
-- [ ] Implement app configuration persistence
-  - [ ] Save app configuration to `SharedPreferences`
-  - [ ] Load app configuration from `SharedPreferences` on app startup
-  - [ ] Provide methods to read and write individual configuration values
+- [x] Implement app configuration persistence
+  - [x] Save app configuration to SQLite (persists reliably on web via IndexedDB)
+  - [x] Load app configuration from SQLite on app startup (`AppConfig.load()`)
+  - [x] Provide methods to read and write individual configuration values
 
-- [ ] Integrate app configuration throughout the app
-  - [ ] Read configuration values from `SharedPreferences` or in-memory object
-  - [ ] Apply configuration settings to relevant features (sync intervals, notifications, etc.)
+- [x] Integrate app configuration throughout the app
+  - [x] `apiBaseUrl` reads from SQLite-backed cache first, then falls back to SharedPreferences → dart-define → default
 
 ## Background & Notifications
 
