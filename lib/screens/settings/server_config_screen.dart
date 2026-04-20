@@ -284,9 +284,38 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // ── Sync settings ──────────────────────────────────────────────
+                // ── Manual Sync ────────────────────────────────────────────────
                 Text(
-                  'Sync Settings',
+                  'Manual Sync',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TextFormField(
+                      controller: _earliestDateController,
+                      decoration: InputDecoration(
+                        labelText: 'Default Earliest Email Date',
+                        helperText:
+                            'The default start date used when you trigger a manual sync. '
+                            'You can override this each time in the sync dialog.',
+                        helperMaxLines: 3,
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.calendar_today_outlined),
+                          onPressed: _pickDate,
+                        ),
+                      ),
+                      readOnly: true,
+                      onTap: _pickDate,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // ── Background Sync ────────────────────────────────────────────
+                Text(
+                  'Background Sync',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
@@ -296,23 +325,13 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
                     child: Column(
                       children: [
                         TextFormField(
-                          controller: _earliestDateController,
-                          decoration: InputDecoration(
-                            labelText: 'Earliest Email Date',
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.calendar_today_outlined),
-                              onPressed: _pickDate,
-                            ),
-                          ),
-                          readOnly: true,
-                          onTap: _pickDate,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
                           controller: _syncDelayController,
                           decoration: const InputDecoration(
                             labelText: 'Sync Delay (seconds)',
                             hintText: '30',
+                            helperText:
+                                'How long to wait after the app starts before the first background sync runs.',
+                            helperMaxLines: 2,
                           ),
                           keyboardType: TextInputType.number,
                           validator:
@@ -328,6 +347,10 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
                           decoration: const InputDecoration(
                             labelText: 'Sync Interval (seconds)',
                             hintText: '900',
+                            helperText:
+                                'How often the app checks for new emails in the background. '
+                                '900 = every 15 minutes.',
+                            helperMaxLines: 2,
                           ),
                           keyboardType: TextInputType.number,
                           validator: (v) => _validateInt(v, 'Sync Interval'),
