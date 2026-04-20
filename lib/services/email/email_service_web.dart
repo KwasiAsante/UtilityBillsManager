@@ -38,6 +38,7 @@ class EmailService {
       EmailType type, {
         int? maxEmails,
         DateTime? earliestEmailDate,
+        DateTime? latestEmailDate,
       }) async {
     try {
       if (!GoogleAccountService().isInitialized ||
@@ -81,8 +82,9 @@ class EmailService {
       if (earliestEmailDate != null) {
         var dateFormat = DateFormat('yyyy/MM/dd');
         // Gmail: after:<older-date> before:<newer-date>
+        final beforeDate = latestEmailDate ?? DateTime.now();
         query +=
-        ' after:${dateFormat.format(earliestEmailDate)} before:${dateFormat.format(DateTime.now())}';
+        ' after:${dateFormat.format(earliestEmailDate)} before:${dateFormat.format(beforeDate)}';
       }
       final listResponse = await gmailApi.users.messages.list(
         'me',

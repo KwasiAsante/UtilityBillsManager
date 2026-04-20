@@ -220,12 +220,14 @@ class EmailDataHelper {
     EmailType type, {
     int? maxEmails,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
   }) async {
     Map<MimeMessage, EmailData> finalMessages = {};
     final messages = await emailService.fetchRecentEmails(
       type,
       maxEmails: maxEmails,
       earliestEmailDate: earliestEmailDate,
+      latestEmailDate: latestEmailDate,
     );
     for (MimeMessage message in messages) {
       AppLogger().d(
@@ -271,6 +273,7 @@ class EmailDataHelper {
           EmailType.bill,
           maxEmails: maxEmails,
           earliestEmailDate: earliestEmailDate,
+          latestEmailDate: latestEmailDate,
         );
         if (billEmails.isNotEmpty) {
           for (MimeMessage message in billEmails.keys) {
@@ -348,6 +351,7 @@ class EmailDataHelper {
           EmailType.payment,
           maxEmails: maxEmails,
           earliestEmailDate: earliestEmailDate,
+          latestEmailDate: latestEmailDate,
         );
         if (paymentEmails.isNotEmpty) {
           List<Rentor> rentors = [];
@@ -468,6 +472,7 @@ class EmailDataHelper {
         EmailType.bill,
         maxEmails: maxEmails,
         earliestEmailDate: earliestEmailDate,
+        latestEmailDate: latestEmailDate,
       );
       if (messages.isNotEmpty) {
         for (MimeMessage message in messages.keys) {
@@ -565,6 +570,7 @@ class EmailDataHelper {
         EmailType.payment,
         maxEmails: maxEmails,
         earliestEmailDate: earliestEmailDate,
+        latestEmailDate: latestEmailDate,
       );
       if (messages.isNotEmpty) {
         List<Rentor> rentors = [];

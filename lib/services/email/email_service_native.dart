@@ -31,6 +31,7 @@ class EmailService {
     EmailType type, {
     int? maxEmails,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
   }) async {
     final client = ImapClient(isLogEnabled: false);
     var didLogin = false;
@@ -59,17 +60,18 @@ class EmailService {
 
       if (earliestEmailDate != null) {
         try {
-          // Search for messages within date range using IMAP SEARCH
-          final now = DateTime.now();
+          // Search for messages within date range using IMAP SEARCH.
+          // BEFORE is exclusive in IMAP, so add 1 day for inclusive semantics.
+          final beforeDate = latestEmailDate != null
+              ? latestEmailDate.add(const Duration(days: 1))
+              : DateTime.now().add(const Duration(days: 1));
 
           final searchResult = await client.searchMessagesWithQuery(
             SearchQueryBuilder.from(
               '',
               SearchQueryType.allTextHeaders,
               since: earliestEmailDate,
-              before: now.add(
-                const Duration(days: 1),
-              ), // BEFORE is exclusive in IMAP
+              before: beforeDate,
             ),
           );
 
