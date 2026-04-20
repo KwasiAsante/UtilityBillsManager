@@ -258,6 +258,7 @@ class EmailDataHelper {
   Future<Result<Map<String, dynamic>>> syncEmails({
     int? maxEmails,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
   }) async {
     Map<String, dynamic>? map = {};
 
@@ -444,6 +445,7 @@ class EmailDataHelper {
         map = await ApiService.emails().getSyncedEmail(
           maxEmails: maxEmails,
           earliestEmailDate: earliestEmailDate,
+          latestEmailDate: latestEmailDate,
         );
         return Result.success(data: map);
       } on Exception catch (e) {
@@ -459,6 +461,7 @@ class EmailDataHelper {
   Future<void> syncBillEmails({
     int? maxEmails,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
   }) async {
     if (AppConfig.mode == AppMode.server) {
       final messages = await _fetchEmails(
@@ -537,6 +540,7 @@ class EmailDataHelper {
       final bills = await ApiService.bills().getSyncedBills(
         maxEmails: maxEmails,
         earliestEmailDate: earliestEmailDate,
+        latestEmailDate: latestEmailDate,
       );
 
       if (bills == null) {
@@ -554,6 +558,7 @@ class EmailDataHelper {
   Future<void> syncPaymentEmails({
     int? maxEmails,
     DateTime? earliestEmailDate,
+    DateTime? latestEmailDate,
   }) async {
     if (AppConfig.mode == AppMode.server) {
       final messages = await _fetchEmails(
@@ -642,6 +647,7 @@ class EmailDataHelper {
       final payments = await ApiService.payments().getSyncedPayments(
         maxEmails: maxEmails,
         earliestEmailDate: earliestEmailDate,
+        latestEmailDate: latestEmailDate,
       );
 
       if (payments == null) {
