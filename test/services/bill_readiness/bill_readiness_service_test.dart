@@ -349,7 +349,7 @@ void main() {
   });
 
   group('checkReadiness — multi-rentor', () {
-    test('returns notification only for the complete rentor', () async {
+    test('returns notifications for all rentors that become complete', () async {
       final john = _rentor(
         rentorId: 'r1',
         billPercentages: {BillType.electric: 35, BillType.gas: 35},

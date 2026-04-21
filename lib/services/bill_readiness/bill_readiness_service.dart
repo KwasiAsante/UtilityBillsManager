@@ -2,6 +2,7 @@ import '../bill_summary/bill_summary_service.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/rentor.dart';
 import '../../helpers/bill_readiness/bill_notification_tracker_helper.dart';
+import '../../utils/app_logger.dart';
 
 /// Returned by [BillReadinessService.checkReadiness] when a rentor's bills are
 /// all accounted for and a compose message notification should be shown.
@@ -68,6 +69,9 @@ class BillReadinessService {
       // Record receipt once.
       final trackedResult =
           await _trackerHelper.hasBillBeenTracked(rentor.rentorId, newBill.billId);
+      if (trackedResult.isError) {
+        AppLogger().e('[BillReadinessService] hasBillBeenTracked failed: ${trackedResult.errorMessage}');
+      }
       final alreadyTracked = trackedResult.isSuccess && (trackedResult.data ?? false);
       if (!alreadyTracked) {
         await _trackerHelper.trackBill(
@@ -84,6 +88,9 @@ class BillReadinessService {
         month: ref.month,
         year: ref.year,
       );
+      if (trackedRowsResult.isError) {
+        AppLogger().e('[BillReadinessService] getTrackedBills failed: ${trackedRowsResult.errorMessage}');
+      }
       final trackedIds = (trackedRowsResult.isSuccess
               ? trackedRowsResult.data ?? []
               : <dynamic>[])
@@ -104,6 +111,9 @@ class BillReadinessService {
         year: ref.year,
         billGroup: 'regular',
       );
+      if (regularSentResult.isError) {
+        AppLogger().e('[BillReadinessService] hasComposeNotificationBeenSent (regular) failed: ${regularSentResult.errorMessage}');
+      }
       final regularSent =
           regularSentResult.isSuccess && (regularSentResult.data ?? false);
       if (!regularSent &&
@@ -120,6 +130,9 @@ class BillReadinessService {
           year: ref.year,
           billGroup: 'water',
         );
+        if (waterSentResult.isError) {
+          AppLogger().e('[BillReadinessService] hasComposeNotificationBeenSent (water) failed: ${waterSentResult.errorMessage}');
+        }
         final waterSent =
             waterSentResult.isSuccess && (waterSentResult.data ?? false);
         if (!waterSent && _isWaterGroupComplete(waterBills, trackedIds)) {
