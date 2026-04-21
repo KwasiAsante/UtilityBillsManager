@@ -9,6 +9,20 @@ import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
 import '../../data/models/server_config.dart';
 
+/// Extracts a human-readable error message from a non-2xx [response].
+///
+/// The server encodes errors as `{"error": "..."}` (400/500) or
+/// `{"message": "..."}` (409).  Falls back to the raw body string when the
+/// body is not valid JSON or neither key is present.
+String _errorBody(http.Response response) {
+  try {
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final msg = body['error'] ?? body['message'];
+    if (msg is String && msg.isNotEmpty) return msg;
+  } catch (_) {}
+  return response.body;
+}
+
 /// Central HTTP client facade for the local shelf server (client mode).
 ///
 /// Defaults to `http://127.0.0.1:8080`.  Call [configure] to override (e.g.
@@ -138,8 +152,8 @@ class BillsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to create bill ${bill.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to create bill ${bill.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error creating bill: $e');
@@ -158,7 +172,7 @@ class BillsApiService {
         final Map<String, dynamic> json = jsonDecode(response.body);
         return Bill.fromJson(json);
       } else {
-        AppLogger().e('Failed to load bill $id: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load bill $id: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -168,18 +182,38 @@ class BillsApiService {
   }
 
   /// GET `/bill/list` — returns all bills.
-  Future<List<Bill>> getAllBills() async {
+  ///
+  /// Pass [limit] and [offset] for pagination; [sortBy] and [sortOrder] to
+  /// control ordering.  When [limit] is provided the server wraps the response
+  /// in `{ "data": [...], "total": N, "limit": N, "offset": N }` — this method
+  /// transparently unwraps that envelope and returns just the list.
+  Future<List<Bill>> getAllBills({
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
-      final response = await ApiService._client.get(Uri.parse('$baseUrl/bill/list'));
+      final queryParams = <String, String>{
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
+      };
+      final uri = Uri.parse('$baseUrl/bill/list')
+          .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => Bill.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load bills: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load bills: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -189,24 +223,39 @@ class BillsApiService {
   }
 
   /// GET `/bill/list/<status>` — returns bills filtered by [status].
-  /// Pass [ids] to further restrict results to specific `billId` values.
-  Future<List<Bill>> getBillsByStatus(String status, {List<String>? ids}) async {
+  ///
+  /// Pass [ids] to restrict results to specific `billId` values.  Pass [limit]
+  /// and [offset] for pagination; [sortBy] and [sortOrder] to control ordering.
+  Future<List<Bill>> getBillsByStatus(
+    String status, {
+    List<String>? ids,
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
       final queryParams = <String, String>{
-        if (ids != null)
-          'bill_ids': ids.join(','),
+        if (ids != null) 'bill_ids': ids.join(','),
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
       };
-      final uri = Uri.parse('$baseUrl/bill/list/$status').replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+      final uri = Uri.parse('$baseUrl/bill/list/$status')
+          .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
       final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => Bill.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load bills: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load bills: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -249,7 +298,7 @@ class BillsApiService {
         AppLogger().w('Bill sync is already running');
         return null;
       } else {
-        AppLogger().e('Failed to sync bills: ${response.statusCode} - $response');
+        AppLogger().e('Failed to sync bills: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -272,8 +321,8 @@ class BillsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to update bill ${bill.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to update bill ${bill.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error update bill: $e');
@@ -292,7 +341,7 @@ class BillsApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete bill $id: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error delete bill $id: $e');
@@ -309,7 +358,7 @@ class BillsApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete all bills: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error delete bills: $e');
@@ -348,8 +397,8 @@ class RentorsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to create rentor ${rentor.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to create rentor ${rentor.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error creating rentor: $e');
@@ -368,7 +417,7 @@ class RentorsApiService {
         final Map<String, dynamic> json = jsonDecode(response.body);
         return Rentor.fromJson(json);
       } else {
-        AppLogger().e('Failed to load rentor $id: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load rentor $id: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -378,18 +427,36 @@ class RentorsApiService {
   }
 
   /// GET `/rentor/list` — returns all rentors.
-  Future<List<Rentor>> getAllRentors() async {
+  ///
+  /// Pass [limit] and [offset] for pagination; [sortBy] and [sortOrder] to
+  /// control ordering.
+  Future<List<Rentor>> getAllRentors({
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
-      final response = await ApiService._client.get(Uri.parse('$baseUrl/rentor/list'));
+      final queryParams = <String, String>{
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
+      };
+      final uri = Uri.parse('$baseUrl/rentor/list')
+          .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => Rentor.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load rentors: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load rentors: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -412,8 +479,8 @@ class RentorsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to update rentor ${rentor.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to update rentor ${rentor.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error updating rentors: $e');
@@ -432,7 +499,7 @@ class RentorsApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete rentor $id: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error delete rentor $id: $e');
@@ -449,7 +516,7 @@ class RentorsApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete all rentors: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error deleting rentors: $e');
@@ -489,8 +556,8 @@ class PaymentsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to create payment: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to create payment: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error fetching payments: $e');
@@ -518,7 +585,7 @@ class PaymentsApiService {
         final Map<String, dynamic> json = jsonDecode(response.body);
         return Payment.fromJson(json);
       } else {
-        AppLogger().e('Failed to load payment $id: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load payment $id: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -529,29 +596,42 @@ class PaymentsApiService {
 
   /// GET `/payment/list` — returns all payments, optionally filtered to [ids]
   /// and with related records eager-loaded via [include] flags.
-  Future<List<Payment>> getAllPayments({Map<String, bool>? include, List<String>? ids}) async {
+  ///
+  /// Pass [limit] and [offset] for pagination; [sortBy] and [sortOrder] to
+  /// control ordering.
+  Future<List<Payment>> getAllPayments({
+    Map<String, bool>? include,
+    List<String>? ids,
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
       final queryParams = <String, String>{
         if (include != null)
           for (final entry in include.entries)
             if (entry.value) entry.key: 'true',
-
-        if (ids != null)
-          'payment_ids': ids.join(','),
+        if (ids != null) 'payment_ids': ids.join(','),
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
       };
-      final uri = Uri.parse(
-        '$baseUrl/payment/list',
-      ).replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+      final uri = Uri.parse('$baseUrl/payment/list')
+          .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
       final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => Payment.fromJson(e, billRows: e['billList'] != null && e['billList'] is List ? List<Map<String, dynamic>>.from(e['billList']) : null))
             .toList();
       } else {
-        AppLogger().e('Failed to load payments: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load payments: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -601,7 +681,7 @@ class PaymentsApiService {
         AppLogger().w('Payment sync is already running');
         return null;
       } else {
-        AppLogger().e('Failed to sync payments: ${response.statusCode} - $response');
+        AppLogger().e('Failed to sync payments: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -624,8 +704,8 @@ class PaymentsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to update payment ${payment.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to update payment ${payment.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error updating payment: $e');
@@ -644,7 +724,7 @@ class PaymentsApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete payment $id: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error deleting payment: $e');
@@ -661,7 +741,7 @@ class PaymentsApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete all payments: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error deleting payments: $e');
@@ -700,8 +780,8 @@ class EmailDataApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to create emailData ${emailData.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to create emailData ${emailData.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error creating emailData: $e');
@@ -732,7 +812,7 @@ class EmailDataApiService {
         final Map<String, dynamic> json = jsonDecode(response.body);
         return EmailData.fromJson(json);
       } else {
-        AppLogger().e('Failed to load emailData $id: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load emailData $id: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -742,26 +822,41 @@ class EmailDataApiService {
   }
 
   /// GET `/email/list` — returns all email records.
-  Future<List<EmailData>> getEmails({Map<String, bool>? include}) async {
+  ///
+  /// Pass [limit] and [offset] for pagination; [sortBy] and [sortOrder] to
+  /// control ordering.
+  Future<List<EmailData>> getEmails({
+    Map<String, bool>? include,
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
-      final includeParams = <String, String>{
+      final queryParams = <String, String>{
         if (include != null)
           for (final entry in include.entries)
             if (entry.value) entry.key: 'true',
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
       };
       final uri = Uri.parse('$baseUrl/email/list').replace(
-        queryParameters: includeParams.isEmpty ? null : includeParams,
+        queryParameters: queryParams.isEmpty ? null : queryParams,
       );
       final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => EmailData.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load emailDatas: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load emailDatas: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -771,26 +866,41 @@ class EmailDataApiService {
   }
 
   /// GET `/email/list/unprocessed` — returns only unprocessed email records.
-  Future<List<EmailData>> getUnprocessedEmails({Map<String, bool>? include}) async {
+  ///
+  /// Pass [limit] and [offset] for pagination; [sortBy] and [sortOrder] to
+  /// control ordering.
+  Future<List<EmailData>> getUnprocessedEmails({
+    Map<String, bool>? include,
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
-      final includeParams = <String, String>{
+      final queryParams = <String, String>{
         if (include != null)
           for (final entry in include.entries)
             if (entry.value) entry.key: 'true',
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
       };
       final uri = Uri.parse('$baseUrl/email/list/unprocessed').replace(
-        queryParameters: includeParams.isEmpty ? null : includeParams,
+        queryParameters: queryParams.isEmpty ? null : queryParams,
       );
       final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => EmailData.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load unprocessed emailDatas: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load unprocessed emailDatas: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -800,26 +910,41 @@ class EmailDataApiService {
   }
 
   /// GET `/email/list/processed` — returns only processed email records.
-  Future<List<EmailData>> getProcessedEmails({Map<String, bool>? include}) async {
+  ///
+  /// Pass [limit] and [offset] for pagination; [sortBy] and [sortOrder] to
+  /// control ordering.
+  Future<List<EmailData>> getProcessedEmails({
+    Map<String, bool>? include,
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
-      final includeParams = <String, String>{
+      final queryParams = <String, String>{
         if (include != null)
           for (final entry in include.entries)
             if (entry.value) entry.key: 'true',
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
       };
       final uri = Uri.parse('$baseUrl/email/list/processed').replace(
-        queryParameters: includeParams.isEmpty ? null : includeParams,
+        queryParameters: queryParams.isEmpty ? null : queryParams,
       );
       final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => EmailData.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load processed emailDatas: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load processed emailDatas: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -868,7 +993,7 @@ class EmailDataApiService {
         AppLogger().w('Email sync is already running');
         return null;
       } else {
-        AppLogger().e('Failed to sync email data: ${response.statusCode} - $response');
+        AppLogger().e('Failed to sync email data: ${response.statusCode} - ${_errorBody(response)}');
         return {};
       }
     } catch (e) {
@@ -891,8 +1016,8 @@ class EmailDataApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to update emailData ${emailData.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to update emailData ${emailData.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error updating emailData: $e');
@@ -911,7 +1036,7 @@ class EmailDataApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete emailData: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error deleting emailData: $e');
@@ -928,7 +1053,7 @@ class EmailDataApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete all emailData: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error deleting emailData: $e');
@@ -959,7 +1084,7 @@ class ConfigApiService {
       if (response.statusCode == 200) {
         return ServerConfig.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
       } else {
-        AppLogger().e('Failed to get config: ${response.statusCode} - $response');
+        AppLogger().e('Failed to get config: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -980,7 +1105,7 @@ class ConfigApiService {
       if (response.statusCode == 200) {
         return ServerConfig.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
       } else {
-        AppLogger().e('Failed to create config: ${response.statusCode} - $response');
+        AppLogger().e('Failed to create config: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -1001,7 +1126,7 @@ class ConfigApiService {
       if (response.statusCode == 200) {
         return ServerConfig.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
       } else {
-        AppLogger().e('Failed to update config: ${response.statusCode} - $response');
+        AppLogger().e('Failed to update config: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -1018,8 +1143,8 @@ class ConfigApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to delete config: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to delete config: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error deleting config: $e');
@@ -1064,9 +1189,9 @@ class NotificationApiService {
         return "OK";
       } else {
         AppLogger().e(
-          'Failed to register device token: ${response.statusCode} - $response',
+          'Failed to register device token: ${response.statusCode} - ${_errorBody(response)}',
         );
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error registering device token: $e');
