@@ -143,7 +143,7 @@ class BillSummaryService {
     return 'Good evening';
   }
 
-  /// Formats [date] as "Month Dayth" — e.g. "April 15th", "May 1st".
+  /// Formats [date] as "Month Day(th)" — e.g. "April 15th", "May 1st".
   String _formatDate(DateTime date) {
     final day = date.day;
     return '${_monthName(date.month)} $day${_ordinalSuffix(day)}';

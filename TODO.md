@@ -45,7 +45,7 @@
 - [x] Craft messages for rentors
   - [x] Generate per-rentor bill summary message (amount owed + due date)
   - [x] Format message for clarity and professionalism
-  - [ ] Support templating for customizable messages
+  - [x] Support templating for customizable messages
 
 - [x] Send or share crafted messages to rentors
   - [ ] Implement message sharing via SMS (e.g., Twilio integration)
