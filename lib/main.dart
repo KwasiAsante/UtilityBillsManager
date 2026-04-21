@@ -24,7 +24,7 @@ import 'utils/app_logger.dart';
 /// 4. Set up the correct `sqflite` database factory for the current platform
 ///    (web → FFI web, desktop → FFI, mobile → default native).
 /// 5. Open the database (runs migrations if needed).
-/// 6. Set [AppState.localDB] and conIn tfigure [ApiService.baseUrl].
+/// 6. Set [AppState.localDB] and configure [ApiService.baseUrl].
 /// 7. Start the local shelf HTTP server when running in server mode.
 /// 8. Launch the Flutter widget tree.
 
