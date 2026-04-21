@@ -32,13 +32,13 @@
 
 ## Background & Notifications
 
-- [ ] Enable background notification support across all platforms
-  - [ ] **Windows** — implement background listener for SSE or Firebase Cloud Messaging
-  - [ ] **macOS** — implement background listener for SSE or Firebase Cloud Messaging
-  - [ ] **iOS** — implement background listener for SSE or Firebase Cloud Messaging
-  - [ ] **Android** — implement background listener for SSE or Firebase Cloud Messaging
-  - [ ] Handle notification wake-ups and foreground/background transitions
-  - [ ] Ensure app can receive and process notifications while running in background
+- [x] Enable background notification support across all platforms
+  - [x] **Windows** — SSE lifecycle observer reconnects on app resume
+  - [x] **macOS** — APS environment entitlements + lifecycle SSE reconnect
+  - [x] **iOS** — UIBackgroundModes (remote-notification, fetch) + lifecycle SSE reconnect
+  - [x] **Android** — POST_NOTIFICATIONS permission + data-only FCM handler + lifecycle SSE reconnect
+  - [x] Handle notification wake-ups and foreground/background transitions
+  - [x] Ensure app can receive and process notifications while running in background
 
 ## Rentor Messaging
 
