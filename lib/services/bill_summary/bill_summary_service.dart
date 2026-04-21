@@ -1,3 +1,4 @@
+import '../../config/app_config.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
@@ -53,28 +54,48 @@ class BillSummaryService {
 
   /// Generates a bill summary message for [rentor] from [selectedBills].
   ///
+  /// The message is built by substituting `{{greeting}}`, `{{firstName}}`,
+  /// `{{fullName}}`, and `{{billSummary}}` placeholders in the template stored
+  /// in [AppConfig.messageTemplate].  The default template produces:
+  ///
+  /// - Regular bills only:
+  ///   "Good morning Alex, the electric bill is $X and gas bill is $Y due April 15th."
+  /// - With water:
+  ///   "Good morning Alex, the electric bill is $X due April 15th. The water bill is $Y due May 1st."
+  /// - Water only:
+  ///   "Good morning Alex, the water bill is $Y due May 1st."
+  ///
   /// [now] defaults to [DateTime.now] and is used to determine the greeting
   /// and the average due-date month for regular bills. Pass it explicitly in
   /// tests to get deterministic output.
-  ///
-  /// Format:
-  /// - Regular bills only:
-  ///   "{greeting} {firstName}, the electric bill is $X and gas bill is $Y due April 15th."
-  /// - With water:
-  ///   "{greeting} {firstName}, the electric bill is $X due April 15th. The water bill is $Y due May 1st."
-  /// - Water only:
-  ///   "{greeting} {firstName}, the water bill is $Y due May 1st."
   String generateMessage(
     Rentor rentor,
     List<Bill> selectedBills, {
     DateTime? now,
   }) {
     final ref = now ?? DateTime.now();
-    final greeting = _greeting(ref.hour);
-    final firstName = rentor.name.split(' ').first;
-
     if (selectedBills.isEmpty) return '';
 
+    final greeting = _greeting(ref.hour);
+    final fullName = rentor.name;
+    final firstName = fullName.split(' ').first;
+    final billSummary = _computeBillSummary(rentor, selectedBills, ref);
+
+    return AppConfig.messageTemplate
+        .replaceAll('{{greeting}}', greeting)
+        .replaceAll('{{firstName}}', firstName)
+        .replaceAll('{{fullName}}', fullName)
+        .replaceAll('{{billSummary}}', billSummary);
+  }
+
+  /// Computes the bill-detail portion of the message — the part that describes
+  /// what is owed and when.  This is the value substituted for `{{billSummary}}`
+  /// in the message template.
+  String _computeBillSummary(
+    Rentor rentor,
+    List<Bill> selectedBills,
+    DateTime ref,
+  ) {
     final waterBills =
         selectedBills.where((b) => b.type == BillType.water).toList();
     final regularBills =
@@ -87,7 +108,7 @@ class BillSummaryService {
       regularOwed.update(bill.type, (v) => v + owed, ifAbsent: () => owed);
     }
 
-    String message = '$greeting $firstName';
+    String summary = '';
     final hasRegular = regularOwed.isNotEmpty;
 
     if (hasRegular) {
@@ -97,7 +118,7 @@ class BillSummaryService {
               .round();
       final avgDate = DateTime(ref.year, ref.month, avgDay);
       final billList = _formatBillList(regularOwed.entries.toList());
-      message += ', $billList due ${_formatDate(avgDate)}.';
+      summary += '$billList due ${_formatDate(avgDate)}.';
     }
 
     if (waterBills.isNotEmpty) {
@@ -107,13 +128,13 @@ class BillSummaryService {
       final waterAmount = '\$${waterOwed.toStringAsFixed(2)}';
       final waterDue = _formatDate(waterDate);
       if (hasRegular) {
-        message += ' The water bill is $waterAmount due $waterDue.';
+        summary += ' The water bill is $waterAmount due $waterDue.';
       } else {
-        message += ', the water bill is $waterAmount due $waterDue.';
+        summary += 'the water bill is $waterAmount due $waterDue.';
       }
     }
 
-    return message;
+    return summary;
   }
 
   String _greeting(int hour) {

@@ -127,11 +127,32 @@ class AppConfig {
     final config = AppConfiguration(
       configId: _appConfig?.configId ?? const Uuid().v4(),
       baseWebAPI: newUrl,
+      messageTemplate: _appConfig?.messageTemplate,
     );
     await AppConfigHelper().saveConfiguration(config);
     _appConfig = config;
     // Keep SharedPreferences in sync for any legacy consumers.
     await Preferences.setString('API_BASE_URL', newUrl);
+  }
+
+  /// Template used to generate per-rentor bill summary messages.
+  ///
+  /// Falls back to [AppConfiguration.defaultMessageTemplate] when no custom
+  /// template has been saved.
+  static String get messageTemplate {
+    final stored = _appConfig?.messageTemplate;
+    if (stored != null && stored.isNotEmpty) return stored;
+    return AppConfiguration.defaultMessageTemplate;
+  }
+
+  static Future<void> setMessageTemplate(String template) async {
+    final config = AppConfiguration(
+      configId: _appConfig?.configId ?? const Uuid().v4(),
+      baseWebAPI: _appConfig?.baseWebAPI,
+      messageTemplate: template,
+    );
+    await AppConfigHelper().saveConfiguration(config);
+    _appConfig = config;
   }
 
   static Future<String> get deviceId async {
