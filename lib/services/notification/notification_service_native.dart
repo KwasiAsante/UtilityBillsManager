@@ -1,18 +1,27 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_notification_store.dart';
 import 'sse_service_native.dart';
 import '../api/api_service.dart';
+import '../bill_readiness/bill_readiness_service.dart';
+import '../bill_summary/bill_summary_service.dart';
 import '../../config/app_config.dart';
 import '../../data/models/app_notification.dart';
+import '../../data/models/bill.dart';
+import '../../data/models/rentor.dart';
 import '../../data/models/sse_event.dart';
 import '../../data/repositories/bills_repository.dart';
 import '../../data/repositories/payments_repository.dart';
+import '../../data/repositories/rentors_repository.dart';
+import '../../helpers/bill_readiness/bill_notification_tracker_helper.dart';
+import '../../screens/bill_summary/message_preview_screen.dart';
 import '../../services/notification/notification_service.dart';
 import '../../utils/app_logger.dart';
 @pragma('vm:entry-point')
@@ -40,6 +49,8 @@ class NativeNotificationService implements NotificationService {
 
   final _localNotifications = FlutterLocalNotificationsPlugin();
   StreamSubscription? _tokenRefreshSubscription;
+  GlobalKey<NavigatorState>? _navigatorKey;
+  final _trackerHelper = BillNotificationTrackerHelper();
 
   @override
   Future<void> initialize() async {
@@ -59,6 +70,22 @@ class NativeNotificationService implements NotificationService {
     } catch (e) {
       AppLogger().e('[NotificationService] Initialization failed: $e', error: e);
       initialized = false;
+    }
+  }
+
+  @override
+  void setNavigatorKey(GlobalKey<NavigatorState> key) {
+    _navigatorKey = key;
+  }
+
+  @override
+  Future<void> handleLaunchNotification() async {
+    final details =
+        await _localNotifications.getNotificationAppLaunchDetails();
+    if (details?.didNotificationLaunchApp == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleNotificationTap(details?.notificationResponse?.payload);
+      });
     }
   }
 
@@ -87,7 +114,12 @@ class NativeNotificationService implements NotificationService {
       linux: LinuxInitializationSettings(defaultActionName: 'Open'),
     );
 
-    await _localNotifications.initialize(settings: initSettings);
+    await _localNotifications.initialize(
+      settings: initSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        _handleNotificationTap(response.payload);
+      },
+    );
 
     if (defaultTargetPlatform == TargetPlatform.android) {
       final impl =
@@ -169,18 +201,129 @@ class NativeNotificationService implements NotificationService {
 
   @override
   void handleSseEvent(SseEvent event) {
-    final title = switch (event.type) {
-      SseEventType.newBill => 'New Bill',
-      SseEventType.newPayment => 'New Payment',
-    };
+    // Dispatch async work without blocking the SSE stream.
+    _handleSseEventAsync(event);
+  }
 
-    AppLogger().d('[SSE] ${event.type}: $title');
-    showNotification(title: title, body: event.message);
-    addToStore(type: event.type, title: title, body: event.message);
-    reloadRepository(event.type);
+  Future<void> _handleSseEventAsync(SseEvent event) async {
+    try {
+      final title = switch (event.type) {
+        SseEventType.newBill => 'New Bill',
+        SseEventType.newPayment => 'New Payment',
+      };
+
+      AppLogger().d('[SSE] ${event.type}: $title');
+      await showNotification(title: title, body: event.message);
+      addToStore(type: event.type, title: title, body: event.message);
+
+      // Await the reload so bills/rentors are current before readiness check.
+      await _reloadRepositoryAsync(event.type);
+
+      if (event.type == SseEventType.newBill) {
+        final bill = Bill.fromJson(event.data);
+
+        if (RentorsRepository().rentors.isEmpty) {
+          await RentorsRepository().reload();
+        }
+        final allRentors = RentorsRepository().rentors;
+        final allBills = BillsRepository().bills;
+
+        final composeNotifications = await BillReadinessService()
+            .checkReadiness(bill, allRentors, allBills);
+
+        final now = DateTime.now();
+        for (final cn in composeNotifications) {
+          await _trackerHelper.logComposeNotificationSent(
+            rentorId: cn.rentor.rentorId,
+            month: now.month,
+            year: now.year,
+            billGroup: cn.isWater ? 'water' : 'regular',
+          );
+          await _showComposeNotification(cn);
+        }
+      }
+    } catch (e) {
+      AppLogger().e('[NotificationService] SSE handling error: $e', error: e);
+    }
+  }
+
+  Future<void> _reloadRepositoryAsync(SseEventType type) async {
+    switch (type) {
+      case SseEventType.newBill:
+        await BillsRepository().reload();
+      case SseEventType.newPayment:
+        await PaymentsRepository().reload();
+    }
   }
 
   //endregion
+
+  Future<void> _showComposeNotification(ComposeNotification cn) async {
+    if (defaultTargetPlatform == TargetPlatform.windows) return;
+
+    final firstName = cn.rentor.name.split(' ').first;
+    final title = cn.isWater
+        ? 'Water bill ready for $firstName'
+        : 'Compose bill summary for $firstName';
+    final body = cn.isWater
+        ? 'Tap to compose water bill message'
+        : 'All bills received — tap to generate message';
+    final payload = jsonEncode({
+      'rentorId': cn.rentor.rentorId,
+      'billIds': cn.bills.map((b) => b.billId).toList(),
+      'isWater': cn.isWater,
+    });
+
+    await _localNotifications.show(
+      id: cn.rentor.rentorId.hashCode ^ (cn.isWater ? 1 : 0),
+      title: title,
+      body: body,
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _androidChannelId,
+          _androidChannelName,
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+        macOS: DarwinNotificationDetails(),
+      ),
+      payload: payload,
+    );
+  }
+
+  Future<void> _handleNotificationTap(String? payload) async {
+    if (payload == null) return;
+    try {
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      final rentorId = data['rentorId'] as String;
+      final billIds = (data['billIds'] as List).cast<String>();
+
+      if (RentorsRepository().rentors.isEmpty) {
+        await RentorsRepository().reload();
+      }
+      final rentor = RentorsRepository().rentors
+          .cast<Rentor?>()
+          .firstWhere((r) => r?.rentorId == rentorId, orElse: () => null);
+      if (rentor == null) return;
+
+      await BillsRepository().reload();
+      final bills = BillsRepository().bills
+          .where((b) => billIds.contains(b.billId))
+          .toList();
+      if (bills.isEmpty) return;
+
+      final message = BillSummaryService().generateMessage(rentor, bills);
+
+      _navigatorKey?.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => MessagePreviewScreen(initialMessage: message),
+        ),
+      );
+    } catch (e) {
+      AppLogger().e('[NotificationService] Tap handling error: $e', error: e);
+    }
+  }
 
   //region FCM
   Future<void> _initFcm() async {
