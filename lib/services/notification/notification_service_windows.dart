@@ -7,9 +7,13 @@ import 'package:uuid/uuid.dart';
 import 'app_notification_store.dart';
 import 'notification_service.dart';
 import 'sse_service_native.dart';
+import '../bill_readiness/bill_readiness_service.dart';
 import '../../data/models/app_notification.dart';
+import '../../data/models/bill.dart';
 import '../../data/repositories/bills_repository.dart';
 import '../../data/repositories/payments_repository.dart';
+import '../../data/repositories/rentors_repository.dart';
+import '../../helpers/bill_readiness/bill_notification_tracker_helper.dart';
 import '../../utils/app_logger.dart';
 import '../../config/app_config.dart';
 import '../../data/models/sse_event.dart';
@@ -30,6 +34,7 @@ class WindowsNotificationService implements NotificationService {
   StreamSubscription<SseEvent>? sseEventsSubscription;
 
   final _localNotifications = FlutterLocalNotificationsPlugin();
+  final _trackerHelper = BillNotificationTrackerHelper();
 
   //region Lifecycle
   @override
@@ -121,17 +126,91 @@ class WindowsNotificationService implements NotificationService {
 
   @override
   void handleSseEvent(SseEvent event) {
-    final title = switch (event.type) {
-      SseEventType.newBill => 'New Bill',
-      SseEventType.newPayment => 'New Payment',
-    };
+    // Dispatch async work without blocking the SSE stream.
+    unawaited(_handleSseEventAsync(event));
+  }
 
-    AppLogger().d('[SSE] ${event.type}: $title');
-    showNotification(title: title, body: event.message);
-    addToStore(type: event.type, title: title, body: event.message);
-    reloadRepository(event.type);
+  Future<void> _handleSseEventAsync(SseEvent event) async {
+    try {
+      final title = switch (event.type) {
+        SseEventType.newBill => 'New Bill',
+        SseEventType.newPayment => 'New Payment',
+      };
+
+      AppLogger().d('[SSE] ${event.type}: $title');
+      await showNotification(title: title, body: event.message);
+      addToStore(type: event.type, title: title, body: event.message);
+
+      await _reloadRepositoryAsync(event.type);
+
+      if (event.type == SseEventType.newBill) {
+        if (RentorsRepository().rentors.isEmpty) {
+          await RentorsRepository().reload();
+        }
+        final allRentors = RentorsRepository().rentors;
+        final allBills = BillsRepository().bills;
+
+        final incomingBills = _parseBillsFromSseData(event.data, allBills);
+        for (final bill in incomingBills) {
+          final composeNotifications = await BillReadinessService()
+              .checkReadiness(bill, allRentors, allBills);
+
+          final now = DateTime.now();
+          for (final cn in composeNotifications) {
+            await _trackerHelper.logComposeNotificationSent(
+              rentorId: cn.rentor.rentorId,
+              month: now.month,
+              year: now.year,
+              billGroup: cn.isWater ? 'water' : 'regular',
+            );
+            await _showComposeNotification(cn);
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger().e('[NotificationService](Windows) SSE handling error: $e', error: e);
+    }
+  }
+
+  Future<void> _reloadRepositoryAsync(SseEventType type) async {
+    switch (type) {
+      case SseEventType.newBill:
+        await BillsRepository().reload();
+      case SseEventType.newPayment:
+        await PaymentsRepository().reload();
+    }
   }
   //endregion
+
+  Future<void> _showComposeNotification(ComposeNotification cn) async {
+    final firstName = cn.rentor.name.split(' ').first;
+    final title = cn.isWater
+        ? 'Water bill ready for $firstName'
+        : 'Compose bill summary for $firstName';
+    final body = cn.isWater
+        ? 'Tap to compose water bill message'
+        : 'All bills received — open app to generate message';
+
+    await _localNotifications.show(
+      id: cn.rentor.rentorId.hashCode ^ (cn.isWater ? 1 : 0),
+      title: title,
+      body: body,
+      notificationDetails: const NotificationDetails(
+        windows: WindowsNotificationDetails(),
+      ),
+    );
+  }
+
+  List<Bill> _parseBillsFromSseData(
+      Map<String, dynamic> data, List<Bill> allBills) {
+    if (data.containsKey('billId')) {
+      return [Bill.fromJson(data)];
+    } else if (data.containsKey('billIds')) {
+      final ids = (data['billIds'] as List).cast<String>();
+      return allBills.where((b) => ids.contains(b.billId)).toList();
+    }
+    return [];
+  }
 
   //region Store & repository helpers
   @override
