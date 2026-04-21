@@ -533,22 +533,23 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12.0),
                     child: GestureDetector(
-                      // When settled (button disabled), GestureDetector still
-                      // catches the tap and shows an informative snackbar.
                       onTap: _eligibleBills!.isEmpty
                           ? () => ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                      '${widget.rentor!.name} is settled for this month'),
+                                    '${widget.rentor!.name} is settled for this month',
+                                  ),
                                 ),
                               )
-                          : null,
-                      child: ElevatedButton.icon(
-                        onPressed: _eligibleBills!.isEmpty
-                            ? null
-                            : _navigateToBillSelection,
-                        icon: const Icon(Icons.message),
-                        label: const Text('Send Bill Summary'),
+                          : _navigateToBillSelection,
+                      child: IgnorePointer(
+                        child: ElevatedButton.icon(
+                          onPressed: _eligibleBills!.isEmpty
+                              ? null
+                              : _navigateToBillSelection,
+                          icon: const Icon(Icons.message),
+                          label: const Text('Send Bill Summary'),
+                        ),
                       ),
                     ),
                   ),
