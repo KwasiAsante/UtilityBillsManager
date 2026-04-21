@@ -27,13 +27,49 @@ import '../../utils/app_logger.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  WidgetsFlutterBinding.ensureInitialized();
   AppLogger().d('[FCM] Background message: ${message.messageId}');
+
+  // FCM notification messages are displayed automatically by the Firebase SDK.
+  // For data-only messages there is no automatic display — show it manually.
+  if (message.notification == null) {
+    final title = message.data['title'] as String?
+        ?? message.data['type'] as String?
+        ?? 'Utility Bills';
+    final body = message.data['body'] as String?
+        ?? message.data['message'] as String?
+        ?? '';
+
+    final plugin = FlutterLocalNotificationsPlugin();
+    await plugin.initialize(
+      const InitializationSettings(
+        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+        iOS: DarwinInitializationSettings(),
+        macOS: DarwinInitializationSettings(),
+      ),
+    );
+    await plugin.show(
+      message.hashCode,
+      title,
+      body,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _androidChannelId,
+          _androidChannelName,
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: DarwinNotificationDetails(),
+        macOS: DarwinNotificationDetails(),
+      ),
+    );
+  }
 }
 
 const _androidChannelId = 'utility_bills_notifications';
 const _androidChannelName = 'Utility Bills';
 
-class NativeNotificationService implements NotificationService {
+class NativeNotificationService with WidgetsBindingObserver implements NotificationService {
   static final NativeNotificationService _instance = NativeNotificationService._internal();
 
   factory NativeNotificationService() => _instance;
@@ -62,13 +98,14 @@ class NativeNotificationService implements NotificationService {
 
     initialized = true;
 
-    AppLogger().d('[NotificationService]W Initializing...');
+    AppLogger().d('[NotificationService] Initializing...');
 
     try {
       await initLocalNotifications();
       await _initFcm();
 
       await connectSse(AppConfig.apiBaseUrl, await AppConfig.deviceId);
+      WidgetsBinding.instance.addObserver(this);
       AppLogger().d('[NotificationService] Initialized successfully');
     } catch (e) {
       AppLogger().e('[NotificationService] Initialization failed: $e', error: e);
@@ -94,10 +131,27 @@ class NativeNotificationService implements NotificationService {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tokenRefreshSubscription?.cancel();
     sseEventsSubscription?.cancel();
     SseService.instance.disconnect();
     initialized = false;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reconnectSseIfNeeded();
+    }
+  }
+
+  void _reconnectSseIfNeeded() async {
+    if (SseService.instance.isConnected) return;
+    AppLogger().d('[SSE] App resumed — reconnecting');
+    await SseService.instance.connect(
+      AppConfig.apiBaseUrl,
+      await AppConfig.deviceId,
+    );
   }
 
   //region Local Notifications

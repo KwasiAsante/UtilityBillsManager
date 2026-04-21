@@ -18,7 +18,7 @@ import '../../utils/app_logger.dart';
 import '../../config/app_config.dart';
 import '../../data/models/sse_event.dart';
 
-class WindowsNotificationService implements NotificationService {
+class WindowsNotificationService with WidgetsBindingObserver implements NotificationService {
   static final WindowsNotificationService _instance = WindowsNotificationService._internal();
 
   factory WindowsNotificationService() => _instance;
@@ -49,6 +49,7 @@ class WindowsNotificationService implements NotificationService {
     try {
       await initLocalNotifications();
       await connectSse(AppConfig.apiBaseUrl, await AppConfig.deviceId);
+      WidgetsBinding.instance.addObserver(this);
       AppLogger().d('[NotificationService](Windows) Initialized successfully');
     } catch (e) {
       AppLogger().e('[NotificationService](Windows) Initialization failed: $e', error: e);
@@ -58,9 +59,26 @@ class WindowsNotificationService implements NotificationService {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     sseEventsSubscription?.cancel();
     SseService.instance.disconnect();
     initialized = false;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _reconnectSseIfNeeded();
+    }
+  }
+
+  void _reconnectSseIfNeeded() async {
+    if (SseService.instance.isConnected) return;
+    AppLogger().d('[SSE] App resumed — reconnecting');
+    await SseService.instance.connect(
+      AppConfig.apiBaseUrl,
+      await AppConfig.deviceId,
+    );
   }
   //endregion
 
