@@ -6,6 +6,8 @@ import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
 import '../../data/repositories/bills_repository.dart';
 import '../../data/repositories/payments_repository.dart';
+import '../../services/bill_summary/bill_summary_service.dart';
+import '../bill_summary/bill_selection_screen.dart';
 import '../../data/repositories/rentors_repository.dart';
 
 /// Form screen for creating a new rentor or editing an existing one.
@@ -45,6 +47,8 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
   late List<BillType> _selectedBillTypes;
   late List<BillType> _excludedBillTypes;
   final _amountOwedController = TextEditingController();
+  final BillSummaryService _billSummaryService = BillSummaryService();
+  List<Bill>? _eligibleBills; // null while loading; empty list means settled
 
   @override
   void initState() {
@@ -73,6 +77,11 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     } else {
       _selectedBillTypes = [];
       _excludedBillTypes = [];
+    }
+
+    if (widget.rentor != null) {
+      // Defer until after first frame so the widget tree is built.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadEligibleBills());
     }
   }
 
@@ -367,6 +376,32 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     );
   }
 
+  Future<void> _loadEligibleBills() async {
+    if (_billsRepository.bills.isEmpty) {
+      await _billsRepository.reload();
+    }
+    if (mounted) {
+      setState(() {
+        _eligibleBills = _billSummaryService.getEligibleBills(
+          widget.rentor!,
+          _billsRepository.bills,
+        );
+      });
+    }
+  }
+
+  void _navigateToBillSelection() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BillSelectionScreen(
+          rentor: widget.rentor!,
+          eligibleBills: _eligibleBills!,
+        ),
+      ),
+    );
+  }
+
   Future<void> _saveRentor() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -494,6 +529,30 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
                   ),
                 ),
                 const SizedBox(height: 25),
+                if (isEditing && _eligibleBills != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: GestureDetector(
+                      onTap: _eligibleBills!.isEmpty
+                          ? () => ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    '${widget.rentor!.name} is settled for this month',
+                                  ),
+                                ),
+                              )
+                          : _navigateToBillSelection,
+                      child: IgnorePointer(
+                        child: ElevatedButton.icon(
+                          onPressed: _eligibleBills!.isEmpty
+                              ? null
+                              : _navigateToBillSelection,
+                          icon: const Icon(Icons.message),
+                          label: const Text('Send Bill Summary'),
+                        ),
+                      ),
+                    ),
+                  ),
                 FilledButton(
                   onPressed: _saveRentor,
                   child: const Text('Save Rentor'),

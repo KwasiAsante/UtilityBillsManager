@@ -7,6 +7,7 @@ import '../../data/models/email_data.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
 import '../../data/models/app_configuration.dart';
+import '../../data/models/bill_notification_tracker.dart';
 import '../../data/models/server_config.dart';
 
 /// Singleton low-level SQLite helper built on top of `sqflite`.
@@ -26,7 +27,7 @@ class DatabaseHelper {
 
   /// Current schema version.  Bump this and add a corresponding
   /// `if (oldVersion < N)` block in [_onUpgrade] for every schema change.
-  static const _databaseVersion = 16;
+  static const _databaseVersion = 17;
 
   static final DatabaseHelper _instance = DatabaseHelper._internal();
 
@@ -189,6 +190,29 @@ class DatabaseHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         configId TEXT,
         baseWebAPI TEXT
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE bill_notification_tracker (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        rentorId   TEXT NOT NULL REFERENCES rentors(rentorId) ON DELETE CASCADE,
+        billId     TEXT NOT NULL REFERENCES bills(billId)     ON DELETE CASCADE,
+        billType   TEXT NOT NULL,
+        month      INTEGER NOT NULL,
+        year       INTEGER NOT NULL,
+        receivedAt TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE bill_compose_notification_log (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        rentorId  TEXT NOT NULL REFERENCES rentors(rentorId) ON DELETE CASCADE,
+        month     INTEGER NOT NULL,
+        year      INTEGER NOT NULL,
+        billGroup TEXT NOT NULL,
+        sentAt    TEXT NOT NULL
       )
     ''');
   }
@@ -583,6 +607,31 @@ class DatabaseHelper {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           configId TEXT,
           baseWebAPI TEXT
+        )
+      ''');
+    }
+
+    if (oldVersion < 17) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS bill_notification_tracker (
+          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+          rentorId   TEXT NOT NULL REFERENCES rentors(rentorId) ON DELETE CASCADE,
+          billId     TEXT NOT NULL REFERENCES bills(billId)     ON DELETE CASCADE,
+          billType   TEXT NOT NULL,
+          month      INTEGER NOT NULL,
+          year       INTEGER NOT NULL,
+          receivedAt TEXT NOT NULL
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS bill_compose_notification_log (
+          id        INTEGER PRIMARY KEY AUTOINCREMENT,
+          rentorId  TEXT NOT NULL REFERENCES rentors(rentorId) ON DELETE CASCADE,
+          month     INTEGER NOT NULL,
+          year      INTEGER NOT NULL,
+          billGroup TEXT NOT NULL,
+          sentAt    TEXT NOT NULL
         )
       ''');
     }
@@ -1482,6 +1531,81 @@ class DatabaseHelper {
     return await db.delete('email_data');
   }
   //endregion
+  //endregion
+
+  //region Bill Notification Tracker
+  /// Inserts a [BillNotificationTracker] row. Returns the new row id.
+  Future<int> insertBillNotificationTracker(
+      BillNotificationTracker tracker) async {
+    final db = await database;
+    return await db.insert('bill_notification_tracker', tracker.toJson());
+  }
+
+  /// Returns all tracker rows for [rentorId] in the given [month]/[year].
+  Future<List<BillNotificationTracker>> getBillNotificationTrackers({
+    required String rentorId,
+    required int month,
+    required int year,
+  }) async {
+    final db = await database;
+    final rows = await db.query(
+      'bill_notification_tracker',
+      where: 'rentorId = ? AND month = ? AND year = ?',
+      whereArgs: [rentorId, month, year],
+    );
+    return rows.map(BillNotificationTracker.fromJson).toList();
+  }
+
+  /// Returns `true` if a tracker row already exists for [rentorId] + [billId].
+  Future<bool> billNotificationTrackerExists({
+    required String rentorId,
+    required String billId,
+  }) async {
+    final db = await database;
+    final rows = await db.query(
+      'bill_notification_tracker',
+      columns: ['id'],
+      where: 'rentorId = ? AND billId = ?',
+      whereArgs: [rentorId, billId],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
+
+  /// Inserts a compose-notification log row. Returns the new row id.
+  Future<int> insertComposeNotificationLog({
+    required String rentorId,
+    required int month,
+    required int year,
+    required String billGroup,
+  }) async {
+    final db = await database;
+    return await db.insert('bill_compose_notification_log', {
+      'rentorId': rentorId,
+      'month': month,
+      'year': year,
+      'billGroup': billGroup,
+      'sentAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Returns `true` if a log row exists for [rentorId]/[month]/[year]/[billGroup].
+  Future<bool> hasComposeNotificationLog({
+    required String rentorId,
+    required int month,
+    required int year,
+    required String billGroup,
+  }) async {
+    final db = await database;
+    final rows = await db.query(
+      'bill_compose_notification_log',
+      columns: ['id'],
+      where: 'rentorId = ? AND month = ? AND year = ? AND billGroup = ?',
+      whereArgs: [rentorId, month, year, billGroup],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
+  }
   //endregion
 
   //region App Configuration

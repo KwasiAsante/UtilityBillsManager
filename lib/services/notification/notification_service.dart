@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 
 import '../../data/models/sse_event.dart';
 
@@ -19,6 +19,16 @@ abstract interface class NotificationService {
     Future<void> initialize();
 
     void dispose();
+
+    /// Registers the [GlobalKey<NavigatorState>] used by the notification tap
+    /// handler to navigate to [MessagePreviewScreen].
+    /// No-op on platforms that do not support tap navigation (web).
+    void setNavigatorKey(GlobalKey<NavigatorState> key);
+
+    /// Checks whether the app was cold-started via a compose notification tap
+    /// and navigates to [MessagePreviewScreen] if so.
+    /// No-op on platforms without local-notification tap support (web).
+    Future<void> handleLaunchNotification();
     //endregion
 
     //region Local Notifications
