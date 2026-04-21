@@ -223,26 +223,27 @@ class NativeNotificationService implements NotificationService {
       await _reloadRepositoryAsync(event.type);
 
       if (event.type == SseEventType.newBill) {
-        final bill = Bill.fromJson(event.data);
-
         if (RentorsRepository().rentors.isEmpty) {
           await RentorsRepository().reload();
         }
         final allRentors = RentorsRepository().rentors;
         final allBills = BillsRepository().bills;
 
-        final composeNotifications = await BillReadinessService()
-            .checkReadiness(bill, allRentors, allBills);
+        final incomingBills = _parseBillsFromSseData(event.data, allBills);
+        for (final bill in incomingBills) {
+          final composeNotifications = await BillReadinessService()
+              .checkReadiness(bill, allRentors, allBills);
 
-        final now = DateTime.now();
-        for (final cn in composeNotifications) {
-          await _trackerHelper.logComposeNotificationSent(
-            rentorId: cn.rentor.rentorId,
-            month: now.month,
-            year: now.year,
-            billGroup: cn.isWater ? 'water' : 'regular',
-          );
-          await _showComposeNotification(cn);
+          final now = DateTime.now();
+          for (final cn in composeNotifications) {
+            await _trackerHelper.logComposeNotificationSent(
+              rentorId: cn.rentor.rentorId,
+              month: now.month,
+              year: now.year,
+              billGroup: cn.isWater ? 'water' : 'regular',
+            );
+            await _showComposeNotification(cn);
+          }
         }
       }
     } catch (e) {
@@ -328,6 +329,24 @@ class NativeNotificationService implements NotificationService {
     } catch (e) {
       AppLogger().e('[NotificationService] Tap handling error: $e', error: e);
     }
+  }
+
+  /// Returns the [Bill] objects described by this SSE [data] map.
+  ///
+  /// The server sends two shapes:
+  /// - **Individual** (`< 5` bills): `data` contains the full bill JSON with a
+  ///   `'billId'` key → parsed directly via [Bill.fromJson].
+  /// - **Grouped** (`≥ 5` bills): `data` contains only `{'billIds': [...]}` →
+  ///   each ID is looked up in [allBills] (already reloaded from the server).
+  List<Bill> _parseBillsFromSseData(
+      Map<String, dynamic> data, List<Bill> allBills) {
+    if (data.containsKey('billId')) {
+      return [Bill.fromJson(data)];
+    } else if (data.containsKey('billIds')) {
+      final ids = (data['billIds'] as List).cast<String>();
+      return allBills.where((b) => ids.contains(b.billId)).toList();
+    }
+    return [];
   }
 
   //region FCM
