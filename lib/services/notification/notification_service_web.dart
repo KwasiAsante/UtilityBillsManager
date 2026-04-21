@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:js_interop';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:web/web.dart' as web;
 
@@ -73,6 +74,16 @@ class WebNotificationService implements NotificationService {
       activeNotifications.clear();
     }
     initialized = false;
+  }
+
+  @override
+  void setNavigatorKey(GlobalKey<NavigatorState> key) {
+    // Not supported on web — web uses browser URL navigation.
+  }
+
+  @override
+  Future<void> handleLaunchNotification() async {
+    // Not supported on web.
   }
   //endregion
 
