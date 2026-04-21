@@ -1,5 +1,6 @@
 import '../database/database_helper.dart';
 import '../../data/models/bill_notification_tracker.dart';
+import '../../data/models/result.dart';
 
 /// Singleton service layer for bill notification tracking persistence.
 ///
@@ -25,60 +26,89 @@ class BillNotificationTrackerHelper {
   /// Exposed for subclassing in tests only.
   BillNotificationTrackerHelper.internal();
 
-  DatabaseHelper get _db => DatabaseHelper();
+  DatabaseHelper get dbHelper => DatabaseHelper();
 
   /// Returns `true` if this [billId] has already been recorded for [rentorId].
-  Future<bool> hasBillBeenTracked(String rentorId, String billId) =>
-      _db.billNotificationTrackerExists(rentorId: rentorId, billId: billId);
+  Future<Result<bool>> hasBillBeenTracked(String rentorId, String billId) async {
+    try {
+      final exists = await dbHelper.billNotificationTrackerExists(
+          rentorId: rentorId, billId: billId);
+      return Result.success(data: exists);
+    } on Exception catch (e) {
+      return Result.exception(exception: e);
+    }
+  }
 
   /// Inserts a tracker row for the given (rentor, bill) pair.
-  Future<void> trackBill({
+  Future<Result<void>> trackBill({
     required String rentorId,
     required String billId,
     required String billType,
     required int month,
     required int year,
   }) async {
-    await _db.insertBillNotificationTracker(
-      BillNotificationTracker(
-        rentorId: rentorId,
-        billId: billId,
-        billType: billType,
-        month: month,
-        year: year,
-        receivedAt: DateTime.now().toIso8601String(),
-      ),
-    );
+    try {
+      await dbHelper.insertBillNotificationTracker(
+        BillNotificationTracker(
+          rentorId: rentorId,
+          billId: billId,
+          billType: billType,
+          month: month,
+          year: year,
+          receivedAt: DateTime.now().toIso8601String(),
+        ),
+      );
+      return Result.success();
+    } on Exception catch (e) {
+      return Result.exception(exception: e);
+    }
   }
 
   /// Returns all tracker rows for [rentorId] in [month]/[year].
-  Future<List<BillNotificationTracker>> getTrackedBills({
+  Future<Result<List<BillNotificationTracker>>> getTrackedBills({
     required String rentorId,
     required int month,
     required int year,
-  }) =>
-      _db.getBillNotificationTrackers(
+  }) async {
+    try {
+      final trackers = await dbHelper.getBillNotificationTrackers(
           rentorId: rentorId, month: month, year: year);
+      return Result.success(data: trackers);
+    } on Exception catch (e) {
+      return Result.exception(exception: e);
+    }
+  }
 
   /// Returns `true` if a compose notification has already been sent for the
   /// given [rentorId]/[month]/[year]/[billGroup] combination.
-  Future<bool> hasComposeNotificationBeenSent({
-    required String rentorId,
-    required int month,
-    required int year,
-    required String billGroup,
-  }) =>
-      _db.hasComposeNotificationLog(
-          rentorId: rentorId, month: month, year: year, billGroup: billGroup);
-
-  /// Records that a compose notification was sent for [rentorId]/[month]/[year]/[billGroup].
-  Future<void> logComposeNotificationSent({
+  Future<Result<bool>> hasComposeNotificationBeenSent({
     required String rentorId,
     required int month,
     required int year,
     required String billGroup,
   }) async {
-    await _db.insertComposeNotificationLog(
-        rentorId: rentorId, month: month, year: year, billGroup: billGroup);
+    try {
+      final sent = await dbHelper.hasComposeNotificationLog(
+          rentorId: rentorId, month: month, year: year, billGroup: billGroup);
+      return Result.success(data: sent);
+    } on Exception catch (e) {
+      return Result.exception(exception: e);
+    }
+  }
+
+  /// Records that a compose notification was sent for [rentorId]/[month]/[year]/[billGroup].
+  Future<Result<void>> logComposeNotificationSent({
+    required String rentorId,
+    required int month,
+    required int year,
+    required String billGroup,
+  }) async {
+    try {
+      await dbHelper.insertComposeNotificationLog(
+          rentorId: rentorId, month: month, year: year, billGroup: billGroup);
+      return Result.success();
+    } on Exception catch (e) {
+      return Result.exception(exception: e);
+    }
   }
 }
