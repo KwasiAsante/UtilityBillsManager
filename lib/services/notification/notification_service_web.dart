@@ -143,15 +143,33 @@ class WebNotificationService implements NotificationService {
 
   @override
   void handleSseEvent(SseEvent event) {
-    final title = switch (event.type) {
-      SseEventType.newBill => 'New Bill',
-      SseEventType.newPayment => 'New Payment',
-    };
+    // Dispatch async work without blocking the SSE stream.
+    unawaited(_handleSseEventAsync(event));
+  }
 
-    AppLogger().d('[SSE] ${event.type}: $title');
-    showNotification(title: title, body: event.message);
-    addToStore(type: event.type, title: title, body: event.message);
-    reloadRepository(event.type);
+  Future<void> _handleSseEventAsync(SseEvent event) async {
+    try {
+      final title = switch (event.type) {
+        SseEventType.newBill => 'New Bill',
+        SseEventType.newPayment => 'New Payment',
+      };
+
+      AppLogger().d('[SSE] ${event.type}: $title');
+      await showNotification(title: title, body: event.message);
+      addToStore(type: event.type, title: title, body: event.message);
+      await _reloadRepositoryAsync(event.type);
+    } catch (e) {
+      AppLogger().e('[NotificationService](Web) SSE handling error: $e', error: e);
+    }
+  }
+
+  Future<void> _reloadRepositoryAsync(SseEventType type) async {
+    switch (type) {
+      case SseEventType.newBill:
+        await BillsRepository().reload();
+      case SseEventType.newPayment:
+        await PaymentsRepository().reload();
+    }
   }
   //endregion
 
