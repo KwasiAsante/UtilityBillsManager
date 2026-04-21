@@ -27,7 +27,7 @@ class DatabaseHelper {
 
   /// Current schema version.  Bump this and add a corresponding
   /// `if (oldVersion < N)` block in [_onUpgrade] for every schema change.
-  static const _databaseVersion = 17;
+  static const _databaseVersion = 18;
 
   static final DatabaseHelper _instance = DatabaseHelper._internal();
 
@@ -189,7 +189,8 @@ class DatabaseHelper {
       CREATE TABLE app_configuration (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         configId TEXT,
-        baseWebAPI TEXT
+        baseWebAPI TEXT,
+        messageTemplate TEXT
       )
     ''');
 
@@ -634,6 +635,10 @@ class DatabaseHelper {
           sentAt    TEXT NOT NULL
         )
       ''');
+    }
+
+    if (oldVersion < 18) {
+      await _ensureColumn(db, 'app_configuration', 'messageTemplate', 'TEXT');
     }
   }
   //endregion

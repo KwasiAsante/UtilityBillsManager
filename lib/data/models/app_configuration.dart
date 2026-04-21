@@ -1,7 +1,13 @@
 /// Local app-level configuration persisted in the SQLite `app_configuration`
-/// table. Currently holds the API base URL; additional fields may be added
-/// as the app grows.
+/// table.
 class AppConfiguration {
+  /// Default template used when no custom template has been saved.
+  ///
+  /// Available placeholders: `{{greeting}}`, `{{firstName}}`, `{{fullName}}`,
+  /// `{{billSummary}}`.
+  static const String defaultMessageTemplate =
+      '{{greeting}} {{firstName}}, {{billSummary}}';
+
   /// SQLite auto-increment row id (never included in [toJson]).
   final int? id;
 
@@ -11,7 +17,13 @@ class AppConfiguration {
   /// Base URL used when making API calls to the remote server.
   String? baseWebAPI;
 
-  AppConfiguration({this.id, this.configId, this.baseWebAPI});
+  /// Template used to generate per-rentor bill summary messages.
+  ///
+  /// Supports `{{greeting}}`, `{{firstName}}`, `{{fullName}}`, and
+  /// `{{billSummary}}` placeholders.  `null` means use [defaultMessageTemplate].
+  String? messageTemplate;
+
+  AppConfiguration({this.id, this.configId, this.baseWebAPI, this.messageTemplate});
 
   /// Serialises to a flat map for SQLite insertion.
   ///
@@ -19,6 +31,7 @@ class AppConfiguration {
   Map<String, dynamic> toJson() => {
         'configId': configId,
         'baseWebAPI': baseWebAPI,
+        'messageTemplate': messageTemplate,
       };
 
   /// Deserialises from a SQLite row map.
@@ -27,5 +40,6 @@ class AppConfiguration {
         id: map['id'] as int?,
         configId: map['configId'] as String?,
         baseWebAPI: map['baseWebAPI'] as String?,
+        messageTemplate: map['messageTemplate'] as String?,
       );
 }
