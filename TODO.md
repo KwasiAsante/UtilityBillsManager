@@ -7,18 +7,17 @@
 - [x] Add additional argument `latestEmailDate` to email sync methods and API request calls
   - [x] Update `EmailDataHelper.syncEmails()` to accept optional `latestEmailDate` parameter
   - [x] Pass `latestEmailDate` to server sync endpoints (`/bill/list/sync`, `/payment/list/sync`, `/email/list/sync`)
-  - [ ] Server tracks and uses `latestEmailDate` for incremental syncs to improve performance
 
 - [x] Update sync/refresh date selection UI
   - [x] Add optional end/latest date field to `SyncOptionsDialog`
-  - [x] End/latest date field is only enabled when earliest email date is selected
+  - [x] End/latest date field is only enabled when the earliest email date is selected
   - [x] Reorganize `SettingsScreen` to clearly distinguish between:
-    - Manual sync default earliest email date setting
+    - Manual sync default the earliest email date setting
     - Sync interval / background polling configuration
 
 ## App Configuration
 
-- [x] Create app configuration model
+- [x] Create an app configuration model
   - [x] Define `AppConfiguration` class with app-specific settings (`baseWebAPI`)
   - [ ] Include fields for sync intervals, notification preferences, user preferences, etc.
 
@@ -34,22 +33,22 @@
 
 - [x] Enable background notification support across all platforms
   - [x] **Windows** — SSE lifecycle observer reconnects on app resume
-  - [x] **macOS** — APS environment entitlements + lifecycle SSE reconnect
+  - [x] **macOS** — APS environment entitlements and lifecycle SSE reconnect
   - [x] **iOS** — UIBackgroundModes (remote-notification, fetch) + lifecycle SSE reconnect
   - [x] **Android** — POST_NOTIFICATIONS permission + data-only FCM handler + lifecycle SSE reconnect
   - [x] Handle notification wake-ups and foreground/background transitions
-  - [x] Ensure app can receive and process notifications while running in background
+  - [x] Ensure the app can receive and process notifications while running in the background
 
 ## Rentor Messaging
 
 - [x] Craft messages for rentors
-  - [x] Generate per-rentor bill summary message (amount owed + due date)
+  - [x] Generate a per-rentor bill summary message (amount owed and due date)
   - [x] Format message for clarity and professionalism
   - [x] Support templating for customizable messages
 
 - [x] Send or share crafted messages to rentors
   - [ ] Implement message sharing via SMS (e.g., Twilio integration)
-  - [x] Provide "share text" feature so users can manually share messages
+  - [x] Provide a "share text" feature so users can manually share messages
   - [x] Support sharing via email, SMS, messaging apps, or other communication channels
 
 ## File Export
