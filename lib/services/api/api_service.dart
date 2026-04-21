@@ -168,12 +168,32 @@ class BillsApiService {
   }
 
   /// GET `/bill/list` — returns all bills.
-  Future<List<Bill>> getAllBills() async {
+  ///
+  /// Pass [limit] and [offset] for pagination; [sortBy] and [sortOrder] to
+  /// control ordering.  When [limit] is provided the server wraps the response
+  /// in `{ "data": [...], "total": N, "limit": N, "offset": N }` — this method
+  /// transparently unwraps that envelope and returns just the list.
+  Future<List<Bill>> getAllBills({
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
-      final response = await ApiService._client.get(Uri.parse('$baseUrl/bill/list'));
+      final queryParams = <String, String>{
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
+      };
+      final uri = Uri.parse('$baseUrl/bill/list')
+          .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => Bill.fromJson(e))
@@ -189,18 +209,33 @@ class BillsApiService {
   }
 
   /// GET `/bill/list/<status>` — returns bills filtered by [status].
-  /// Pass [ids] to further restrict results to specific `billId` values.
-  Future<List<Bill>> getBillsByStatus(String status, {List<String>? ids}) async {
+  ///
+  /// Pass [ids] to restrict results to specific `billId` values.  Pass [limit]
+  /// and [offset] for pagination; [sortBy] and [sortOrder] to control ordering.
+  Future<List<Bill>> getBillsByStatus(
+    String status, {
+    List<String>? ids,
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
       final queryParams = <String, String>{
-        if (ids != null)
-          'bill_ids': ids.join(','),
+        if (ids != null) 'bill_ids': ids.join(','),
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
       };
-      final uri = Uri.parse('$baseUrl/bill/list/$status').replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+      final uri = Uri.parse('$baseUrl/bill/list/$status')
+          .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
       final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => Bill.fromJson(e))
@@ -378,12 +413,30 @@ class RentorsApiService {
   }
 
   /// GET `/rentor/list` — returns all rentors.
-  Future<List<Rentor>> getAllRentors() async {
+  ///
+  /// Pass [limit] and [offset] for pagination; [sortBy] and [sortOrder] to
+  /// control ordering.
+  Future<List<Rentor>> getAllRentors({
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
-      final response = await ApiService._client.get(Uri.parse('$baseUrl/rentor/list'));
+      final queryParams = <String, String>{
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
+      };
+      final uri = Uri.parse('$baseUrl/rentor/list')
+          .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+      final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => Rentor.fromJson(e))
@@ -529,23 +582,36 @@ class PaymentsApiService {
 
   /// GET `/payment/list` — returns all payments, optionally filtered to [ids]
   /// and with related records eager-loaded via [include] flags.
-  Future<List<Payment>> getAllPayments({Map<String, bool>? include, List<String>? ids}) async {
+  ///
+  /// Pass [limit] and [offset] for pagination; [sortBy] and [sortOrder] to
+  /// control ordering.
+  Future<List<Payment>> getAllPayments({
+    Map<String, bool>? include,
+    List<String>? ids,
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
       final queryParams = <String, String>{
         if (include != null)
           for (final entry in include.entries)
             if (entry.value) entry.key: 'true',
-
-        if (ids != null)
-          'payment_ids': ids.join(','),
+        if (ids != null) 'payment_ids': ids.join(','),
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
       };
-      final uri = Uri.parse(
-        '$baseUrl/payment/list',
-      ).replace(queryParameters: queryParams.isEmpty ? null : queryParams);
+      final uri = Uri.parse('$baseUrl/payment/list')
+          .replace(queryParameters: queryParams.isEmpty ? null : queryParams);
       final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => Payment.fromJson(e, billRows: e['billList'] != null && e['billList'] is List ? List<Map<String, dynamic>>.from(e['billList']) : null))
@@ -742,20 +808,35 @@ class EmailDataApiService {
   }
 
   /// GET `/email/list` — returns all email records.
-  Future<List<EmailData>> getEmails({Map<String, bool>? include}) async {
+  ///
+  /// Pass [limit] and [offset] for pagination; [sortBy] and [sortOrder] to
+  /// control ordering.
+  Future<List<EmailData>> getEmails({
+    Map<String, bool>? include,
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
-      final includeParams = <String, String>{
+      final queryParams = <String, String>{
         if (include != null)
           for (final entry in include.entries)
             if (entry.value) entry.key: 'true',
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
       };
       final uri = Uri.parse('$baseUrl/email/list').replace(
-        queryParameters: includeParams.isEmpty ? null : includeParams,
+        queryParameters: queryParams.isEmpty ? null : queryParams,
       );
       final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => EmailData.fromJson(e))
@@ -771,20 +852,35 @@ class EmailDataApiService {
   }
 
   /// GET `/email/list/unprocessed` — returns only unprocessed email records.
-  Future<List<EmailData>> getUnprocessedEmails({Map<String, bool>? include}) async {
+  ///
+  /// Pass [limit] and [offset] for pagination; [sortBy] and [sortOrder] to
+  /// control ordering.
+  Future<List<EmailData>> getUnprocessedEmails({
+    Map<String, bool>? include,
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
-      final includeParams = <String, String>{
+      final queryParams = <String, String>{
         if (include != null)
           for (final entry in include.entries)
             if (entry.value) entry.key: 'true',
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
       };
       final uri = Uri.parse('$baseUrl/email/list/unprocessed').replace(
-        queryParameters: includeParams.isEmpty ? null : includeParams,
+        queryParameters: queryParams.isEmpty ? null : queryParams,
       );
       final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => EmailData.fromJson(e))
@@ -800,20 +896,35 @@ class EmailDataApiService {
   }
 
   /// GET `/email/list/processed` — returns only processed email records.
-  Future<List<EmailData>> getProcessedEmails({Map<String, bool>? include}) async {
+  ///
+  /// Pass [limit] and [offset] for pagination; [sortBy] and [sortOrder] to
+  /// control ordering.
+  Future<List<EmailData>> getProcessedEmails({
+    Map<String, bool>? include,
+    int? limit,
+    int? offset,
+    String? sortBy,
+    String? sortOrder,
+  }) async {
     try {
-      final includeParams = <String, String>{
+      final queryParams = <String, String>{
         if (include != null)
           for (final entry in include.entries)
             if (entry.value) entry.key: 'true',
+        if (limit != null) 'limit': '$limit',
+        if (offset != null) 'offset': '$offset',
+        if (sortBy != null) 'sort_by': sortBy,
+        if (sortOrder != null) 'sort_order': sortOrder,
       };
       final uri = Uri.parse('$baseUrl/email/list/processed').replace(
-        queryParameters: includeParams.isEmpty ? null : includeParams,
+        queryParameters: queryParams.isEmpty ? null : queryParams,
       );
       final response = await ApiService._client.get(uri);
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final List<dynamic> jsonList =
+            decoded is Map ? decoded['data'] as List : decoded as List;
         return jsonList
             .whereType<Map<String, dynamic>>()
             .map((e) => EmailData.fromJson(e))
