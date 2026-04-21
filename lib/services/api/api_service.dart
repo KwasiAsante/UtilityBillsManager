@@ -3,6 +3,20 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../data/models/bill.dart';
+
+/// Extracts a human-readable error message from a non-2xx [response].
+///
+/// The server encodes errors as `{"error": "..."}` (400/500) or
+/// `{"message": "..."}` (409).  Falls back to the raw body string when the
+/// body is not valid JSON or neither key is present.
+String _errorBody(http.Response response) {
+  try {
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final msg = body['error'] ?? body['message'];
+    if (msg is String && msg.isNotEmpty) return msg;
+  } catch (_) {}
+  return response.body;
+}
 import '../../utils/app_logger.dart';
 import '../../data/models/email_data.dart';
 import '../../data/models/payment.dart';
@@ -138,8 +152,8 @@ class BillsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to create bill ${bill.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to create bill ${bill.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error creating bill: $e');
@@ -158,7 +172,7 @@ class BillsApiService {
         final Map<String, dynamic> json = jsonDecode(response.body);
         return Bill.fromJson(json);
       } else {
-        AppLogger().e('Failed to load bill $id: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load bill $id: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -199,7 +213,7 @@ class BillsApiService {
             .map((e) => Bill.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load bills: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load bills: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -241,7 +255,7 @@ class BillsApiService {
             .map((e) => Bill.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load bills: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load bills: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -284,7 +298,7 @@ class BillsApiService {
         AppLogger().w('Bill sync is already running');
         return null;
       } else {
-        AppLogger().e('Failed to sync bills: ${response.statusCode} - $response');
+        AppLogger().e('Failed to sync bills: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -307,8 +321,8 @@ class BillsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to update bill ${bill.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to update bill ${bill.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error update bill: $e');
@@ -327,7 +341,7 @@ class BillsApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete bill $id: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error delete bill $id: $e');
@@ -344,7 +358,7 @@ class BillsApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete all bills: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error delete bills: $e');
@@ -383,8 +397,8 @@ class RentorsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to create rentor ${rentor.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to create rentor ${rentor.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error creating rentor: $e');
@@ -403,7 +417,7 @@ class RentorsApiService {
         final Map<String, dynamic> json = jsonDecode(response.body);
         return Rentor.fromJson(json);
       } else {
-        AppLogger().e('Failed to load rentor $id: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load rentor $id: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -442,7 +456,7 @@ class RentorsApiService {
             .map((e) => Rentor.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load rentors: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load rentors: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -465,8 +479,8 @@ class RentorsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to update rentor ${rentor.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to update rentor ${rentor.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error updating rentors: $e');
@@ -485,7 +499,7 @@ class RentorsApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete rentor $id: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error delete rentor $id: $e');
@@ -502,7 +516,7 @@ class RentorsApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete all rentors: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error deleting rentors: $e');
@@ -542,8 +556,8 @@ class PaymentsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to create payment: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to create payment: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error fetching payments: $e');
@@ -571,7 +585,7 @@ class PaymentsApiService {
         final Map<String, dynamic> json = jsonDecode(response.body);
         return Payment.fromJson(json);
       } else {
-        AppLogger().e('Failed to load payment $id: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load payment $id: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -617,7 +631,7 @@ class PaymentsApiService {
             .map((e) => Payment.fromJson(e, billRows: e['billList'] != null && e['billList'] is List ? List<Map<String, dynamic>>.from(e['billList']) : null))
             .toList();
       } else {
-        AppLogger().e('Failed to load payments: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load payments: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -667,7 +681,7 @@ class PaymentsApiService {
         AppLogger().w('Payment sync is already running');
         return null;
       } else {
-        AppLogger().e('Failed to sync payments: ${response.statusCode} - $response');
+        AppLogger().e('Failed to sync payments: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -690,8 +704,8 @@ class PaymentsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to update payment ${payment.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to update payment ${payment.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error updating payment: $e');
@@ -710,7 +724,7 @@ class PaymentsApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete payment $id: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error deleting payment: $e');
@@ -727,7 +741,7 @@ class PaymentsApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete all payments: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error deleting payments: $e');
@@ -766,8 +780,8 @@ class EmailDataApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to create emailData ${emailData.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to create emailData ${emailData.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error creating emailData: $e');
@@ -798,7 +812,7 @@ class EmailDataApiService {
         final Map<String, dynamic> json = jsonDecode(response.body);
         return EmailData.fromJson(json);
       } else {
-        AppLogger().e('Failed to load emailData $id: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load emailData $id: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -842,7 +856,7 @@ class EmailDataApiService {
             .map((e) => EmailData.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load emailDatas: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load emailDatas: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -886,7 +900,7 @@ class EmailDataApiService {
             .map((e) => EmailData.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load unprocessed emailDatas: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load unprocessed emailDatas: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -930,7 +944,7 @@ class EmailDataApiService {
             .map((e) => EmailData.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load processed emailDatas: ${response.statusCode} - $response');
+        AppLogger().e('Failed to load processed emailDatas: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
@@ -979,7 +993,7 @@ class EmailDataApiService {
         AppLogger().w('Email sync is already running');
         return null;
       } else {
-        AppLogger().e('Failed to sync email data: ${response.statusCode} - $response');
+        AppLogger().e('Failed to sync email data: ${response.statusCode} - ${_errorBody(response)}');
         return {};
       }
     } catch (e) {
@@ -1002,8 +1016,8 @@ class EmailDataApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to update emailData ${emailData.id}: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to update emailData ${emailData.id}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error updating emailData: $e');
@@ -1022,7 +1036,7 @@ class EmailDataApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete emailData: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error deleting emailData: $e');
@@ -1039,7 +1053,7 @@ class EmailDataApiService {
         return "OK";
       } else {
         AppLogger().e('Failed to delete all emailData: ${response.statusCode} - ${response.toString()}');
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error deleting emailData: $e');
@@ -1070,7 +1084,7 @@ class ConfigApiService {
       if (response.statusCode == 200) {
         return ServerConfig.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
       } else {
-        AppLogger().e('Failed to get config: ${response.statusCode} - $response');
+        AppLogger().e('Failed to get config: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -1091,7 +1105,7 @@ class ConfigApiService {
       if (response.statusCode == 200) {
         return ServerConfig.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
       } else {
-        AppLogger().e('Failed to create config: ${response.statusCode} - $response');
+        AppLogger().e('Failed to create config: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -1112,7 +1126,7 @@ class ConfigApiService {
       if (response.statusCode == 200) {
         return ServerConfig.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
       } else {
-        AppLogger().e('Failed to update config: ${response.statusCode} - $response');
+        AppLogger().e('Failed to update config: ${response.statusCode} - ${_errorBody(response)}');
         return null;
       }
     } catch (e) {
@@ -1129,8 +1143,8 @@ class ConfigApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to delete config: ${response.statusCode} - $response');
-        return response.toString();
+        AppLogger().e('Failed to delete config: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error deleting config: $e');
@@ -1175,9 +1189,9 @@ class NotificationApiService {
         return "OK";
       } else {
         AppLogger().e(
-          'Failed to register device token: ${response.statusCode} - $response',
+          'Failed to register device token: ${response.statusCode} - ${_errorBody(response)}',
         );
-        return response.toString();
+        return _errorBody(response);
       }
     } catch (e) {
       AppLogger().e('Error registering device token: $e');
