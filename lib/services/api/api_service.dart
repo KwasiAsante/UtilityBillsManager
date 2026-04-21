@@ -3,6 +3,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../data/models/bill.dart';
+import '../../utils/app_logger.dart';
+import '../../data/models/email_data.dart';
+import '../../data/models/payment.dart';
+import '../../data/models/rentor.dart';
+import '../../data/models/server_config.dart';
 
 /// Extracts a human-readable error message from a non-2xx [response].
 ///
@@ -17,11 +22,6 @@ String _errorBody(http.Response response) {
   } catch (_) {}
   return response.body;
 }
-import '../../utils/app_logger.dart';
-import '../../data/models/email_data.dart';
-import '../../data/models/payment.dart';
-import '../../data/models/rentor.dart';
-import '../../data/models/server_config.dart';
 
 /// Central HTTP client facade for the local shelf server (client mode).
 ///
