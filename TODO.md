@@ -42,15 +42,15 @@
 
 ## Rentor Messaging
 
-- [ ] Craft messages for rentors
-  - [ ] Generate per-rentor bill summary message (amount owed + due date)
-  - [ ] Format message for clarity and professionalism
+- [x] Craft messages for rentors
+  - [x] Generate per-rentor bill summary message (amount owed + due date)
+  - [x] Format message for clarity and professionalism
   - [ ] Support templating for customizable messages
 
-- [ ] Send or share crafted messages to rentors
+- [x] Send or share crafted messages to rentors
   - [ ] Implement message sharing via SMS (e.g., Twilio integration)
-  - [ ] Provide "share text" feature so users can manually share messages
-  - [ ] Support sharing via email, SMS, messaging apps, or other communication channels
+  - [x] Provide "share text" feature so users can manually share messages
+  - [x] Support sharing via email, SMS, messaging apps, or other communication channels
 
 ## File Export
 
