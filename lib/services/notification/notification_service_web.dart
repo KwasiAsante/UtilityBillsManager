@@ -7,14 +7,18 @@ import 'package:uuid/uuid.dart';
 import 'package:web/web.dart' as web;
 
 import '../api/api_service.dart';
+import '../bill_readiness/bill_readiness_service.dart';
 import 'app_notification_store.dart';
 import 'notification_service.dart';
 import 'sse_service_native.dart';
 import '../../config/app_config.dart';
 import '../../data/models/app_notification.dart';
+import '../../data/models/bill.dart';
 import '../../data/models/sse_event.dart';
 import '../../data/repositories/bills_repository.dart';
 import '../../data/repositories/payments_repository.dart';
+import '../../data/repositories/rentors_repository.dart';
+import '../../helpers/bill_readiness/bill_notification_tracker_helper.dart';
 import '../../utils/app_logger.dart';
 
 @pragma('vm:entry-point')
@@ -38,6 +42,7 @@ class WebNotificationService implements NotificationService {
   StreamSubscription<SseEvent>? sseEventsSubscription;
 
   StreamSubscription? _tokenRefreshSubscription;
+  final _trackerHelper = BillNotificationTrackerHelper();
 
   List<web.Notification> activeNotifications = [];
 
@@ -157,7 +162,33 @@ class WebNotificationService implements NotificationService {
       AppLogger().d('[SSE] ${event.type}: $title');
       await showNotification(title: title, body: event.message);
       addToStore(type: event.type, title: title, body: event.message);
+
       await _reloadRepositoryAsync(event.type);
+
+      if (event.type == SseEventType.newBill) {
+        if (RentorsRepository().rentors.isEmpty) {
+          await RentorsRepository().reload();
+        }
+        final allRentors = RentorsRepository().rentors;
+        final allBills = BillsRepository().bills;
+
+        final incomingBills = _parseBillsFromSseData(event.data, allBills);
+        for (final bill in incomingBills) {
+          final composeNotifications = await BillReadinessService()
+              .checkReadiness(bill, allRentors, allBills);
+
+          final now = DateTime.now();
+          for (final cn in composeNotifications) {
+            await _trackerHelper.logComposeNotificationSent(
+              rentorId: cn.rentor.rentorId,
+              month: now.month,
+              year: now.year,
+              billGroup: cn.isWater ? 'water' : 'regular',
+            );
+            _showComposeNotification(cn);
+          }
+        }
+      }
     } catch (e) {
       AppLogger().e('[NotificationService](Web) SSE handling error: $e', error: e);
     }
@@ -170,6 +201,36 @@ class WebNotificationService implements NotificationService {
       case SseEventType.newPayment:
         await PaymentsRepository().reload();
     }
+  }
+
+  void _showComposeNotification(ComposeNotification cn) {
+    if (web.Notification.permission != 'granted') return;
+
+    final firstName = cn.rentor.name.split(' ').first;
+    final title = cn.isWater
+        ? 'Water bill ready for $firstName'
+        : 'Compose bill summary for $firstName';
+    final body = cn.isWater
+        ? 'Tap to compose water bill message'
+        : 'All bills received — open app to generate message';
+    final tag = '${cn.rentor.rentorId}:${cn.isWater ? 'water' : 'regular'}';
+
+    final notification = web.Notification(
+      title,
+      web.NotificationOptions(tag: tag, body: body),
+    );
+    activeNotifications.add(notification);
+  }
+
+  List<Bill> _parseBillsFromSseData(
+      Map<String, dynamic> data, List<Bill> allBills) {
+    if (data.containsKey('billId')) {
+      return [Bill.fromJson(data)];
+    } else if (data.containsKey('billIds')) {
+      final ids = (data['billIds'] as List).cast<String>();
+      return allBills.where((b) => ids.contains(b.billId)).toList();
+    }
+    return [];
   }
   //endregion
 
