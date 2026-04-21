@@ -24,6 +24,7 @@ import '../../helpers/bill_readiness/bill_notification_tracker_helper.dart';
 import '../../screens/bill_summary/message_preview_screen.dart';
 import '../../services/notification/notification_service.dart';
 import '../../utils/app_logger.dart';
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   AppLogger().d('[FCM] Background message: ${message.messageId}');
@@ -49,7 +50,9 @@ class NativeNotificationService implements NotificationService {
 
   final _localNotifications = FlutterLocalNotificationsPlugin();
   StreamSubscription? _tokenRefreshSubscription;
+
   GlobalKey<NavigatorState>? _navigatorKey;
+
   final _trackerHelper = BillNotificationTrackerHelper();
 
   @override

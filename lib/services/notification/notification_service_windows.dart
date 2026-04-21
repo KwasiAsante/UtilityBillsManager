@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import 'app_notification_store.dart';
@@ -57,6 +58,16 @@ class WindowsNotificationService implements NotificationService {
     initialized = false;
   }
   //endregion
+
+  @override
+  void setNavigatorKey(GlobalKey<NavigatorState> key) {
+    // Not supported on web — web uses browser URL navigation.
+  }
+
+  @override
+  Future<void> handleLaunchNotification() async {
+    // Not supported on web.
+  }
 
   //region Local Notifications
   @override
