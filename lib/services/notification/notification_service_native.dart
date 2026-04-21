@@ -202,7 +202,7 @@ class NativeNotificationService implements NotificationService {
   @override
   void handleSseEvent(SseEvent event) {
     // Dispatch async work without blocking the SSE stream.
-    _handleSseEventAsync(event);
+    unawaited(_handleSseEventAsync(event));
   }
 
   Future<void> _handleSseEventAsync(SseEvent event) async {
@@ -307,7 +307,9 @@ class NativeNotificationService implements NotificationService {
           .firstWhere((r) => r?.rentorId == rentorId, orElse: () => null);
       if (rentor == null) return;
 
-      await BillsRepository().reload();
+      if (BillsRepository().bills.isEmpty) {
+        await BillsRepository().reload();
+      }
       final bills = BillsRepository().bills
           .where((b) => billIds.contains(b.billId))
           .toList();
