@@ -57,9 +57,8 @@ class DatabaseHelper {
   /// Web persists under a logical name only (IndexedDB); mobile/desktop use
   /// [getDatabasesPath] + file name.
   Future<Database> _initDatabase() async {
-    final path = kIsWeb
-        ? _databaseName
-        : join(await getDatabasesPath(), _databaseName);
+    final path =
+        kIsWeb ? _databaseName : join(await getDatabasesPath(), _databaseName);
     return await openDatabase(
       path,
       version: _databaseVersion,
@@ -577,7 +576,12 @@ class DatabaseHelper {
     }
 
     if (oldVersion < 13) {
-      await _ensureColumn(db, 'payment_bills', 'applied', 'INTEGER NOT NULL DEFAULT 0');
+      await _ensureColumn(
+        db,
+        'payment_bills',
+        'applied',
+        'INTEGER NOT NULL DEFAULT 0',
+      );
       await _ensureColumn(db, 'payment_bills', 'appliedAmount', 'REAL');
     }
 
@@ -918,10 +922,11 @@ class DatabaseHelper {
     List<Map<String, dynamic>>? billRows,
   }) async {
     if (includeBill && billRows != null) {
-      final billIds = billRows
-          .map((row) => row['b_billId']?.toString())
-          .whereType<String>()
-          .toList();
+      final billIds =
+          billRows
+              .map((row) => row['b_billId']?.toString())
+              .whereType<String>()
+              .toList();
       result['billIds'] = billIds;
     } else {
       final billIdResults = await db.query(
@@ -931,9 +936,8 @@ class DatabaseHelper {
       );
 
       if (billIdResults.isNotEmpty) {
-        final billIds = billIdResults
-            .map((row) => row['billId'] as String)
-            .toList();
+        final billIds =
+            billIdResults.map((row) => row['billId'] as String).toList();
         result['billIds'] = billIds;
       }
     }
@@ -948,10 +952,11 @@ class DatabaseHelper {
   }) async {
     if (results.isEmpty) return;
 
-    final paymentIds = results
-        .map((row) => row['paymentId']?.toString())
-        .whereType<String>()
-        .toList();
+    final paymentIds =
+        results
+            .map((row) => row['paymentId']?.toString())
+            .whereType<String>()
+            .toList();
 
     if (paymentIds.isEmpty) return;
 
@@ -959,7 +964,8 @@ class DatabaseHelper {
       for (final result in results) {
         final pId = result['paymentId']?.toString();
         if (pId == null || pId.isEmpty) continue;
-        final billIds = billsResult[pId]
+        final billIds =
+            billsResult[pId]
                 ?.map((row) => row['b_billId']?.toString())
                 .whereType<String>()
                 .toList() ??
@@ -977,10 +983,15 @@ class DatabaseHelper {
         for (final result in results) {
           final pId = result['paymentId']?.toString();
           if (pId == null || pId.isEmpty) continue;
-          final billIds = billIdsResults
-              .where((row) => row['paymentId'] != null && row['paymentId']!.toString() == pId)
-              .map((row) => row['billId'] as String)
-              .toList();
+          final billIds =
+              billIdsResults
+                  .where(
+                    (row) =>
+                        row['paymentId'] != null &&
+                        row['paymentId']!.toString() == pId,
+                  )
+                  .map((row) => row['billId'] as String)
+                  .toList();
           result['billIds'] = billIds;
         }
       }
@@ -995,11 +1006,10 @@ class DatabaseHelper {
   }) async {
     if (billIds != null && billIds.isNotEmpty) {
       for (final billId in billIds) {
-        await db.insert(
-          'payment_bills',
-          {'paymentId': paymentId, 'billId': billId},
-          conflictAlgorithm: ConflictAlgorithm.ignore,
-        );
+        await db.insert('payment_bills', {
+          'paymentId': paymentId,
+          'billId': billId,
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
     }
   }
@@ -1082,21 +1092,40 @@ class DatabaseHelper {
   }
 
   /// Returns all bills in the `bills` table.
-  Future<List<Bill>> readAllBills() async {
+  Future<List<Bill>> readAllBills({List<String>? ids}) async {
     final db = await database;
-    final result = await db.query('bills');
+    String placeholders =
+        ids != null && ids.isNotEmpty ? ids.map((_) => '?').join(', ') : '';
+    final result =
+        placeholders.isEmpty
+            ? await db.query('bills')
+            : await db.query(
+              'bills',
+              where: 'billId IN ($placeholders)',
+              whereArgs: ids,
+            );
     return result.map((map) => Bill.fromJson(map)).toList();
   }
 
   /// Returns bills matching [status] (case-insensitive).  Pass [ids] to further
   /// restrict results to a specific set of `billId` values.
-  Future<List<Bill>> readBillsByStatus(String status, {List<String>? ids}) async {
+  Future<List<Bill>> readBillsByStatus(
+    String status, {
+    List<String>? ids,
+  }) async {
     final db = await database;
-    String placeholders = ids != null && ids.isNotEmpty ? ids.map((_) => '?').join(', ') : '';
+    String placeholders =
+        ids != null && ids.isNotEmpty ? ids.map((_) => '?').join(', ') : '';
     final result = await db.query(
       'bills',
-      where: placeholders.isEmpty ? 'status = ?' : 'status = ? AND billId IN ($placeholders)',
-      whereArgs: [status.toLowerCase(), ...(ids != null && ids.isNotEmpty ? ids : [])],
+      where:
+          placeholders.isEmpty
+              ? 'status = ?'
+              : 'status = ? AND billId IN ($placeholders)',
+      whereArgs: [
+        status.toLowerCase(),
+        ...(ids != null && ids.isNotEmpty ? ids : []),
+      ],
     );
 
     return result.map((map) => Bill.fromJson(map)).toList();
@@ -1185,7 +1214,11 @@ class DatabaseHelper {
     final db = await database;
     final paymentData = payment.toJson();
     final result = await db.insert('payments', paymentData);
-    await _insertPaymentBillIds(db, paymentId: payment.paymentId!, billIds: payment.billIds);
+    await _insertPaymentBillIds(
+      db,
+      paymentId: payment.paymentId,
+      billIds: payment.billIds,
+    );
     return result;
   }
 
@@ -1193,7 +1226,10 @@ class DatabaseHelper {
   ///
   /// Pass `include: {'bill': true}` and/or `include: {'rentor': true}` to
   /// eagerly join associated records.  Returns `null` if not found.
-  Future<Payment?> readPayment(String paymentId, {Map<String, bool>? include}) async {
+  Future<Payment?> readPayment(
+    String paymentId, {
+    Map<String, bool>? include,
+  }) async {
     final db = await database;
     final includeBill = include?['bill'] == true;
     final includeRentor = include?['rentor'] == true;
@@ -1202,14 +1238,18 @@ class DatabaseHelper {
     List<Map<String, dynamic>> billsResult = [];
 
     if (!includeRentor) {
-      result = _toMutableRows(await db.query(
-        'payments',
-        where: 'paymentId = ?',
-        whereArgs: [paymentId],
-      ));
+      result = _toMutableRows(
+        await db.query(
+          'payments',
+          where: 'paymentId = ?',
+          whereArgs: [paymentId],
+        ),
+      );
     } else {
       final query = _buildPaymentQuery(includeRentor: true);
-      result = _toMutableRows(await db.rawQuery('$query WHERE p.paymentId = ?', [paymentId]));
+      result = _toMutableRows(
+        await db.rawQuery('$query WHERE p.paymentId = ?', [paymentId]),
+      );
     }
 
     if (result.isEmpty) {
@@ -1217,7 +1257,8 @@ class DatabaseHelper {
     }
 
     if (includeBill) {
-      billsResult = await db.rawQuery('''
+      billsResult = await db.rawQuery(
+        '''
         SELECT b.id AS b_id,
                b.billId AS b_billId,
                b.company AS b_company,
@@ -1230,7 +1271,9 @@ class DatabaseHelper {
         FROM payment_bills pb
         JOIN bills b ON b.billId = pb.billId
         WHERE pb.paymentId = ?
-      ''', [paymentId]);
+      ''',
+        [paymentId],
+      );
     }
 
     await _hydrateBillIds(
@@ -1241,12 +1284,18 @@ class DatabaseHelper {
       billRows: includeBill ? billsResult : null,
     );
 
-    return Payment.fromJson(Map<String, dynamic>.from(result.first), billRows: billsResult);
+    return Payment.fromJson(
+      Map<String, dynamic>.from(result.first),
+      billRows: billsResult,
+    );
   }
 
   /// Returns all payments, optionally filtered to [ids] and with related
   /// bills/rentors eagerly loaded based on the [include] flags.
-  Future<List<Payment>> readAllPayments({Map<String, bool>? include, List<String>? ids}) async {
+  Future<List<Payment>> readAllPayments({
+    Map<String, bool>? include,
+    List<String>? ids,
+  }) async {
     final db = await database;
     final includeBill = include?['bill'] == true;
     final includeRentor = include?['rentor'] == true;
@@ -1255,8 +1304,17 @@ class DatabaseHelper {
     Map<String, List<Map<String, dynamic>>> billsResult = {};
 
     if (!includeRentor) {
-      String placeholders = ids != null && ids.isNotEmpty ? ids.map((_) => '?').join(', ') : '';
-      result = _toMutableRows(placeholders.isEmpty ? await db.query('payments') : await db.query('payments', where: 'paymentId IN ($placeholders)', whereArgs: ids));
+      String placeholders =
+          ids != null && ids.isNotEmpty ? ids.map((_) => '?').join(', ') : '';
+      result = _toMutableRows(
+        placeholders.isEmpty
+            ? await db.query('payments')
+            : await db.query(
+              'payments',
+              where: 'paymentId IN ($placeholders)',
+              whereArgs: ids,
+            ),
+      );
     } else {
       final query = _buildPaymentQuery(includeRentor: true, ids: ids);
       result = _toMutableRows(await db.rawQuery(query));
@@ -1267,10 +1325,11 @@ class DatabaseHelper {
     }
 
     if (includeBill) {
-      final paymentIds = result
-          .map((row) => row['paymentId']?.toString())
-          .whereType<String>()
-          .toList();
+      final paymentIds =
+          result
+              .map((row) => row['paymentId']?.toString())
+              .whereType<String>()
+              .toList();
 
       if (paymentIds.isNotEmpty) {
         final placeholders = paymentIds.map((_) => '?').join(', ');
@@ -1291,9 +1350,14 @@ class DatabaseHelper {
         ''', paymentIds);
 
         for (String paymentId in paymentIds) {
-          billsResult[paymentId] = rawBillRows
-              .where((row) => row['pb_paymentId'] != null && row['pb_paymentId']!.toString() == paymentId)
-              .toList();
+          billsResult[paymentId] =
+              rawBillRows
+                  .where(
+                    (row) =>
+                        row['pb_paymentId'] != null &&
+                        row['pb_paymentId']!.toString() == paymentId,
+                  )
+                  .toList();
         }
       }
     }
@@ -1306,8 +1370,17 @@ class DatabaseHelper {
     );
 
     return result
-        .where((map) => map['paymentId'] != null && map['paymentId']!.toString().isNotEmpty)
-        .map((map) => Payment.fromJson(map, billRows: billsResult[map['paymentId']!.toString()]))
+        .where(
+          (map) =>
+              map['paymentId'] != null &&
+              map['paymentId']!.toString().isNotEmpty,
+        )
+        .map(
+          (map) => Payment.fromJson(
+            map,
+            billRows: billsResult[map['paymentId']!.toString()],
+          ),
+        )
         .toList();
   }
 
@@ -1323,7 +1396,7 @@ class DatabaseHelper {
       'payments',
       paymentData,
       where: 'paymentId = ?',
-      whereArgs: [payment.paymentId!],
+      whereArgs: [payment.paymentId],
     );
 
     // Incremental diff on payment_bills: preserve existing rows (and their applied state),
@@ -1334,7 +1407,8 @@ class DatabaseHelper {
       where: 'paymentId = ?',
       whereArgs: [payment.paymentId],
     );
-    final existingBillIds = existingRows.map((r) => r['billId'] as String).toSet();
+    final existingBillIds =
+        existingRows.map((r) => r['billId'] as String).toSet();
     final newBillIds = (payment.billIds ?? []).toSet();
 
     final toRemove = existingBillIds.difference(newBillIds);
@@ -1348,11 +1422,11 @@ class DatabaseHelper {
 
     final toAdd = newBillIds.difference(existingBillIds);
     for (final billId in toAdd) {
-      await db.insert(
-        'payment_bills',
-        {'paymentId': payment.paymentId, 'billId': billId, 'applied': 0},
-        conflictAlgorithm: ConflictAlgorithm.ignore,
-      );
+      await db.insert('payment_bills', {
+        'paymentId': payment.paymentId,
+        'billId': billId,
+        'applied': 0,
+      }, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
 
     return result;
@@ -1372,7 +1446,11 @@ class DatabaseHelper {
 
   /// Marks the `payment_bills` junction row as applied and records the exact
   /// [appliedAmount] credited toward [billId] from [paymentId].
-  Future<void> markPaymentBillApplied(String paymentId, String billId, double appliedAmount) async {
+  Future<void> markPaymentBillApplied(
+    String paymentId,
+    String billId,
+    double appliedAmount,
+  ) async {
     final db = await database;
     await db.update(
       'payment_bills',
@@ -1385,7 +1463,10 @@ class DatabaseHelper {
   /// Returns the previously recorded `appliedAmount` for the ([paymentId],
   /// [billId]) pair if the junction row is marked `applied = 1`, otherwise
   /// returns `null`.
-  Future<double?> getPaymentBillAppliedAmount(String paymentId, String billId) async {
+  Future<double?> getPaymentBillAppliedAmount(
+    String paymentId,
+    String billId,
+  ) async {
     final db = await database;
     final result = await db.query(
       'payment_bills',
@@ -1408,7 +1489,11 @@ class DatabaseHelper {
   /// Returns the [EmailData] record whose `emailId` matches [emailId], or
   /// `null` if not found.  Pass [include] flags to join `bill` and/or
   /// `payment`.
-  Future<EmailData?> readEmail(String emailId, {Map<String, bool>? include, bool queryByEmailId = false}) async {
+  Future<EmailData?> readEmail(
+    String emailId, {
+    Map<String, bool>? include,
+    bool queryByEmailId = false,
+  }) async {
     final db = await database;
     final includeBill = include?['bill'] == true;
     final includePayment = include?['payment'] == true;
@@ -1424,7 +1509,8 @@ class DatabaseHelper {
       final query = _buildEmailDataQuery(
         includeBill: includeBill,
         includePayment: includePayment,
-        whereClause: 'WHERE ${(queryByEmailId ? 'e.emailId = ?' : 'e.emailDataId = ?')}',
+        whereClause:
+            'WHERE ${(queryByEmailId ? 'e.emailId = ?' : 'e.emailDataId = ?')}',
       );
       result = await db.rawQuery(query, [emailId]);
     }
@@ -1457,7 +1543,9 @@ class DatabaseHelper {
   }
 
   /// Returns only email records where `processed = 0`.
-  Future<List<EmailData>> readUnprocessedEmails({Map<String, bool>? include}) async {
+  Future<List<EmailData>> readUnprocessedEmails({
+    Map<String, bool>? include,
+  }) async {
     final db = await database;
     final includeBill = include?['bill'] == true;
     final includePayment = include?['payment'] == true;
@@ -1482,7 +1570,9 @@ class DatabaseHelper {
   }
 
   /// Returns only email records where `processed = 1`.
-  Future<List<EmailData>> readProcessedEmails({Map<String, bool>? include}) async {
+  Future<List<EmailData>> readProcessedEmails({
+    Map<String, bool>? include,
+  }) async {
     final db = await database;
     final includeBill = include?['bill'] == true;
     final includePayment = include?['payment'] == true;
@@ -1521,14 +1611,18 @@ class DatabaseHelper {
       'email_data',
       data,
       where: 'emailDataId = ?',
-      whereArgs: [emaildata.emailDataId!],
+      whereArgs: [emaildata.emailDataId],
     );
   }
 
   /// Deletes the email record identified by [id] (`emailDataId`).
   Future<int> deleteEmailData(String id) async {
     final db = await database;
-    return await db.delete('email_data', where: 'emailDataId = ?', whereArgs: [id]);
+    return await db.delete(
+      'email_data',
+      where: 'emailDataId = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<int> deleteAllEmailData() async {
@@ -1541,7 +1635,8 @@ class DatabaseHelper {
   //region Bill Notification Tracker
   /// Inserts a [BillNotificationTracker] row. Returns the new row id.
   Future<int> insertBillNotificationTracker(
-      BillNotificationTracker tracker) async {
+    BillNotificationTracker tracker,
+  ) async {
     final db = await database;
     return await db.insert('bill_notification_tracker', tracker.toJson());
   }
@@ -1682,5 +1777,6 @@ class DatabaseHelper {
     final db = await database;
     await db.close();
   }
+
   //endregion
 }
