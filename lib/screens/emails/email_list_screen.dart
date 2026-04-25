@@ -180,6 +180,41 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
     await _emailDataRepository.reload();
   }
 
+  Future<void> _deleteEmail(EmailData emailData) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Email'),
+            content: Text(
+              'Are you sure you want to delete email ${emailData.emailSubject} record?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed == true) {
+      await _emailDataRepository.delete(emailData.emailDataId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Email record deleted.')),
+        );
+      }
+    }
+  }
+
   Future<void> _deleteAllEmails() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -360,20 +395,33 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
                         )
                         .toList(),
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: 'More actions',
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem(
-                    value: 'refresh',
-                    child: ListTile(
-                      leading: Icon(Icons.refresh),
-                      title: Text('Sync emails'),
-                      contentPadding: EdgeInsets.zero,
+          if (AppBreakpoints.isWide(context))
+            IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: 'Sync emails',
+              onPressed: _loading ? null : _syncEmails,
+            ),
+          if (AppBreakpoints.isWide(context))
+            IconButton(
+              icon: const Icon(Icons.delete_sweep),
+              tooltip: 'Delete all email records',
+              color: Colors.red,
+              onPressed: _deleteAllEmails,
+            ),
+          if (!AppBreakpoints.isWide(context))
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'More actions',
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'refresh',
+                      child: ListTile(
+                        leading: Icon(Icons.sync),
+                        title: Text('Sync emails'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-                  if (!AppBreakpoints.isWide(context))
                     const PopupMenuItem(
                       value: 'settings',
                       child: ListTile(
@@ -382,31 +430,31 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
                         contentPadding: EdgeInsets.zero,
                       ),
                     ),
-                  const PopupMenuItem(
-                    value: 'delete_all',
-                    child: ListTile(
-                      leading: Icon(Icons.delete_sweep, color: Colors.red),
-                      title: Text(
-                        'Delete all email records',
-                        style: TextStyle(color: Colors.red),
+                    const PopupMenuItem(
+                      value: 'delete_all',
+                      child: ListTile(
+                        leading: Icon(Icons.delete_sweep, color: Colors.red),
+                        title: Text(
+                          'Delete all email records',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        contentPadding: EdgeInsets.zero,
                       ),
-                      contentPadding: EdgeInsets.zero,
                     ),
-                  ),
-                ],
-            onSelected: (String value) {
-              if (value == 'refresh') {
-                _syncEmails();
-              } else if (value == 'settings') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                );
-              } else if (value == 'delete_all') {
-                _deleteAllEmails();
-              }
-            },
-          ),
+                  ],
+              onSelected: (String value) {
+                if (value == 'refresh') {
+                  _syncEmails();
+                } else if (value == 'settings') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                } else if (value == 'delete_all') {
+                  _deleteAllEmails();
+                }
+              },
+            ),
         ],
       ),
       body: ResponsiveConstraint(
@@ -557,32 +605,7 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
                 ),
               );
             } else if (value == 'delete') {
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder:
-                    (context) => AlertDialog(
-                      title: const Text('Delete Email'),
-                      content: const Text(
-                        'Are you sure you want to delete this email record?',
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text(
-                            'Delete',
-                            style: TextStyle(color: Colors.red),
-                          ),
-                        ),
-                      ],
-                    ),
-              );
-              if (confirmed == true) {
-                await _emailDataRepository.delete(email.emailDataId!);
-              }
+              await _deleteEmail(email);
             }
           },
           itemBuilder:

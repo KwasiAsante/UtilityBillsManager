@@ -13,7 +13,7 @@ import './payment.dart';
 /// email's metadata (sender + date + subject hash) to avoid duplicate imports.
 class EmailData {
   final int? id;
-  final String? emailDataId;
+  final String emailDataId;
   final String emailSubject;
   final String emailBody;
   int? emailId;

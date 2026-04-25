@@ -261,6 +261,7 @@ class EmailDataHelper {
     int? maxEmails,
     DateTime? earliestEmailDate,
     DateTime? latestEmailDate,
+    bool? parse,
   }) async {
     Map<String, dynamic>? map = {};
 
@@ -450,6 +451,7 @@ class EmailDataHelper {
           maxEmails: maxEmails,
           earliestEmailDate: earliestEmailDate,
           latestEmailDate: latestEmailDate,
+          parse: parse,
         );
         return Result.success(data: map);
       } on Exception catch (e) {
@@ -663,5 +665,6 @@ class EmailDataHelper {
       }
     }
   }
+
   // endregion
 }
