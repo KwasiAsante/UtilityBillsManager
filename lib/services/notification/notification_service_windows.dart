@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
@@ -7,19 +8,25 @@ import 'package:uuid/uuid.dart';
 import 'app_notification_store.dart';
 import 'notification_service.dart';
 import 'sse_service_native.dart';
+import '../bill_summary/bill_summary_service.dart';
 import '../bill_readiness/bill_readiness_service.dart';
+import '../windows/windows_manager_service.dart';
+import '../../config/app_config.dart';
 import '../../data/models/app_notification.dart';
 import '../../data/models/bill.dart';
+import '../../data/models/sse_event.dart';
+import '../../data/models/rentor.dart';
 import '../../data/repositories/bills_repository.dart';
 import '../../data/repositories/payments_repository.dart';
 import '../../data/repositories/rentors_repository.dart';
 import '../../helpers/bill_readiness/bill_notification_tracker_helper.dart';
+import '../../screens/bill_summary/message_preview_screen.dart';
 import '../../utils/app_logger.dart';
-import '../../config/app_config.dart';
-import '../../data/models/sse_event.dart';
-
-class WindowsNotificationService with WidgetsBindingObserver implements NotificationService {
-  static final WindowsNotificationService _instance = WindowsNotificationService._internal();
+class WindowsNotificationService
+    with WidgetsBindingObserver
+    implements NotificationService {
+  static final WindowsNotificationService _instance =
+      WindowsNotificationService._internal();
 
   factory WindowsNotificationService() => _instance;
 
@@ -32,6 +39,8 @@ class WindowsNotificationService with WidgetsBindingObserver implements Notifica
 
   @override
   StreamSubscription<SseEvent>? sseEventsSubscription;
+
+  GlobalKey<NavigatorState>? _navigatorKey;
 
   final _localNotifications = FlutterLocalNotificationsPlugin();
   final _trackerHelper = BillNotificationTrackerHelper();
@@ -52,7 +61,10 @@ class WindowsNotificationService with WidgetsBindingObserver implements Notifica
       WidgetsBinding.instance.addObserver(this);
       AppLogger().d('[NotificationService](Windows) Initialized successfully');
     } catch (e) {
-      AppLogger().e('[NotificationService](Windows) Initialization failed: $e', error: e);
+      AppLogger().e(
+        '[NotificationService](Windows) Initialization failed: $e',
+        error: e,
+      );
       initialized = false;
     }
   }
@@ -84,12 +96,17 @@ class WindowsNotificationService with WidgetsBindingObserver implements Notifica
 
   @override
   void setNavigatorKey(GlobalKey<NavigatorState> key) {
-    // Not supported on web — web uses browser URL navigation.
+    _navigatorKey = key;
   }
 
   @override
   Future<void> handleLaunchNotification() async {
-    // Not supported on web.
+    final details = await _localNotifications.getNotificationAppLaunchDetails();
+    if (details?.didNotificationLaunchApp == true) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleNotificationTap(details?.notificationResponse?.payload);
+      });
+    }
   }
 
   //region Local Notifications
@@ -103,7 +120,12 @@ class WindowsNotificationService with WidgetsBindingObserver implements Notifica
       ),
     );
 
-    await _localNotifications.initialize(settings: initSettings);
+    await _localNotifications.initialize(
+      settings: initSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        _handleNotificationTap(response.payload);
+      },
+    );
     AppLogger().d('[LocalNotifications] Windows initialised');
   }
 
@@ -186,7 +208,10 @@ class WindowsNotificationService with WidgetsBindingObserver implements Notifica
         }
       }
     } catch (e) {
-      AppLogger().e('[NotificationService](Windows) SSE handling error: $e', error: e);
+      AppLogger().e(
+        '[NotificationService](Windows) SSE handling error: $e',
+        error: e,
+      );
     }
   }
 
@@ -202,12 +227,14 @@ class WindowsNotificationService with WidgetsBindingObserver implements Notifica
 
   Future<void> _showComposeNotification(ComposeNotification cn) async {
     final firstName = cn.rentor.name.split(' ').first;
-    final title = cn.isWater
-        ? 'Water bill ready for $firstName'
-        : 'Compose bill summary for $firstName';
-    final body = cn.isWater
-        ? 'Tap to compose water bill message'
-        : 'All bills received — open app to generate message';
+    final title =
+        cn.isWater
+            ? 'Water bill ready for $firstName'
+            : 'Compose bill summary for $firstName';
+    final body =
+        cn.isWater
+            ? 'Tap to compose water bill message'
+            : 'All bills received — open app to generate message';
 
     await _localNotifications.show(
       id: cn.rentor.rentorId.hashCode ^ (cn.isWater ? 1 : 0),
@@ -219,8 +246,53 @@ class WindowsNotificationService with WidgetsBindingObserver implements Notifica
     );
   }
 
+  Future<void> _handleNotificationTap(String? payload) async {
+    if (payload == null || payload.isEmpty) {
+      await WindowsManagerService.showWindow();
+      return;
+    }
+
+    try {
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      final rentorId = data['rentorId'] as String;
+      final billIds = (data['billIds'] as List).cast<String>();
+
+      if (RentorsRepository().rentors.isEmpty) {
+        await RentorsRepository().reload();
+      }
+      final rentor = RentorsRepository().rentors.cast<Rentor?>().firstWhere(
+        (r) => r?.rentorId == rentorId,
+        orElse: () => null,
+      );
+      if (rentor == null) return;
+
+      if (BillsRepository().bills.isEmpty) {
+        await BillsRepository().reload();
+      }
+      final bills =
+          BillsRepository().bills
+              .where((b) => billIds.contains(b.billId))
+              .toList();
+      if (bills.isEmpty) return;
+
+      final message = BillSummaryService().generateMessage(rentor, bills);
+
+      _navigatorKey?.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => MessagePreviewScreen(initialMessage: message),
+        ),
+      );
+
+      WindowsManagerService.showWindow();
+    } catch (e) {
+      AppLogger().e('[NotificationService] Tap handling error: $e', error: e);
+    }
+  }
+
   List<Bill> _parseBillsFromSseData(
-      Map<String, dynamic> data, List<Bill> allBills) {
+    Map<String, dynamic> data,
+    List<Bill> allBills,
+  ) {
     if (data.containsKey('billId')) {
       return [Bill.fromJson(data)];
     } else if (data.containsKey('billIds')) {
@@ -257,5 +329,6 @@ class WindowsNotificationService with WidgetsBindingObserver implements Notifica
         PaymentsRepository().reload();
     }
   }
+
   //endregion
 }

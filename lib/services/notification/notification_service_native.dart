@@ -33,16 +33,18 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // FCM notification messages are displayed automatically by the Firebase SDK.
   // For data-only messages there is no automatic display — show it manually.
   if (message.notification == null) {
-    final title = message.data['title'] as String?
-        ?? message.data['type'] as String?
-        ?? 'Utility Bills';
-    final body = message.data['body'] as String?
-        ?? message.data['message'] as String?
-        ?? '';
+    final title =
+        message.data['title'] as String? ??
+        message.data['type'] as String? ??
+        'Utility Bills';
+    final body =
+        message.data['body'] as String? ??
+        message.data['message'] as String? ??
+        '';
 
     final plugin = FlutterLocalNotificationsPlugin();
     await plugin.initialize(
-      const InitializationSettings(
+      settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
         iOS: DarwinInitializationSettings(),
         macOS: DarwinInitializationSettings(),
@@ -54,7 +56,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // channel created in initLocalNotifications() is not available here.
     await plugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(
           const AndroidNotificationChannel(
             _androidChannelId,
@@ -64,10 +67,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         );
 
     await plugin.show(
-      message.hashCode,
-      title,
-      body,
-      const NotificationDetails(
+      id: message.hashCode,
+      title: title,
+      body: body,
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _androidChannelId,
           _androidChannelName,
@@ -84,8 +87,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 const _androidChannelId = 'utility_bills_notifications';
 const _androidChannelName = 'Utility Bills';
 
-class NativeNotificationService with WidgetsBindingObserver implements NotificationService {
-  static final NativeNotificationService _instance = NativeNotificationService._internal();
+class NativeNotificationService
+    with WidgetsBindingObserver
+    implements NotificationService {
+  static final NativeNotificationService _instance =
+      NativeNotificationService._internal();
 
   factory NativeNotificationService() => _instance;
 
@@ -123,7 +129,10 @@ class NativeNotificationService with WidgetsBindingObserver implements Notificat
       WidgetsBinding.instance.addObserver(this);
       AppLogger().d('[NotificationService] Initialized successfully');
     } catch (e) {
-      AppLogger().e('[NotificationService] Initialization failed: $e', error: e);
+      AppLogger().e(
+        '[NotificationService] Initialization failed: $e',
+        error: e,
+      );
       initialized = false;
     }
   }
@@ -135,8 +144,7 @@ class NativeNotificationService with WidgetsBindingObserver implements Notificat
 
   @override
   Future<void> handleLaunchNotification() async {
-    final details =
-        await _localNotifications.getNotificationAppLaunchDetails();
+    final details = await _localNotifications.getNotificationAppLaunchDetails();
     if (details?.didNotificationLaunchApp == true) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _handleNotificationTap(details?.notificationResponse?.payload);
@@ -195,10 +203,10 @@ class NativeNotificationService with WidgetsBindingObserver implements Notificat
 
     if (defaultTargetPlatform == TargetPlatform.android) {
       final impl =
-      _localNotifications
-          .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-      >();
+          _localNotifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
       if (impl != null) {
         await impl.createNotificationChannel(
           const AndroidNotificationChannel(
@@ -233,9 +241,7 @@ class NativeNotificationService with WidgetsBindingObserver implements Notificat
     }
 
     await _localNotifications.show(
-      id: DateTime
-          .now()
-          .millisecondsSinceEpoch & 0x7FFFFFFF,
+      id: DateTime.now().millisecondsSinceEpoch & 0x7FFFFFFF,
       title: title,
       body: body,
       notificationDetails: const NotificationDetails(
@@ -335,12 +341,14 @@ class NativeNotificationService with WidgetsBindingObserver implements Notificat
     if (defaultTargetPlatform == TargetPlatform.windows) return;
 
     final firstName = cn.rentor.name.split(' ').first;
-    final title = cn.isWater
-        ? 'Water bill ready for $firstName'
-        : 'Compose bill summary for $firstName';
-    final body = cn.isWater
-        ? 'Tap to compose water bill message'
-        : 'All bills received — tap to generate message';
+    final title =
+        cn.isWater
+            ? 'Water bill ready for $firstName'
+            : 'Compose bill summary for $firstName';
+    final body =
+        cn.isWater
+            ? 'Tap to compose water bill message'
+            : 'All bills received — tap to generate message';
     final payload = jsonEncode({
       'rentorId': cn.rentor.rentorId,
       'billIds': cn.bills.map((b) => b.billId).toList(),
@@ -366,7 +374,7 @@ class NativeNotificationService with WidgetsBindingObserver implements Notificat
   }
 
   Future<void> _handleNotificationTap(String? payload) async {
-    if (payload == null) return;
+    if (payload == null || payload.isEmpty) return;
     try {
       final data = jsonDecode(payload) as Map<String, dynamic>;
       final rentorId = data['rentorId'] as String;
@@ -375,17 +383,19 @@ class NativeNotificationService with WidgetsBindingObserver implements Notificat
       if (RentorsRepository().rentors.isEmpty) {
         await RentorsRepository().reload();
       }
-      final rentor = RentorsRepository().rentors
-          .cast<Rentor?>()
-          .firstWhere((r) => r?.rentorId == rentorId, orElse: () => null);
+      final rentor = RentorsRepository().rentors.cast<Rentor?>().firstWhere(
+        (r) => r?.rentorId == rentorId,
+        orElse: () => null,
+      );
       if (rentor == null) return;
 
       if (BillsRepository().bills.isEmpty) {
         await BillsRepository().reload();
       }
-      final bills = BillsRepository().bills
-          .where((b) => billIds.contains(b.billId))
-          .toList();
+      final bills =
+          BillsRepository().bills
+              .where((b) => billIds.contains(b.billId))
+              .toList();
       if (bills.isEmpty) return;
 
       final message = BillSummaryService().generateMessage(rentor, bills);
@@ -408,7 +418,9 @@ class NativeNotificationService with WidgetsBindingObserver implements Notificat
   /// - **Grouped** (`≥ 5` bills): `data` contains only `{'billIds': [...]}` →
   ///   each ID is looked up in [allBills] (already reloaded from the server).
   List<Bill> _parseBillsFromSseData(
-      Map<String, dynamic> data, List<Bill> allBills) {
+    Map<String, dynamic> data,
+    List<Bill> allBills,
+  ) {
     if (data.containsKey('billId')) {
       return [Bill.fromJson(data)];
     } else if (data.containsKey('billIds')) {
@@ -420,7 +432,8 @@ class NativeNotificationService with WidgetsBindingObserver implements Notificat
 
   //region FCM
   Future<void> _initFcm() async {
-    final supported = defaultTargetPlatform == TargetPlatform.android ||
+    final supported =
+        defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS ||
         defaultTargetPlatform == TargetPlatform.macOS;
 
@@ -437,8 +450,8 @@ class NativeNotificationService with WidgetsBindingObserver implements Notificat
     final token = await FirebaseMessaging.instance.getToken();
     if (token != null) await _registerFcmToken(token);
 
-    _tokenRefreshSubscription =
-        FirebaseMessaging.instance.onTokenRefresh.listen(_registerFcmToken);
+    _tokenRefreshSubscription = FirebaseMessaging.instance.onTokenRefresh
+        .listen(_registerFcmToken);
 
     FirebaseMessaging.onMessage.listen(_handleFcmForeground);
     FirebaseMessaging.onMessageOpenedApp.listen(_handleFcmOpen);
@@ -479,12 +492,11 @@ class NativeNotificationService with WidgetsBindingObserver implements Notificat
     );
   }
 
-  SseEventType? _eventTypeFromString(String? type) =>
-      switch (type) {
-        'newBill' => SseEventType.newBill,
-        'newPayment' => SseEventType.newPayment,
-        _ => null,
-      };
+  SseEventType? _eventTypeFromString(String? type) => switch (type) {
+    'newBill' => SseEventType.newBill,
+    'newPayment' => SseEventType.newPayment,
+    _ => null,
+  };
 
   //endregion
 
