@@ -1,21 +1,160 @@
+import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 
-/// Singleton logger backed by the [logger](https://pub.dev/packages/logger) package.
+// ---------------------------------------------------------------------------
+// File output – daily rotation with per-file size cap
+// ---------------------------------------------------------------------------
+
+/// Writes log events to plain-text files under `<documents>/logs/`.
+///
+/// Naming convention:
+///   • First file of the day → `yyyy-MM-dd.log`
+///   • Subsequent files (after size cap is reached) → `yyyy-MM-dd_1.log`,
+///     `yyyy-MM-dd_2.log`, …
+///
+/// Initialization is async (requires [path_provider]); messages emitted
+/// before the directory is ready are queued and flushed once ready.
+class _FileLogOutput extends LogOutput {
+  /// Maximum bytes written to a single log file before rolling over.
+  final int maxFileSizeBytes;
+
+  _FileLogOutput({this.maxFileSizeBytes = 5 * 1024 * 1024}) {
+    if (!kIsWeb) _initAsync();
+  }
+
+  Directory? _logsDir;
+  File? _currentFile;
+  String? _currentDateStr;
+  bool _ready = false;
+  final List<String> _queue = [];
+
+  Future<void> _initAsync() async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      _logsDir = Directory('${appDir.path}/logs');
+      await _logsDir!.create(recursive: true);
+    } catch (_) {
+      // If we cannot create the directory, disable file logging silently.
+    } finally {
+      _ready = true;
+      _flush();
+    }
+  }
+
+  void _flush() {
+    for (final entry in _queue) {
+      _write(entry);
+    }
+    _queue.clear();
+  }
+
+  @override
+  void output(OutputEvent event) {
+    if (kIsWeb) return;
+
+    final entry = _format(event);
+    if (!_ready) {
+      _queue.add(entry);
+    } else {
+      _write(entry);
+    }
+  }
+
+  // --- formatting -----------------------------------------------------------
+
+  String _format(OutputEvent event) {
+    final ts = DateTime.now().toIso8601String();
+    final lvl = event.level.name.toUpperCase().padRight(5);
+    final body = event.lines.map(_stripAnsi).join('\n        ');
+    return '[$ts] [$lvl] $body\n';
+  }
+
+  static final _ansiRe = RegExp(r'\x1B\[[0-9;]*[a-zA-Z]');
+  String _stripAnsi(String s) => s.replaceAll(_ansiRe, '');
+
+  // --- file resolution ------------------------------------------------------
+
+  void _write(String entry) {
+    if (_logsDir == null) return;
+    try {
+      _resolveFile().writeAsStringSync(entry, mode: FileMode.append);
+    } catch (_) {
+      // Silently ignore transient I/O errors.
+    }
+  }
+
+  File _resolveFile() {
+    final today = _today();
+
+    if (_currentDateStr != today) {
+      _currentDateStr = today;
+      _currentFile = null;
+    }
+
+    if (_currentFile != null) {
+      try {
+        if (_currentFile!.lengthSync() >= maxFileSizeBytes) {
+          _currentFile = null;
+        }
+      } catch (_) {
+        _currentFile = null;
+      }
+    }
+
+    _currentFile ??= _nextAvailableFile(today);
+    return _currentFile!;
+  }
+
+  /// Returns `yyyy-MM-dd` for today.
+  String _today() {
+    final n = DateTime.now();
+    return '${n.year}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
+  }
+
+  /// Finds a file that either does not yet exist or has room left.
+  File _nextAvailableFile(String date) {
+    final base = '${_logsDir!.path}/$date';
+    var candidate = File('$base.log');
+    var idx = 1;
+    while (candidate.existsSync() &&
+        candidate.lengthSync() >= maxFileSizeBytes) {
+      candidate = File('${base}_$idx.log');
+      idx++;
+    }
+    return candidate;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AppLogger
+// ---------------------------------------------------------------------------
+
+/// Singleton logger that writes to two destinations simultaneously:
+///
+/// 1. **Console (stdout)** – coloured [PrettyPrinter] output.
+/// 2. **File** – plain-text daily-rotating files under
+///    `<documents>/logs/yyyy-MM-dd[_N].log`.  A new file is created once the
+///    current one reaches [_fileMaxBytes] (default 5 MB).
 ///
 /// Use the level helpers matching the severity of each message:
+/// - [t] – trace / extremely verbose
 /// - [d] – debug / verbose flow information
 /// - [i] – informational milestones (e.g. server started)
 /// - [w] – warnings / unexpected-but-recoverable situations
 /// - [e] – errors that need investigation
+/// - [f] – fatal / unrecoverable failures
 ///
-/// The underlying [Logger] uses the default [DevelopmentFilter], so output is
-/// suppressed automatically in release builds.
+/// The underlying [Logger] uses the default [DevelopmentFilter], so debug
+/// output is suppressed automatically in release builds.
 ///
-/// Each log message is automatically prefixed with the calling class and method
-/// name, e.g. `[ApiService.fetchBills] Error fetching bills`.
+/// Each message is automatically prefixed with the calling class/method name,
+/// e.g. `[ApiService.fetchBills] Error fetching bills`.
 class AppLogger {
-  static final AppLogger _instance = AppLogger._internal();
+  static const int _fileMaxBytes = 5 * 1024 * 1024; // 5 MB
 
+  static final AppLogger _instance = AppLogger._internal();
   factory AppLogger() => _instance;
 
   AppLogger._internal();
@@ -29,7 +168,13 @@ class AppLogger {
       printEmojis: true,
       dateTimeFormat: DateTimeFormat.onlyTimeAndSinceStart,
     ),
+    output: MultiOutput([
+      ConsoleOutput(),
+      _FileLogOutput(maxFileSizeBytes: _fileMaxBytes),
+    ]),
   );
+
+  // --- caller resolution ----------------------------------------------------
 
   /// Returns a `[caller] ` prefix by finding the first non-logger, non-SDK frame.
   ///
@@ -57,6 +202,8 @@ class AppLogger {
     }
     return '';
   }
+
+  // --- public API -----------------------------------------------------------
 
   void t(dynamic message, {Object? error, StackTrace? stackTrace}) {
     final caller = _caller(StackTrace.current);
