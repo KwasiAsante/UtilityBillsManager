@@ -207,7 +207,7 @@ class PaymentsHelper {
       final rowsDeleted = await dbHelper.deletePayment(id);
       if (rowsDeleted > 0) {
         if (payment != null && payment.billIds != null && payment.billIds!.isNotEmpty) {
-          await BillsHelper().reversePaymentStatusForBills(payment, payment.billIds!);
+          await BillsHelper().reversePaymentStatusForBills(payment, billIds: payment.billIds!);
         }
         return Result.success();
       } else {
@@ -216,9 +216,6 @@ class PaymentsHelper {
     } else {
       final returnValue = await ApiService.payments().deletePayment(id);
       if (returnValue == "OK") {
-        if (payment != null && payment.billIds != null && payment.billIds!.isNotEmpty) {
-          await BillsHelper().reversePaymentStatusForBills(payment, payment.billIds!);
-        }
         return Result.success();
       } else {
         return Result.error(errorMessage: returnValue);
@@ -241,7 +238,7 @@ class PaymentsHelper {
       await dbHelper.deleteAllPayments();
       for (final payment in allPayments) {
         if (payment.billIds != null && payment.billIds!.isNotEmpty) {
-          await BillsHelper().reversePaymentStatusForBills(payment, payment.billIds!);
+          await BillsHelper().reversePaymentStatusForBills(payment, billIds: payment.billIds!);
         }
       }
       return Result.success();
@@ -249,25 +246,9 @@ class PaymentsHelper {
       try {
         final returnValue = await ApiService.payments().deleteAllPayments();
         if (returnValue == "OK") {
-          for (final payment in allPayments) {
-            if (payment.billIds != null && payment.billIds!.isNotEmpty) {
-              await BillsHelper().reversePaymentStatusForBills(payment, payment.billIds!);
-            }
-          }
           return Result.success();
         }
         return Result.error(errorMessage: returnValue);
-      } on NoSuchMethodError {
-        // Backward-compatible fallback for API variants without bulk delete.
-        for (final payment in allPayments) {
-          if (payment.paymentId != null) {
-            await ApiService.payments().deletePayment(payment.paymentId!);
-            if (payment.billIds != null && payment.billIds!.isNotEmpty) {
-              await BillsHelper().reversePaymentStatusForBills(payment, payment.billIds!);
-            }
-          }
-        }
-        return Result.success();
       } catch (e) {
         return Result.error(errorMessage: e.toString());
       }

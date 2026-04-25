@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../config/server_configuration.dart';
 import '../../data/models/payment.dart';
+import '../../data/repositories/bills_repository.dart';
 import '../../data/repositories/payments_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
@@ -193,6 +194,56 @@ class _PaymentListScreenState
     // _onPaymentsUpdated() handles the rest via listener
   }
 
+  Future<void> _deletePayment(Payment payment) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+        title: const Text('Delete Payment'),
+        content: Text(
+          'Are you sure you want to delete payment from ${payment.rentorName} for \$${payment.amountPaid} on ${DateFormat('MMM d, yyyy').format(payment.paymentDate)}?\nThis action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final result = await _paymentsRepository.delete(payment.paymentId);
+      if (result.isError) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting payments: ${result.errorMessage}'),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (payment.hasBills) {
+        await BillsRepository().reload();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Payment deleted.')));
+      }
+    }
+  }
+
   Future<void> _deleteAllPayments() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -219,6 +270,7 @@ class _PaymentListScreenState
     );
 
     if (confirmed == true) {
+      bool hasBills = _allPayments.any((payment) => payment.hasBills);
       final result = await _paymentsRepository.deleteAll();
       if (result.isError) {
         if (mounted) {
@@ -229,6 +281,10 @@ class _PaymentListScreenState
           );
         }
         return;
+      }
+
+      if (hasBills) {
+        await BillsRepository().reload();
       }
 
       if (mounted) {
@@ -404,20 +460,33 @@ class _PaymentListScreenState
                         )
                         .toList(),
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: 'More actions',
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem(
-                    value: 'refresh',
-                    child: ListTile(
-                      leading: Icon(Icons.refresh),
-                      title: Text('Refresh'),
-                      contentPadding: EdgeInsets.zero,
+          if (AppBreakpoints.isWide(context))
+            IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: 'Sync payments',
+              onPressed: _loading ? null : _syncPayments,
+            ),
+          if (AppBreakpoints.isWide(context))
+            IconButton(
+              icon: const Icon(Icons.delete_sweep),
+              tooltip: 'Delete all payments',
+              color: Colors.red,
+              onPressed: _deleteAllPayments,
+            ),
+          if (!AppBreakpoints.isWide(context))
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'More actions',
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem(
+                      value: 'refresh',
+                      child: ListTile(
+                        leading: Icon(Icons.sync),
+                        title: Text('Sync payments'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-                  if (!AppBreakpoints.isWide(context))
                     const PopupMenuItem(
                       value: 'settings',
                       child: ListTile(
@@ -426,31 +495,31 @@ class _PaymentListScreenState
                         contentPadding: EdgeInsets.zero,
                       ),
                     ),
-                  const PopupMenuItem(
-                    value: 'delete_all',
-                    child: ListTile(
-                      leading: Icon(Icons.delete_sweep, color: Colors.red),
-                      title: Text(
-                        'Delete all payments',
-                        style: TextStyle(color: Colors.red),
+                    const PopupMenuItem(
+                      value: 'delete_all',
+                      child: ListTile(
+                        leading: Icon(Icons.delete_sweep, color: Colors.red),
+                        title: Text(
+                          'Delete all payments',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        contentPadding: EdgeInsets.zero,
                       ),
-                      contentPadding: EdgeInsets.zero,
                     ),
-                  ),
-                ],
-            onSelected: (String value) async {
-              if (value == 'refresh') {
-                await _syncPayments();
-              } else if (value == 'settings') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                );
-              } else if (value == 'delete_all') {
-                _deleteAllPayments();
-              }
-            },
-          ),
+                  ],
+              onSelected: (String value) async {
+                if (value == 'refresh') {
+                  await _syncPayments();
+                } else if (value == 'settings') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                } else if (value == 'delete_all') {
+                  _deleteAllPayments();
+                }
+              },
+            ),
         ],
       ),
       body: ResponsiveConstraint(
@@ -619,9 +688,7 @@ class _PaymentListScreenState
                                               ),
                                             );
                                           } else if (value == 'delete') {
-                                            await _paymentsRepository.delete(
-                                              payment.paymentId!,
-                                            );
+                                            await _deletePayment(payment);
                                           }
                                         },
                                         itemBuilder:

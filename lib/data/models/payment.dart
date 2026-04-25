@@ -17,7 +17,7 @@ import './rentor.dart';
 /// junction table; [billIds] is the in-memory projection of those rows.
 class Payment {
   final int? id;
-  final String? paymentId;
+  final String paymentId;
   List<String>? billIds;
   String? rentorId;
   final double amountPaid;
@@ -96,6 +96,8 @@ class Payment {
       return 'Unknown Rentor';
     }
   }
+
+  bool get hasBills => (billIds != null && billIds!.isNotEmpty) || (bills != null && bills!.isNotEmpty);
 
   /// Serializes this payment to a flat JSON map for the REST API or SQLite.
   /// Note: [bills] and [rentor] objects are **not** included — only their IDs.

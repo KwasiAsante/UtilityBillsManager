@@ -403,7 +403,7 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
     if (removedBillIds.isNotEmpty && widget.payment != null) {
       await _billsHelper.reversePaymentStatusForBills(
         widget.payment!,
-        removedBillIds,
+        billIds: removedBillIds,
       );
     }
 
@@ -417,17 +417,17 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
     _allRentors = [];
 
     // Apply only newly added bills
-    if (addedBillIds.isNotEmpty) {
-      final addedBills =
-          _selectedBills.where((b) => addedBillIds.contains(b.billId)).toList();
-      await _billsHelper.updatePaymentStatuses(
-        payment,
-        bills: addedBills,
-        rentor: payment.rentor,
-        rentorId: payment.rentorId,
-      );
-      await BillsRepository().reload();
-    } else if (removedBillIds.isNotEmpty) {
+    if (addedBillIds.isNotEmpty || removedBillIds.isNotEmpty) {
+      if (addedBillIds.isNotEmpty) {
+        final addedBills =
+                  _selectedBills.where((b) => addedBillIds.contains(b.billId)).toList();
+        await _billsHelper.updatePaymentStatusForBills(
+          payment,
+          bills: addedBills,
+          rentor: payment.rentor,
+          rentorId: payment.rentorId,
+        );
+      }
       await BillsRepository().reload();
     }
 

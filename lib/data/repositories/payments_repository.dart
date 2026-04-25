@@ -50,7 +50,9 @@ class PaymentsRepository extends ChangeNotifier {
   /// Updates an existing [payment] record and reloads the list on success.
   Future<Result<Payment>> update(Payment payment) async {
     final result = await _helper.updatePayment(payment);
-    if (result.isSuccess) await reload();
+    if (result.isSuccess) {
+      await reload();
+    }
     return result;
   }
 
