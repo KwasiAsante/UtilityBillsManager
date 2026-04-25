@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 
 import '../../data/repositories/email_data_repository.dart';
 import '../base/google_sign_in_screen_state.dart';
-import '../../config/server_configuration.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
@@ -50,7 +49,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
   Future<void> onGoogleSignedIn({bool canSync = true}) async {
     await _loadData(
       syncEmails: canSync,
-      earliestEmailDate: ServerConfiguration.emailEarliestDate,
+      earliestEmailDate: _summaryEmailEarliestDate(),
     );
   }
 
@@ -76,7 +75,16 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
 
   String _statusFilter = 'All';
   bool _loading = false;
-  bool _deferLoading = false; // used to defer loading until after Google sign-in if needed or when screen becomes visible
+  bool _deferLoading =
+      false; // used to defer loading until after Google sign-in if needed or when screen becomes visible
+
+  DateTime _summaryEmailEarliestDate() {
+    DateTime now = DateTime.now();
+    if (now.day == 1) {
+      return DateTime(now.year, now.month - 1, 1);
+    }
+    return DateTime(now.year, now.month, 1);
+  }
   bool _isListScrollable = false;
 
   /// When false (default): bills within the "considered paid" threshold show
@@ -146,10 +154,9 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
       if (widget.isVisible) {
         _loadData(
           syncEmails: true,
-          earliestEmailDate: ServerConfiguration.emailEarliestDate,
+          earliestEmailDate: _summaryEmailEarliestDate(),
         );
-      }
-      else {
+      } else {
         _deferLoading = true;
       }
     }
@@ -171,7 +178,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
     if (isVisibleNow && _deferLoading) {
       _loadData(
         syncEmails: true,
-        earliestEmailDate: ServerConfiguration.emailEarliestDate,
+        earliestEmailDate: _summaryEmailEarliestDate(),
       );
     }
   }
@@ -242,6 +249,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
         earliestEmailDate: earliestEmailDate,
         latestEmailDate: latestEmailDate,
         maxEmails: maxEmails,
+        parse: true
       );
     }
 
@@ -785,7 +793,6 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
     );
   }
 
-
   //region Scroll
   void _checkScrollability() {
     if (_scrollController.hasClients) {
@@ -834,53 +841,94 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
                         )
                         .toList(),
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: 'More actions',
-            itemBuilder:
-                (context) => [
-                  PopupMenuItem(
-                    value: 'sync',
-                    enabled: !_loading,
-                    child: const ListTile(
-                      leading: Icon(Icons.sync),
-                      title: Text('Sync bills & payments'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'toggle_unpaid',
-                    child: ListTile(
-                      leading: Icon(
-                        _showActualUnpaid
-                            ? Icons.visibility
-                            : Icons.visibility_off,
+          if (AppBreakpoints.isWide(context))
+            IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: 'Sync bills & payments',
+              onPressed: _loading ? null : _syncData,
+            ),
+          if (AppBreakpoints.isWide(context))
+            IconButton(
+              icon: Icon(
+                _showActualUnpaid ? Icons.visibility : Icons.visibility_off,
+                color:
+                    _showActualUnpaid
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+              ),
+              tooltip:
+                  _showActualUnpaid
+                      ? 'Hide actual unpaid amounts'
+                      : 'Show actual unpaid amounts',
+              onPressed:
+                  () => setState(() => _showActualUnpaid = !_showActualUnpaid),
+            ),
+          if (AppBreakpoints.isWide(context))
+            IconButton(
+              icon: const Icon(Icons.table_chart_outlined),
+              tooltip: 'Export CSV',
+              onPressed: _exportToCSV,
+            ),
+          if (AppBreakpoints.isWide(context))
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              tooltip: 'Export PDF',
+              onPressed: _exportToPDF,
+            ),
+          if (AppBreakpoints.isWide(context))
+            IconButton(
+              icon: const Icon(Icons.delete_forever),
+              tooltip: 'Delete All Data',
+              color: Colors.red,
+              onPressed: _deleteAllData,
+            ),
+          if (!AppBreakpoints.isWide(context))
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'More actions',
+              itemBuilder:
+                  (context) => [
+                    PopupMenuItem(
+                      value: 'sync',
+                      enabled: !_loading,
+                      child: const ListTile(
+                        leading: Icon(Icons.sync),
+                        title: Text('Sync bills & payments'),
+                        contentPadding: EdgeInsets.zero,
                       ),
-                      title: Text(
-                        _showActualUnpaid
-                            ? 'Hide actual unpaid amounts'
-                            : 'Show actual unpaid amounts',
+                    ),
+                    PopupMenuItem(
+                      value: 'toggle_unpaid',
+                      child: ListTile(
+                        leading: Icon(
+                          _showActualUnpaid
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                        ),
+                        title: Text(
+                          _showActualUnpaid
+                              ? 'Hide actual unpaid amounts'
+                              : 'Show actual unpaid amounts',
+                        ),
+                        contentPadding: EdgeInsets.zero,
                       ),
-                      contentPadding: EdgeInsets.zero,
                     ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'export_csv',
-                    child: ListTile(
-                      leading: Icon(Icons.table_chart_outlined),
-                      title: Text('Export CSV'),
-                      contentPadding: EdgeInsets.zero,
+                    const PopupMenuItem(
+                      value: 'export_csv',
+                      child: ListTile(
+                        leading: Icon(Icons.table_chart_outlined),
+                        title: Text('Export CSV'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'export_pdf',
-                    child: ListTile(
-                      leading: Icon(Icons.picture_as_pdf_outlined),
-                      title: Text('Export PDF'),
-                      contentPadding: EdgeInsets.zero,
+                    const PopupMenuItem(
+                      value: 'export_pdf',
+                      child: ListTile(
+                        leading: Icon(Icons.picture_as_pdf_outlined),
+                        title: Text('Export PDF'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-                  if (!AppBreakpoints.isWide(context))
                     const PopupMenuItem(
                       value: 'settings',
                       child: ListTile(
@@ -889,47 +937,46 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
                         contentPadding: EdgeInsets.zero,
                       ),
                     ),
-                  const PopupMenuItem(
-                    value: 'delete_all',
-                    child: ListTile(
-                      leading: Icon(Icons.delete_forever, color: Colors.red),
-                      title: Text(
-                        'Delete All Data',
-                        style: TextStyle(color: Colors.red),
+                    const PopupMenuItem(
+                      value: 'delete_all',
+                      child: ListTile(
+                        leading: Icon(Icons.delete_forever, color: Colors.red),
+                        title: Text(
+                          'Delete All Data',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        contentPadding: EdgeInsets.zero,
                       ),
-                      contentPadding: EdgeInsets.zero,
                     ),
-                  ),
-                ],
-            onSelected: (String value) {
-              if (value == 'sync') {
-                if (!_loading) _syncData();
-              } else if (value == 'toggle_unpaid') {
-                setState(() => _showActualUnpaid = !_showActualUnpaid);
-              } else if (value == 'export_csv') {
-                _exportToCSV();
-              } else if (value == 'export_pdf') {
-                _exportToPDF();
-              } else if (value == 'settings') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                );
-              } else if (value == 'delete_all') {
-                _deleteAllData();
-              }
-            },
-          ),
+                  ],
+              onSelected: (String value) {
+                if (value == 'sync') {
+                  if (!_loading) _syncData();
+                } else if (value == 'toggle_unpaid') {
+                  setState(() => _showActualUnpaid = !_showActualUnpaid);
+                } else if (value == 'export_csv') {
+                  _exportToCSV();
+                } else if (value == 'export_pdf') {
+                  _exportToPDF();
+                } else if (value == 'settings') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                } else if (value == 'delete_all') {
+                  _deleteAllData();
+                }
+              },
+            ),
         ],
       ),
-      body: ResponsiveConstraint(
-        child: _buildBody(),
-      ),
+      body: ResponsiveConstraint(child: _buildBody()),
     );
   }
 
   Widget _buildBody() {
-    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
     final content = Column(
       children: [
@@ -943,10 +990,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
                   ? const Center(child: CircularProgressIndicator())
                   : TabBarView(
                     controller: _tabController,
-                    children: [
-                      _buildMonthlySummary(),
-                      _buildBillTypeSummary(),
-                    ],
+                    children: [_buildMonthlySummary(), _buildBillTypeSummary()],
                   ),
         ),
       ],
