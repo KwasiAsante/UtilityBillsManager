@@ -30,58 +30,64 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   AppLogger().d('[FCM] Background message: ${message.messageId}');
 
-  // FCM notification messages are displayed automatically by the Firebase SDK.
-  // For data-only messages there is no automatic display — show it manually.
-  if (message.notification == null) {
-    final title =
-        message.data['title'] as String? ??
-        message.data['type'] as String? ??
-        'Utility Bills';
-    final body =
-        message.data['body'] as String? ??
-        message.data['message'] as String? ??
-        '';
+  // Always show a local notification in the background isolate.
+  //
+  // Firebase auto-displays notification messages on stock Android, but many
+  // OEM devices (Samsung, Xiaomi, Huawei, etc.) suppress this via battery
+  // optimisation. Showing a local notification here ensures delivery on all
+  // devices. On stock Android this may produce a duplicate when the message
+  // also has a `notification` payload; the trade-off is acceptable since
+  // missing notifications is worse than an occasional extra one.
+  final title =
+      message.notification?.title ??
+      message.data['title'] as String? ??
+      message.data['type'] as String? ??
+      'Utility Bills';
+  final body =
+      message.notification?.body ??
+      message.data['body'] as String? ??
+      message.data['message'] as String? ??
+      '';
 
-    final plugin = FlutterLocalNotificationsPlugin();
-    await plugin.initialize(
-      settings: const InitializationSettings(
-        android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-        iOS: DarwinInitializationSettings(),
-        macOS: DarwinInitializationSettings(),
-      ),
-    );
+  final plugin = FlutterLocalNotificationsPlugin();
+  await plugin.initialize(
+    settings: const InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      iOS: DarwinInitializationSettings(),
+      macOS: DarwinInitializationSettings(),
+    ),
+  );
 
-    // Android 8+ requires the channel to exist before posting a notification.
-    // The background isolate doesn't share state with the main isolate, so the
-    // channel created in initLocalNotifications() is not available here.
-    await plugin
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
-        ?.createNotificationChannel(
-          const AndroidNotificationChannel(
-            _androidChannelId,
-            _androidChannelName,
-            importance: Importance.high,
-          ),
-        );
-
-    await plugin.show(
-      id: message.hashCode,
-      title: title,
-      body: body,
-      notificationDetails: NotificationDetails(
-        android: AndroidNotificationDetails(
+  // Android 8+ requires the channel to exist before posting a notification.
+  // The background isolate doesn't share state with the main isolate, so the
+  // channel created in initLocalNotifications() is not available here.
+  await plugin
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >()
+      ?.createNotificationChannel(
+        const AndroidNotificationChannel(
           _androidChannelId,
           _androidChannelName,
           importance: Importance.high,
-          priority: Priority.high,
         ),
-        iOS: DarwinNotificationDetails(),
-        macOS: DarwinNotificationDetails(),
+      );
+
+  await plugin.show(
+    id: message.hashCode,
+    title: title,
+    body: body,
+    notificationDetails: const NotificationDetails(
+      android: AndroidNotificationDetails(
+        _androidChannelId,
+        _androidChannelName,
+        importance: Importance.high,
+        priority: Priority.high,
       ),
-    );
-  }
+      iOS: DarwinNotificationDetails(),
+      macOS: DarwinNotificationDetails(),
+    ),
+  );
 }
 
 const _androidChannelId = 'utility_bills_notifications';
