@@ -191,6 +191,52 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
     await _billsRepository.reload();
   }
 
+  Future<void> _deleteBill(Bill bill) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+        title: const Text('Delete Bill'),
+        content: Text(
+          'Are you sure you want to delete bill ${bill.companyName}? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final result = await _billsRepository.delete(bill.billId);
+      if (result.isError) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error deleting bill: ${result.errorMessage}'),
+            ),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Bill deleted.')));
+      }
+    }
+  }
+
   Future<void> _deleteAllBills() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -467,32 +513,45 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                         )
                         .toList(),
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: 'More actions',
-            onSelected: (String value) {
-              if (value == 'refresh') {
-                if (!_loading) _syncBills();
-              } else if (value == 'settings') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                );
-              } else if (value == 'delete_all') {
-                _deleteAllBills();
-              }
-            },
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem<String>(
-                    value: 'refresh',
-                    child: ListTile(
-                      leading: Icon(Icons.refresh),
-                      title: Text('Refresh'),
-                      contentPadding: EdgeInsets.zero,
+          if (AppBreakpoints.isWide(context))
+            IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: 'Sync bills',
+              onPressed: _loading ? null : _syncBills,
+            ),
+          if (AppBreakpoints.isWide(context))
+            IconButton(
+              icon: const Icon(Icons.delete_sweep),
+              tooltip: 'Delete all bills',
+              color: Colors.red,
+              onPressed: _deleteAllBills,
+            ),
+          if (!AppBreakpoints.isWide(context))
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'More actions',
+              onSelected: (String value) {
+                if (value == 'refresh') {
+                  if (!_loading) _syncBills();
+                } else if (value == 'settings') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                } else if (value == 'delete_all') {
+                  _deleteAllBills();
+                }
+              },
+              itemBuilder:
+                  (context) => [
+                    const PopupMenuItem<String>(
+                      value: 'refresh',
+                      child: ListTile(
+                        leading: Icon(Icons.sync),
+                        title: Text('Sync bills'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-                  if (!AppBreakpoints.isWide(context))
                     const PopupMenuItem<String>(
                       value: 'settings',
                       child: ListTile(
@@ -501,19 +560,19 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                         contentPadding: EdgeInsets.zero,
                       ),
                     ),
-                  const PopupMenuItem<String>(
-                    value: 'delete_all',
-                    child: ListTile(
-                      leading: Icon(Icons.delete_sweep, color: Colors.red),
-                      title: Text(
-                        'Delete All',
-                        style: TextStyle(color: Colors.red),
+                    const PopupMenuItem<String>(
+                      value: 'delete_all',
+                      child: ListTile(
+                        leading: Icon(Icons.delete_sweep, color: Colors.red),
+                        title: Text(
+                          'Delete All',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        contentPadding: EdgeInsets.zero,
                       ),
-                      contentPadding: EdgeInsets.zero,
                     ),
-                  ),
-                ],
-          ),
+                  ],
+            ),
         ],
       ),
       body: ResponsiveConstraint(
@@ -657,9 +716,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
                                               ),
                                             );
                                           } else if (value == 'delete') {
-                                            await _billsRepository.delete(
-                                              bill.billId,
-                                            );
+                                            await _deleteBill(bill);
                                           }
                                         },
                                         itemBuilder:

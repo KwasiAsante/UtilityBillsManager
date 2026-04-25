@@ -135,6 +135,41 @@ class _RentorListScreenState extends State<RentorListScreen> {
     });
   }
 
+  Future<void> _deleteRentor(Rentor rentor) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Rentor'),
+            content: Text(
+              'Are you sure you want to delete ${rentor.name}? This action cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed == true) {
+      await _rentorsRepository.delete(rentor.rentorId);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('${rentor.name} deleted.')));
+      }
+    }
+  }
+
   Future<void> _deleteAllRentors() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -255,53 +290,69 @@ class _RentorListScreenState extends State<RentorListScreen> {
                         )
                         .toList(),
           ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            tooltip: 'More actions',
-            itemBuilder:
-                (context) => [
-                  const PopupMenuItem<String>(
-                    value: 'refresh',
-                    child: ListTile(
-                      leading: Icon(Icons.refresh),
-                      title: Text('Refresh'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  if (!AppBreakpoints.isWide(context))
+          if (AppBreakpoints.isWide(context))
+            IconButton(
+              icon: const Icon(Icons.sync),
+              tooltip: 'Refresh rentors',
+              onPressed: () async {
+                if (!_loading) await _rentorsRepository.reload();
+              },
+            ),
+          if (AppBreakpoints.isWide(context))
+            IconButton(
+              icon: const Icon(Icons.delete_sweep),
+              tooltip: 'Delete all rentors',
+              color: Colors.red,
+              onPressed: _deleteAllRentors,
+            ),
+          if (!AppBreakpoints.isWide(context))
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              tooltip: 'More actions',
+              itemBuilder:
+                  (context) => [
                     const PopupMenuItem<String>(
-                      value: 'settings',
+                      value: 'refresh',
                       child: ListTile(
-                        leading: Icon(Icons.settings_outlined),
-                        title: Text('Settings'),
+                        leading: Icon(Icons.refresh),
+                        title: Text('Refresh'),
                         contentPadding: EdgeInsets.zero,
                       ),
                     ),
-                  const PopupMenuItem<String>(
-                    value: 'delete_all',
-                    child: ListTile(
-                      leading: Icon(Icons.delete_sweep, color: Colors.red),
-                      title: Text(
-                        'Delete all rentors',
-                        style: TextStyle(color: Colors.red),
+                    if (!AppBreakpoints.isWide(context))
+                      const PopupMenuItem<String>(
+                        value: 'settings',
+                        child: ListTile(
+                          leading: Icon(Icons.settings_outlined),
+                          title: Text('Settings'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
                       ),
-                      contentPadding: EdgeInsets.zero,
+                    const PopupMenuItem<String>(
+                      value: 'delete_all',
+                      child: ListTile(
+                        leading: Icon(Icons.delete_sweep, color: Colors.red),
+                        title: Text(
+                          'Delete all rentors',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                      ),
                     ),
-                  ),
-                ],
-            onSelected: (String value) async {
-              if (value == 'refresh') {
-                await _rentorsRepository.reload();
-              } else if (value == 'settings') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                );
-              } else if (value == 'delete_all') {
-                _deleteAllRentors();
-              }
-            },
-          ),
+                  ],
+              onSelected: (String value) async {
+                if (value == 'refresh') {
+                  await _rentorsRepository.reload();
+                } else if (value == 'settings') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                } else if (value == 'delete_all') {
+                  _deleteAllRentors();
+                }
+              },
+            ),
         ],
       ),
       body: ResponsiveConstraint(
@@ -429,9 +480,7 @@ class _RentorListScreenState extends State<RentorListScreen> {
                                         ),
                                       );
                                     } else if (value == 'delete') {
-                                      await _rentorsRepository.delete(
-                                        rentor.rentorId,
-                                      );
+                                      await _deleteRentor(rentor);
                                     }
                                   },
                                   itemBuilder:
