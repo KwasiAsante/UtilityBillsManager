@@ -9,6 +9,8 @@ import 'config/server_configuration.dart';
 import 'data/models/app_state.dart';
 import 'database/db_factory.dart';
 import 'factory/notification/notification_service_factory.dart';
+import 'factory/windows/tray_manager_service_factory_native.dart';
+import 'factory/windows/windows_manager_service_factory_native.dart';
 import 'helpers/database/database_helper.dart';
 import 'screens/main_tab_screen.dart';
 import 'services/api/api_service.dart';
@@ -35,6 +37,11 @@ void main() async {
   AppLogger().i('BUILD_TARGET: $s');
   
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (defaultTargetPlatform == TargetPlatform.windows) {
+    await initWindowManager();
+    await initTrayManager();
+  }
 
   // Firebase is not configured for Linux. Wrap in a platform guard to avoid
   // a runtime exception when running on Linux during development.
