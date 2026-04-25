@@ -152,7 +152,7 @@ class BillsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to create bill ${bill.id}: ${response.statusCode} - ${_errorBody(response)}');
+        AppLogger().e('Failed to create bill ${bill.billId}: ${response.statusCode} - ${_errorBody(response)}');
         return _errorBody(response);
       }
     } catch (e) {
@@ -321,7 +321,71 @@ class BillsApiService {
       if (response.statusCode == 200) {
         return "OK";
       } else {
-        AppLogger().e('Failed to update bill ${bill.id}: ${response.statusCode} - ${_errorBody(response)}');
+        AppLogger().e('Failed to update bill ${bill.billId}: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
+      }
+    } catch (e) {
+      AppLogger().e('Error update bill: $e');
+      return e.toString();
+    }
+  }
+
+  Future<String> updatePaymentStatusForBills(Payment payment, {List<Bill>? bills, List<String>? billIds}) async {
+    try {
+      if (bills == null && billIds == null) {
+        return "Either bills or bill ids must be provided";
+      }
+
+      final map = {
+        'payment': payment,
+        if (bills != null && bills.isNotEmpty)
+          'bills': bills,
+        if (billIds != null && billIds.isNotEmpty)
+          'billIds': billIds
+      };
+
+      final response = await ApiService._client.put(
+        Uri.parse('$baseUrl/bill/list/payment/status'),
+        body: jsonEncode(map),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        return "OK";
+      } else {
+        AppLogger().e('Failed to update bills\' payment status: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
+      }
+    } catch (e) {
+      AppLogger().e('Error update bill: $e');
+      return e.toString();
+    }
+  }
+
+  Future<String> reversePaymentStatusForBills(Payment payment, {List<Bill>? bills, List<String>? billIds}) async {
+    try {
+      if (bills == null && billIds == null) {
+        return "Either bills or bill ids must be provided";
+      }
+
+      final map = {
+        'payment': payment,
+        if (bills != null && bills.isNotEmpty)
+          'bills': bills,
+        if (billIds != null && billIds.isNotEmpty)
+          'billIds': billIds
+      };
+
+      final response = await ApiService._client.put(
+        Uri.parse('$baseUrl/bill/list/payment/status/reverse'),
+        body: jsonEncode(map),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        return "OK";
+      } else {
+        AppLogger().e('Failed to update bills\' payment status: ${response.statusCode} - ${_errorBody(response)}');
         return _errorBody(response);
       }
     } catch (e) {
@@ -816,7 +880,7 @@ class EmailDataApiService {
         return null;
       }
     } catch (e) {
-      AppLogger().e('Error fetching emailDatas: $e');
+      AppLogger().e('Error fetching emailData list: $e');
       return null;
     }
   }
@@ -856,11 +920,11 @@ class EmailDataApiService {
             .map((e) => EmailData.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load emailDatas: ${response.statusCode} - ${_errorBody(response)}');
+        AppLogger().e('Failed to load emailData list: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
-      AppLogger().e('Error fetching emailDatas: $e');
+      AppLogger().e('Error fetching emailData list: $e');
       return [];
     }
   }
@@ -900,11 +964,11 @@ class EmailDataApiService {
             .map((e) => EmailData.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load unprocessed emailDatas: ${response.statusCode} - ${_errorBody(response)}');
+        AppLogger().e('Failed to load unprocessed emailData list: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
-      AppLogger().e('Error fetching emailDatas: $e');
+      AppLogger().e('Error fetching emailData list: $e');
       return [];
     }
   }
@@ -944,11 +1008,11 @@ class EmailDataApiService {
             .map((e) => EmailData.fromJson(e))
             .toList();
       } else {
-        AppLogger().e('Failed to load processed emailDatas: ${response.statusCode} - ${_errorBody(response)}');
+        AppLogger().e('Failed to load processed emailData list: ${response.statusCode} - ${_errorBody(response)}');
         return [];
       }
     } catch (e) {
-      AppLogger().e('Error fetching emailDatas: $e');
+      AppLogger().e('Error fetching emailData list: $e');
       return [];
     }
   }
@@ -963,6 +1027,7 @@ class EmailDataApiService {
     int? maxEmails,
     DateTime? earliestEmailDate,
     DateTime? latestEmailDate,
+    bool? parse
   }) async {
     try {
       final queryParams = <String, String>{
@@ -972,6 +1037,8 @@ class EmailDataApiService {
           'earliestEmailDate': earliestEmailDate.toIso8601String(),
         if (latestEmailDate != null)
           'latestEmailDate': latestEmailDate.toIso8601String(),
+        if (parse != null)
+          'parse': '$parse',
       };
       final uri = Uri.parse('$baseUrl/email/list/sync')
           .replace(queryParameters: queryParams);
