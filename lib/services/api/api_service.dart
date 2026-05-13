@@ -55,6 +55,9 @@ class LoggingHttpClient extends http.BaseClient {
       AppLogger().d(
         '← ${response.statusCode} ${request.url} (${stopwatch.elapsedMilliseconds}ms)\n$body',
       );
+      if (response.statusCode == 403) {
+        ApiService.onUnauthorized?.call();
+      }
       return http.StreamedResponse(
         Stream.value(bodyBytes),
         response.statusCode,
@@ -79,6 +82,10 @@ class ApiService {
   static String baseUrl = 'http://127.0.0.1:8080';
   static final http.Client _client = LoggingHttpClient();
   static String? _authToken;
+
+  /// Called by [LoggingHttpClient] when any response has status 403.
+  /// Register this from [AuthService] to avoid a circular import.
+  static void Function()? onUnauthorized;
 
   /// Overrides the base URL for all API service singletons.
   static void configure({required String baseUrl}) {
