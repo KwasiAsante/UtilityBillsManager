@@ -45,7 +45,13 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('Create account'));
       await tester.pumpAndSettle();
-      expect(find.text('Create account'), findsWidgets);
+      // The sign-in link only exists on RegisterScreen
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is RichText && w.text.toPlainText().contains('Sign in'),
+        ),
+        findsOneWidget,
+      );
     });
   });
 }

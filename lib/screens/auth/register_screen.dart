@@ -88,8 +88,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   obscureText: true,
                   autofillHints: const [AutofillHints.newPassword],
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Password is required' : null,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Password is required';
+                    if (v.length < 8) return 'Password must be at least 8 characters';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 24),
                 if (_error != null) ...[

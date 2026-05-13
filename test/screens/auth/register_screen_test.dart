@@ -46,6 +46,16 @@ void main() {
       expect(find.text('Email is required'), findsOneWidget);
       expect(find.text('Password is required'), findsOneWidget);
     });
+
+    testWidgets('shows error when password is too short', (tester) async {
+      await tester.pumpWidget(buildScreen());
+      await tester.pumpAndSettle();
+      await tester.enterText(find.widgetWithText(TextFormField, 'Email'), 'a@b.com');
+      await tester.enterText(find.widgetWithText(TextFormField, 'Password'), 'short');
+      await tester.tap(find.text('Create account').last);
+      await tester.pumpAndSettle();
+      expect(find.text('Password must be at least 8 characters'), findsOneWidget);
+    });
   });
 
   group('RegisterScreen navigation', () {
