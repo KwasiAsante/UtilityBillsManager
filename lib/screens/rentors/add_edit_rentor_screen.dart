@@ -48,6 +48,7 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
   late List<BillType> _excludedBillTypes;
   final _amountOwedController = TextEditingController();
   final BillSummaryService _billSummaryService = BillSummaryService();
+
   List<Bill>? _eligibleBills; // null while loading; empty list means settled
 
   @override
@@ -532,27 +533,20 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
                 if (isEditing && _eligibleBills != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12.0),
-                    child: GestureDetector(
-                      onTap: _eligibleBills!.isEmpty
+                    child: ElevatedButton.icon(
+                        onPressed: _eligibleBills!.isEmpty
                           ? () => ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
+                              SnackBar(
                                   content: Text(
-                                    '${widget.rentor!.name} is settled for this month',
-                                  ),
-                                ),
+                                      '${widget.rentor!.name} is settled for this month'
+                                  )
                               )
+                          )
                           : _navigateToBillSelection,
-                      child: IgnorePointer(
-                        child: ElevatedButton.icon(
-                          onPressed: _eligibleBills!.isEmpty
-                              ? null
-                              : _navigateToBillSelection,
-                          icon: const Icon(Icons.message),
-                          label: const Text('Send Bill Summary'),
-                        ),
-                      ),
+                        icon: const Icon(Icons.message),
+                        label: const Text('Send Bill Summary')
                     ),
-                  ),
+                ),
                 FilledButton(
                   onPressed: _saveRentor,
                   child: const Text('Save Rentor'),

@@ -178,11 +178,12 @@ class Rentor {
   /// one exists; otherwise falls back to `0.0` (not the default percentage —
   /// that would override the user's explicit zero assignment).  The result is
   /// rounded to the nearest whole dollar.
-  static double calculateOwedAmount(Rentor rentor, Bill bill) {
+  static double calculateOwedAmount(Rentor rentor, Bill bill, {bool roundToWholeDollar = false}) {
     if (rentor.excludedBillTypes.contains(bill.type)) return 0.0;
     double? customPercentage = rentor.billPercentages[bill.type];
     double percentage = customPercentage ?? rentor.defaultPercentage;
-    return (bill.amount * (percentage / 100)).round().toDouble();
+    double amount = bill.amount * (percentage / 100);
+    return roundToWholeDollar ? amount.round().toDouble() : amount;
   }
 
   /// Convenience instance wrapper for [calculateOwedAmount].
