@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pdfrx/pdfrx.dart';
 
 import 'firebase_options.dart';
@@ -15,7 +16,6 @@ import 'helpers/database/database_helper.dart';
 import 'screens/main_tab_screen.dart';
 import 'services/api/api_service.dart';
 import 'utils/app_logger.dart';
-
 
 /// Application entry point.
 ///
@@ -33,14 +33,19 @@ import 'utils/app_logger.dart';
 final navigatorKey = GlobalKey<NavigatorState>();
 final notificationService = createNotificationService();
 void main() async {
-  final s = const String.fromEnvironment('BUILD_TARGET');
-  AppLogger().i('BUILD_TARGET: $s');
-  
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (defaultTargetPlatform == TargetPlatform.windows) {
-    await initWindowManager();
-    await initTrayManager();
+  await addAppMeta();
+
+  if (kIsWeb) {
+    AppLogger().i('Running on web platform');
+  }
+  else {
+    AppLogger().i('Running on ${defaultTargetPlatform.name} platform');
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      await initWindowManager();
+      await initTrayManager();
+    }
   }
 
   // Firebase is not configured for Linux. Wrap in a platform guard to avoid
@@ -76,6 +81,17 @@ void main() async {
 
   runApp(const MyApp());
 }
+
+// add this function to your web-specific dart files
+dynamic addAppMeta() async {
+  // Get the package info
+  PackageInfo packageInfo = await PackageInfo.fromPlatform();
+  String version = packageInfo.version;
+  String buildNum = packageInfo.buildNumber;
+
+  AppLogger().i('App version: $version.$buildNum');
+}
+
 /// Root [StatelessWidget] that configures the [MaterialApp] and injects
 /// the deep-purple colour scheme.
 class MyApp extends StatelessWidget {
@@ -91,19 +107,26 @@ class MyApp extends StatelessWidget {
         cardTheme: CardThemeData(
           elevation: 1,
           clipBehavior: Clip.antiAlias,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.grey.shade50,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             minimumSize: const Size(double.infinity, 48),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         ),
       ),
