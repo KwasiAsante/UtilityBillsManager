@@ -4,6 +4,16 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 // ---------------------------------------------------------------------------
+// Filter
+// ---------------------------------------------------------------------------
+
+/// Always allows evert log event through, regardless of build mode or level.
+class _AllowAllFilter extends LogFilter {
+  @override
+  bool shouldLog(LogEvent event) => true;
+}
+
+// ---------------------------------------------------------------------------
 // File output – daily rotation with per-file size cap
 // ---------------------------------------------------------------------------
 
@@ -160,6 +170,7 @@ class AppLogger {
   AppLogger._internal();
 
   final Logger _logger = Logger(
+    filter: _AllowAllFilter(),
     printer: PrettyPrinter(
       methodCount: 0,
       errorMethodCount: 5,
