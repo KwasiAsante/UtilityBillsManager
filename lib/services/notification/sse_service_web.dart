@@ -33,16 +33,26 @@ class SseService extends SseServiceBase {
     final client = SseClient(url, debugKey: deviceId);
     _activeClient = client;
 
-    client.onConnected.then((_) {
-      AppLogger().d('[SSE] Connected — sending deviceId');
-      // Identify this device to the server as the first message.
-      client.sink.add(deviceId!);
-      onConnected();
-    }).catchError((Object e) {
-      AppLogger().e('[SSE] Connection failed: $e');
-      close();
-      onClosed();
-    });
+    client.onConnected
+        .timeout(
+          const Duration(seconds: 15),
+          onTimeout: () {
+            AppLogger().w('[SSE] Connection handshake timed out after 15s');
+            close();
+            onClosed();
+          },
+        )
+        .then((_) {
+          AppLogger().d('[SSE] Connected — sending deviceId');
+          // Identify this device to the server as the first message.
+          client.sink.add(deviceId!);
+          onConnected();
+        })
+        .catchError((Object e) {
+          AppLogger().e('[SSE] Connection failed: $e');
+          close();
+          onClosed();
+        });
 
     client.stream.listen(
       _onMessage,
