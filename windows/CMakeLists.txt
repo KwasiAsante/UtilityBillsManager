@@ -57,6 +57,19 @@ add_subdirectory("runner")
 # them to the application.
 include(flutter/generated_plugins.cmake)
 
+# flutter_local_notifications_windows uses ATL (atlbase.h) but its CMakeLists
+# doesn't add the ATL include path. Derive it from the MSVC compiler location
+# and inject it so the build finds the headers.
+if(MSVC AND TARGET flutter_local_notifications_windows)
+  get_filename_component(_atl_root "${CMAKE_CXX_COMPILER}/../../../.." ABSOLUTE)
+  set(_atl_include "${_atl_root}/atlmfc/include")
+  if(EXISTS "${_atl_include}/atlbase.h")
+    target_include_directories(flutter_local_notifications_windows PRIVATE "${_atl_include}")
+  endif()
+  unset(_atl_root)
+  unset(_atl_include)
+endif()
+
 
 # === Installation ===
 # Support files are copied into place next to the executable, so that it can
