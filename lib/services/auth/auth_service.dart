@@ -21,6 +21,7 @@ class AuthService extends ChangeNotifier {
 
   void clearUnauthorized() {
     _pendingUnauthorized = false;
+    notifyListeners();
   }
 
   void notifyUnauthorized() {
@@ -61,8 +62,11 @@ class AuthService extends ChangeNotifier {
 
   /// Signs out — revokes the server session and clears local state.
   Future<void> logout() async {
-    await ApiService.auth().logout();
-    await _clearSession();
+    try {
+      await ApiService.auth().logout();
+    } finally {
+      await _clearSession();
+    }
   }
 
   Future<void> _persistSession(String token, String email) async {

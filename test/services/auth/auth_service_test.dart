@@ -3,9 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:utility_bills_manager/services/auth/auth_service.dart';
 
 void main() {
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
-    // Reset singleton state between tests
+    await AuthService().loadFromPrefs(); // flushes token/email from empty prefs
     AuthService().clearUnauthorized();
   });
 
@@ -32,11 +32,12 @@ void main() {
   group('AuthService.notifyUnauthorized', () {
     test('sets pendingUnauthorized to true and notifies', () {
       var notified = false;
-      AuthService().addListener(() => notified = true);
+      void listener() => notified = true;
+      AuthService().addListener(listener);
       AuthService().notifyUnauthorized();
       expect(AuthService().pendingUnauthorized, isTrue);
       expect(notified, isTrue);
-      AuthService().removeListener(() {});
+      AuthService().removeListener(listener);
     });
 
     test('clearUnauthorized resets the flag', () {
