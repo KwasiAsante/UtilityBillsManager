@@ -90,6 +90,7 @@ abstract class SseServiceBase {
     reconnectTimer?.cancel();
     reconnectTimer = Timer(Duration(milliseconds: delay), () {
       if (state != SseState.idle) return;
+      state = SseState.connecting;
       open();
     });
   }
@@ -109,6 +110,21 @@ abstract class SseServiceBase {
     state = SseState.connected;
     attempt = 0;
     AppLogger().d('[SSE] Connected');
+  }
+
+  /// Forces a reconnect regardless of current state.
+  ///
+  /// Use when the app resumes from background/sleep and the SSE may be in a
+  /// stuck [SseState.connecting] state (e.g. zombie TCP connection from before
+  /// a sleep/wake cycle where [channel.ready] never resolved).
+  Future<void> forceReconnect(String serverUrl, String deviceId) async {
+    AppLogger().d('[SSE] Force reconnecting');
+    reconnectTimer?.cancel();
+    reconnectTimer = null;
+    close();
+    state = SseState.idle;
+    attempt = 0;
+    await connect(serverUrl, deviceId);
   }
 
   void onClosed() {
