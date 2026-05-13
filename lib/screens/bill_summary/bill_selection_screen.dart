@@ -75,7 +75,7 @@ class _BillSelectionScreenState extends State<BillSelectionScreen> {
                 final bill = widget.eligibleBills[index];
                 final isSelected = _selectedIds.contains(bill.billId);
                 final owedAmount =
-                    Rentor.calculateOwedAmount(widget.rentor, bill);
+                    Rentor.calculateOwedAmount(widget.rentor, bill, roundToWholeDollar: false);
                 return CheckboxListTile(
                   value: isSelected,
                   onChanged: (value) => _toggleBill(bill.billId, value),

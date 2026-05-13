@@ -104,7 +104,7 @@ class BillSummaryService {
     // Sum owed amount per bill type for regular bills.
     final Map<BillType, double> regularOwed = {};
     for (final bill in regularBills) {
-      final owed = Rentor.calculateOwedAmount(rentor, bill);
+      final owed = Rentor.calculateOwedAmount(rentor, bill, roundToWholeDollar: false);
       regularOwed.update(bill.type, (v) => v + owed, ifAbsent: () => owed);
     }
 
@@ -116,14 +116,18 @@ class BillSummaryService {
           (regularBills.map((b) => b.dueDate.day).reduce((a, b) => a + b) /
                   regularBills.length)
               .round();
-      final avgDate = DateTime(ref.year, ref.month, avgDay);
+      // Floor the due date to the 20th. If today is within 7 days of the
+      // 20th (day >= 13), push the floor to the 27th so there's always at
+      // least a week of notice from the message date.
+      final floorDay = ref.day >= 13 ? 27 : 20;
+      final avgDate = DateTime(ref.year, ref.month, avgDay < floorDay ? floorDay : avgDay);
       final billList = _formatBillList(regularOwed.entries.toList());
       summary += '$billList due ${_formatDate(avgDate)}.';
     }
 
     if (waterBills.isNotEmpty) {
       final waterOwed = waterBills.fold(
-          0.0, (sum, b) => sum + Rentor.calculateOwedAmount(rentor, b));
+          0.0, (sum, b) => sum + Rentor.calculateOwedAmount(rentor, b, roundToWholeDollar: false));
       final waterDate = waterBills.first.dueDate;
       final waterAmount = '\$${waterOwed.toStringAsFixed(2)}';
       final waterDue = _formatDate(waterDate);
