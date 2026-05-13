@@ -15,6 +15,7 @@ import 'factory/windows/windows_manager_service_factory_native.dart';
 import 'helpers/database/database_helper.dart';
 import 'screens/main_tab_screen.dart';
 import 'services/api/api_service.dart';
+import 'services/auth/auth_service.dart';
 import 'utils/app_logger.dart';
 
 /// Application entry point.
@@ -71,6 +72,7 @@ void main() async {
   await AppConfig.load();
 
   ApiService.configure(baseUrl: AppConfig.apiBaseUrl);
+  await AuthService().loadFromPrefs();
 
   await ServerConfiguration.init();
 
