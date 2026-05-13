@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../../data/models/auth_session.dart';
 import '../../data/models/bill.dart';
 import '../../utils/app_logger.dart';
 import '../../data/models/email_data.dart';
@@ -40,6 +41,10 @@ class LoggingHttpClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final token = ApiService._authToken;
+    if (token != null && !request.headers.containsKey('Authorization')) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
     final stopwatch = Stopwatch()..start();
     AppLogger().d('→ ${request.method} ${request.url}');
     try {
@@ -73,10 +78,18 @@ class LoggingHttpClient extends http.BaseClient {
 class ApiService {
   static String baseUrl = 'http://127.0.0.1:8080';
   static final http.Client _client = LoggingHttpClient();
+  static String? _authToken;
 
   /// Overrides the base URL for all API service singletons.
   static void configure({required String baseUrl}) {
     ApiService.baseUrl = baseUrl;
+  }
+
+  /// Sets the Bearer token attached to every outgoing request.
+  ///
+  /// Pass `null` to clear the token (e.g. after logout).
+  static void setAuthToken(String? token) {
+    _authToken = token;
   }
 
   /// Returns the [BillsApiService] singleton configured with the current [baseUrl].
@@ -119,6 +132,13 @@ class ApiService {
     final notificationApiService = NotificationApiService._instance;
     notificationApiService.baseUrl = baseUrl;
     return notificationApiService;
+  }
+
+  /// Returns the [AuthApiService] singleton configured with the current [baseUrl].
+  static AuthApiService auth() {
+    final authApiService = AuthApiService._instance;
+    authApiService.baseUrl = baseUrl;
+    return authApiService;
   }
 }
 
@@ -1262,6 +1282,93 @@ class NotificationApiService {
       }
     } catch (e) {
       AppLogger().e('Error registering device token: $e');
+      return e.toString();
+    }
+  }
+}
+
+/// HTTP client for authentication endpoints (`/auth/register`, `/auth/login`, `/auth/logout`).
+///
+/// Login returns an [AuthSession] on success. Register and logout return `"OK"` or an error
+/// string, following the same pattern as the other API services.
+class AuthApiService {
+  static final AuthApiService _instance = AuthApiService._internal();
+
+  factory AuthApiService() => _instance;
+
+  AuthApiService._internal();
+
+  String baseUrl = '';
+
+  /// POST `/auth/register` — creates a new user account.
+  ///
+  /// Returns `"OK"` on success (`201`) or a human-readable error string on failure.
+  Future<String> register(String email, String password) async {
+    try {
+      final response = await ApiService._client.post(
+        Uri.parse('$baseUrl/auth/register'),
+        body: jsonEncode({'email': email, 'password': password}),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 201) {
+        return 'OK';
+      } else {
+        AppLogger().e('Failed to register: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
+      }
+    } catch (e) {
+      AppLogger().e('Error registering: $e');
+      return e.toString();
+    }
+  }
+
+  /// POST `/auth/login` — authenticates with [email] and [password].
+  ///
+  /// Returns an [AuthSession] on success (`200`), or `null` on failure. The
+  /// optional [deviceName] is forwarded to the server for session labelling.
+  Future<AuthSession?> login(String email, String password, {String? deviceName}) async {
+    try {
+      final body = <String, dynamic>{'email': email, 'password': password};
+      if (deviceName != null) body['deviceName'] = deviceName;
+
+      final response = await ApiService._client.post(
+        Uri.parse('$baseUrl/auth/login'),
+        body: jsonEncode(body),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        return AuthSession.fromJson(json);
+      } else {
+        AppLogger().e('Failed to login: ${response.statusCode} - ${_errorBody(response)}');
+        return null;
+      }
+    } catch (e) {
+      AppLogger().e('Error logging in: $e');
+      return null;
+    }
+  }
+
+  /// POST `/auth/logout` — revokes the current session token.
+  ///
+  /// The server always responds `200` (idempotent). Returns `"OK"` or an error string.
+  Future<String> logout() async {
+    try {
+      final response = await ApiService._client.post(
+        Uri.parse('$baseUrl/auth/logout'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        return 'OK';
+      } else {
+        AppLogger().e('Failed to logout: ${response.statusCode} - ${_errorBody(response)}');
+        return _errorBody(response);
+      }
+    } catch (e) {
+      AppLogger().e('Error logging out: $e');
       return e.toString();
     }
   }
