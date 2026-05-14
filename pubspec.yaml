@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.2.0+5
+version: 1.2.0+6
 
 environment:
   sdk: ^3.7.0
@@ -155,4 +155,11 @@ msix_config:
   certificate_path: C:\Users\Kwasi\UTILBILLMANGR.pfx
   certificate_password: RaijinThor21.2
   capabilities: internetClient
-  logoPath: assets/icon/utility_bills_manager_icon.png
+  logo_path: assets/icon/utility_bills_manager_icon.png
+  app_installer:
+    publish_folder_path: docs
+    hours_between_update_checks: 0
+    automatic_background_task: true
+    update_blocks_activation: false
+    show_prompt: true
+    force_update_from_any_version: false

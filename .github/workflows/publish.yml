@@ -1,0 +1,63 @@
+name: Publish Release
+
+# Triggers:
+#   - Push a version tag:  git tag v1.2.1 && git push --tags
+#   - Or click "Run workflow" in the GitHub Actions tab
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to push the updated docs/ back to main
+
+jobs:
+  publish:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          lfs: true          # pull any existing LFS-tracked MSIX files
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Restore signing certificate
+        shell: pwsh
+        run: |
+          $certBytes = [System.Convert]::FromBase64String("${{ secrets.CERT_PFX_BASE64 }}")
+          $certPath  = "$env:RUNNER_TEMP\cert.pfx"
+          [System.IO.File]::WriteAllBytes($certPath, $certBytes)
+          "CERT_PATH=$certPath" | Out-File $env:GITHUB_ENV -Append
+
+      - name: Build, package and fix URIs
+        shell: pwsh
+        run: |
+          .\publish.ps1 `
+            -CertPath     "$env:CERT_PATH" `
+            -CertPassword "${{ secrets.CERT_PASSWORD }}"
+
+      - name: Commit and push docs/
+        shell: pwsh
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/
+          # Only commit if there are staged changes
+          $staged = git diff --staged --name-only
+          if ($staged) {
+            git commit -m "chore: publish release [skip ci]"
+            git push origin main
+            Write-Host "Pushed updated docs/ to main" -ForegroundColor Green
+          } else {
+            Write-Host "No changes in docs/ — nothing to push."
+          }

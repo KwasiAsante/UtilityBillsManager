@@ -1,0 +1,80 @@
+# publish.ps1
+# Builds a Windows release, packages it as MSIX, and rewrites the generated
+# .appinstaller file so its Uri attributes point to GitHub Pages instead of
+# local Windows paths.  Commit and push docs/ after running this script.
+#
+# Local usage:
+#   .\publish.ps1              # full build + publish (uses cert from pubspec.yaml)
+#   .\publish.ps1 -SkipBuild   # re-publish without rebuilding
+#
+# CI usage (GitHub Actions passes cert via secrets):
+#   .\publish.ps1 -CertPath "path\to\cert.pfx" -CertPassword "secret"
+
+param(
+    [switch]$SkipBuild,
+    [string]$CertPath     = "",
+    [string]$CertPassword = ""
+)
+
+$ErrorActionPreference = "Stop"
+
+$GithubPagesBase = "https://kwasisante.github.io/UtilityBillsManager"
+$PublishFolder   = Join-Path $PSScriptRoot "docs"
+
+# ---------------------------------------------------------------------------
+# 1. Build
+# ---------------------------------------------------------------------------
+if (-not $SkipBuild) {
+    Write-Host "`nBuilding Windows release..." -ForegroundColor Cyan
+    flutter build windows --release
+    if ($LASTEXITCODE -ne 0) { throw "flutter build failed (exit $LASTEXITCODE)" }
+}
+
+# ---------------------------------------------------------------------------
+# 2. Package + publish (generates .appinstaller and copies versioned MSIX)
+#    Pass certificate overrides when provided (used by CI).
+# ---------------------------------------------------------------------------
+Write-Host "`nPackaging and publishing MSIX..." -ForegroundColor Cyan
+
+$msixArgs = @("run", "msix:publish")
+if ($CertPath)     { $msixArgs += "--certificate-path",     $CertPath }
+if ($CertPassword) { $msixArgs += "--certificate-password", $CertPassword }
+
+& dart @msixArgs
+if ($LASTEXITCODE -ne 0) { throw "msix:publish failed (exit $LASTEXITCODE)" }
+
+# ---------------------------------------------------------------------------
+# 3. Fix .appinstaller URIs: local Windows path → GitHub Pages URL
+# ---------------------------------------------------------------------------
+$appInstallerFile = Get-ChildItem $PublishFolder -Filter "*.appinstaller" -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+
+if (-not $appInstallerFile) {
+    Write-Warning "No .appinstaller found in $PublishFolder — skipping URI fix."
+} else {
+    $content = Get-Content $appInstallerFile.FullName -Raw -Encoding UTF8
+
+    $content = $content.Replace($PublishFolder, $GithubPagesBase)
+
+    $pass = 0
+    while ($content -match 'Uri="https://[^"]*\\' -and $pass -lt 10) {
+        $content = $content -replace '(Uri="https://[^"]*?)\\', '$1/'
+        $pass++
+    }
+
+    Set-Content $appInstallerFile.FullName $content -Encoding UTF8 -NoNewline
+    Write-Host "Fixed URIs in $($appInstallerFile.Name)" -ForegroundColor Green
+}
+
+# ---------------------------------------------------------------------------
+# 4. Summary
+# ---------------------------------------------------------------------------
+Write-Host "`n--- Done ---" -ForegroundColor Green
+Write-Host ""
+Write-Host "Commit and push docs/ to publish the update:" -ForegroundColor Yellow
+Write-Host "  git add docs/"
+Write-Host "  git commit -m `"chore: release <version>`""
+Write-Host "  git push"
+Write-Host ""
+Write-Host "Auto-update endpoint:"
+Write-Host "  $GithubPagesBase/utility_bills_manager.appinstaller" -ForegroundColor Cyan
