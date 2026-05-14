@@ -33,7 +33,9 @@ jobs:
 
       - name: Create local_secrets.json placeholder
         shell: pwsh
-        run: '"{}" | Out-File -FilePath "assets/config/local_secrets.json" -Encoding utf8'
+        run: |
+          New-Item -ItemType Directory -Force "assets/config" | Out-Null
+          '{}' | Out-File -FilePath "assets/config/local_secrets.json" -Encoding utf8
 
       - name: Restore signing certificate
         shell: pwsh
