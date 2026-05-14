@@ -21,19 +21,14 @@ $ErrorActionPreference = "Stop"
 $GithubPagesBase = "https://kwasisante.github.io/UtilityBillsManager"
 $PublishFolder   = Join-Path $PSScriptRoot "docs"
 
-# ---------------------------------------------------------------------------
 # 1. Build
-# ---------------------------------------------------------------------------
 if (-not $SkipBuild) {
     Write-Host "`nBuilding Windows release..." -ForegroundColor Cyan
     flutter build windows --release
     if ($LASTEXITCODE -ne 0) { throw "flutter build failed (exit $LASTEXITCODE)" }
 }
 
-# ---------------------------------------------------------------------------
-# 2. Package + publish (generates .appinstaller and copies versioned MSIX)
-#    Pass certificate overrides when provided (used by CI).
-# ---------------------------------------------------------------------------
+# 2. Package + publish
 Write-Host "`nPackaging and publishing MSIX..." -ForegroundColor Cyan
 
 $msixArgs = @("run", "msix:publish")
@@ -43,17 +38,14 @@ if ($CertPassword) { $msixArgs += "--certificate-password", $CertPassword }
 & dart @msixArgs
 if ($LASTEXITCODE -ne 0) { throw "msix:publish failed (exit $LASTEXITCODE)" }
 
-# ---------------------------------------------------------------------------
-# 3. Fix .appinstaller URIs: local Windows path → GitHub Pages URL
-# ---------------------------------------------------------------------------
+# 3. Fix .appinstaller URIs: local Windows path -> GitHub Pages URL
 $appInstallerFile = Get-ChildItem $PublishFolder -Filter "*.appinstaller" -ErrorAction SilentlyContinue |
     Select-Object -First 1
 
 if (-not $appInstallerFile) {
-    Write-Warning "No .appinstaller found in $PublishFolder — skipping URI fix."
+    Write-Warning "No .appinstaller found in $PublishFolder -- skipping URI fix."
 } else {
     $content = Get-Content $appInstallerFile.FullName -Raw -Encoding UTF8
-
     $content = $content.Replace($PublishFolder, $GithubPagesBase)
 
     $pass = 0
@@ -66,15 +58,14 @@ if (-not $appInstallerFile) {
     Write-Host "Fixed URIs in $($appInstallerFile.Name)" -ForegroundColor Green
 }
 
-# ---------------------------------------------------------------------------
 # 4. Summary
-# ---------------------------------------------------------------------------
 Write-Host "`n--- Done ---" -ForegroundColor Green
 Write-Host ""
 Write-Host "Commit and push docs/ to publish the update:" -ForegroundColor Yellow
 Write-Host "  git add docs/"
-Write-Host "  git commit -m `"chore: release <version>`""
+Write-Host '  git commit -m "chore: release vX.Y.Z"'
 Write-Host "  git push"
 Write-Host ""
-Write-Host "Auto-update endpoint:"
-Write-Host "  $GithubPagesBase/utility_bills_manager.appinstaller" -ForegroundColor Cyan
+$endpoint = $GithubPagesBase + "/utility_bills_manager.appinstaller"
+Write-Host "Auto-update endpoint:" -ForegroundColor Yellow
+Write-Host "  $endpoint" -ForegroundColor Cyan
