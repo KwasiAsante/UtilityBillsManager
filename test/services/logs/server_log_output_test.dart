@@ -1,0 +1,137 @@
+import 'dart:convert';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:utility_bills_manager/services/logs/server_log_output.dart';
+import 'package:logger/logger.dart';
+import 'package:logger/src/log_event.dart';
+
+// ---------------------------------------------------------------------------
+// Fake HTTP client
+// ---------------------------------------------------------------------------
+
+class _FakeHttpClient extends http.BaseClient {
+  final int statusCode;
+  final List<Map<String, dynamic>> captured = [];
+
+  _FakeHttpClient({this.statusCode = 200});
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final body = request is http.Request ? request.body : '';
+    captured.add({
+      'method': request.method,
+      'path': request.url.path,
+      'headers': Map<String, String>.from(request.headers),
+      'body': body,
+    });
+    return http.StreamedResponse(
+      Stream.fromIterable(<List<int>>[]),
+      statusCode,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+OutputEvent _infoEvent(String message) =>
+    OutputEvent(LogEvent(Level.info, message), [message]);
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+void main() {
+  group('ServerLogOutput', () {
+    test('does not flush when buffer has fewer than 20 lines', () async {
+      final fake = _FakeHttpClient();
+      final output = ServerLogOutput(
+        client: fake,
+        getDeviceId: () async => 'dev-1',
+        getBaseUrl: () => 'http://localhost',
+      );
+
+      for (var i = 0; i < 19; i++) {
+        output.output(_infoEvent('line $i'));
+      }
+
+      // Give async work a chance to run (there should be none)
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(fake.captured, isEmpty,
+          reason: 'should not flush with fewer than 20 lines');
+    });
+
+    test('flushes when buffer reaches 20 lines and advances byteOffset', () async {
+      final fake = _FakeHttpClient(statusCode: 200);
+      final output = ServerLogOutput(
+        client: fake,
+        getDeviceId: () async => 'dev-1',
+        getBaseUrl: () => 'http://localhost',
+      );
+
+      for (var i = 0; i < 20; i++) {
+        output.output(_infoEvent('line $i'));
+      }
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(fake.captured, hasLength(1));
+      expect(fake.captured.first['path'], '/logs/device');
+      expect(fake.captured.first['headers']['x-device-id'], 'dev-1');
+      expect(fake.captured.first['method'], 'POST');
+
+      // Verify the body is a JSON array of strings
+      final body = jsonDecode(fake.captured.first['body'] as String);
+      expect(body, isA<List>());
+      expect((body as List).length, 20);
+
+      // byteOffset should have advanced
+      expect(output.byteOffset, greaterThan(0));
+    });
+
+    test('does not advance byteOffset on non-200 response', () async {
+      final fake = _FakeHttpClient(statusCode: 500);
+      final output = ServerLogOutput(
+        client: fake,
+        getDeviceId: () async => 'dev-1',
+        getBaseUrl: () => 'http://localhost',
+      );
+
+      for (var i = 0; i < 20; i++) {
+        output.output(_infoEvent('line $i'));
+      }
+
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(output.byteOffset, 0);
+    });
+
+    test('is silent on network error', () async {
+      final failingClient = _FailingHttpClient();
+      final output = ServerLogOutput(
+        client: failingClient,
+        getDeviceId: () async => 'dev-1',
+        getBaseUrl: () => 'http://localhost',
+      );
+
+      for (var i = 0; i < 20; i++) {
+        output.output(_infoEvent('line $i'));
+      }
+
+      // Should complete without throwing
+      await expectLater(
+        Future<void>.delayed(const Duration(milliseconds: 50)),
+        completes,
+      );
+    });
+  });
+}
+
+class _FailingHttpClient extends http.BaseClient {
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) =>
+      Future.error(Exception('network unavailable'));
+}
