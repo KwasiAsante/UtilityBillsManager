@@ -29,6 +29,10 @@ if (-not $SkipBuild) {
 }
 
 # 2. Package + publish
+# Remove any existing .appinstaller so msix:publish skips its interactive
+# version-bump prompt (it only checks when the file already exists).
+Remove-Item (Join-Path $PublishFolder "*.appinstaller") -ErrorAction SilentlyContinue
+
 Write-Host "`nPackaging and publishing MSIX..." -ForegroundColor Cyan
 
 $msixArgs = @("run", "msix:publish")
