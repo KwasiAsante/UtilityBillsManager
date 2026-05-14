@@ -33,14 +33,19 @@ class LogUploadService {
   final Future<String> Function() _getLogsDir;
 
   Timer? _timer;
+  bool _stopped = false;
 
   /// Starts the midnight upload cycle.
   ///
   /// Call once during app startup (after [AppConfig.init]).
-  void start() => _scheduleNextMidnight();
+  void start() {
+    _stopped = false;
+    _scheduleNextMidnight();
+  }
 
   /// Cancels the scheduled timer. Call on app shutdown if needed.
   void stop() {
+    _stopped = true;
     _timer?.cancel();
     _timer = null;
   }
@@ -55,9 +60,9 @@ class LogUploadService {
     final today = _todayStr();
     final file = File('$logsDir/$today.log');
 
-    if (!file.existsSync()) return;
+    if (!await file.exists()) return;
 
-    final fileLength = file.lengthSync();
+    final fileLength = await file.length();
     final offset = _logOutput.byteOffset;
     if (fileLength <= offset) return;
 
@@ -75,7 +80,7 @@ class LogUploadService {
           .post(
             uri,
             headers: {
-              'Content-Type': 'text/plain',
+              'Content-Type': 'text/plain; charset=utf-8',
               'x-device-id': deviceId,
             },
             body: chunk,
@@ -101,8 +106,11 @@ class LogUploadService {
 
   Future<void> _onMidnight() async {
     await uploadGap();
-    _logOutput.resetByteOffset(); // start fresh for the new day
-    _scheduleNextMidnight();
+    // Always reset — at midnight we switch to a new log file (new date), so the
+    // offset must start at 0 regardless of whether the upload succeeded.
+    // Failed uploads result in that gap being lost (acceptable in v1, no retry).
+    _logOutput.resetByteOffset();
+    if (!_stopped) _scheduleNextMidnight();
   }
 
   static String _todayStr() {
