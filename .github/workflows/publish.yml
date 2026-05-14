@@ -5,10 +5,7 @@ name: Publish Release
 #   - Or click "Run workflow" in the GitHub Actions tab
 on:
   push:
-    branches:
-      - main
-  # push:
-  #   tags: ['v*']
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
