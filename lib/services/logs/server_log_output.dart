@@ -16,6 +16,8 @@ import '../../config/app_config.dart';
 ///   file so [LogUploadService] can read the remainder at end-of-day.
 /// - On any failure (network error, non-200) the lines are dropped silently;
 ///   the end-of-day upload covers the gap.
+/// - [_format] is intentionally identical to `_FileLogOutput._format` so that
+///   [byteOffset] byte counts align with the on-device log file bytes.
 class ServerLogOutput extends LogOutput {
   ServerLogOutput({
     http.Client? client,
@@ -99,7 +101,7 @@ class ServerLogOutput extends LogOutput {
 
   static String _format(OutputEvent event) {
     final ts = DateTime.now().toIso8601String();
-    final lvl = event.level.name.toUpperCase().padRight(5);
+    final lvl = event.level.name.toUpperCase().padRight(7);
     final body = event.lines.map(_stripAnsi).join('\n        ');
     return '[$ts] [$lvl] $body\n';
   }

@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:utility_bills_manager/services/logs/server_log_output.dart';
 import 'package:logger/logger.dart';
-import 'package:logger/src/log_event.dart';
 
 // ---------------------------------------------------------------------------
 // Fake HTTP client
@@ -52,6 +51,7 @@ void main() {
         getDeviceId: () async => 'dev-1',
         getBaseUrl: () => 'http://localhost',
       );
+      addTearDown(output.destroy);
 
       for (var i = 0; i < 19; i++) {
         output.output(_infoEvent('line $i'));
@@ -71,6 +71,7 @@ void main() {
         getDeviceId: () async => 'dev-1',
         getBaseUrl: () => 'http://localhost',
       );
+      addTearDown(output.destroy);
 
       for (var i = 0; i < 20; i++) {
         output.output(_infoEvent('line $i'));
@@ -99,6 +100,7 @@ void main() {
         getDeviceId: () async => 'dev-1',
         getBaseUrl: () => 'http://localhost',
       );
+      addTearDown(output.destroy);
 
       for (var i = 0; i < 20; i++) {
         output.output(_infoEvent('line $i'));
@@ -116,6 +118,7 @@ void main() {
         getDeviceId: () async => 'dev-1',
         getBaseUrl: () => 'http://localhost',
       );
+      addTearDown(output.destroy);
 
       for (var i = 0; i < 20; i++) {
         output.output(_infoEvent('line $i'));
@@ -126,6 +129,27 @@ void main() {
         Future<void>.delayed(const Duration(milliseconds: 50)),
         completes,
       );
+    });
+
+    test('destroy flushes partial buffer', () async {
+      final fake = _FakeHttpClient(statusCode: 200);
+      final output = ServerLogOutput(
+        client: fake,
+        getDeviceId: () async => 'dev-1',
+        getBaseUrl: () => 'http://localhost',
+      );
+
+      // Add fewer than 20 lines (would not auto-flush)
+      for (var i = 0; i < 5; i++) {
+        output.output(_infoEvent('line $i'));
+      }
+
+      // destroy() should fire-and-forget flush
+      await output.destroy();
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(fake.captured, hasLength(1));
+      expect((jsonDecode(fake.captured.first['body'] as String) as List).length, 5);
     });
   });
 }
