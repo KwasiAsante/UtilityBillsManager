@@ -29,9 +29,14 @@ if (-not $SkipBuild) {
 }
 
 # 2. Package + publish
-# Remove any existing .appinstaller so msix:publish skips its interactive
-# version-bump prompt (it only checks when the file already exists).
+# Remove stale .appinstaller and any old MSIX files so that:
+#   - msix:publish skips its interactive version-bump prompt
+#   - the versions/ folder contains only the freshly built MSIX (no stale LFS pointers)
 Remove-Item (Join-Path $PublishFolder "*.appinstaller") -ErrorAction SilentlyContinue
+$versionsFolder = Join-Path $PublishFolder "versions"
+if (Test-Path $versionsFolder) {
+    Remove-Item (Join-Path $versionsFolder "*.msix") -ErrorAction SilentlyContinue
+}
 
 Write-Host "`nPackaging and publishing MSIX..." -ForegroundColor Cyan
 

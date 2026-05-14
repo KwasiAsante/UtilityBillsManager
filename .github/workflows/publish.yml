@@ -70,8 +70,10 @@ jobs:
           $tag = "v$version"
           Write-Host "Version: $version   Tag: $tag" -ForegroundColor Cyan
 
-          # Locate the MSIX that publish.ps1 placed in docs/versions/
-          $msixFile = Get-ChildItem "docs/versions" -Filter "*.msix" -ErrorAction SilentlyContinue | Select-Object -First 1
+          # Locate the MSIX that publish.ps1 placed in docs/versions/ (newest first, guards
+          # against any stale files that survived the cleanup)
+          $msixFile = Get-ChildItem "docs/versions" -Filter "*.msix" -ErrorAction SilentlyContinue |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
           if (-not $msixFile) { throw "No MSIX found in docs/versions/ — did publish.ps1 succeed?" }
           Write-Host "MSIX: $($msixFile.Name)" -ForegroundColor Cyan
 
