@@ -5,7 +5,10 @@ name: Publish Release
 #   - Or click "Run workflow" in the GitHub Actions tab
 on:
   push:
-    tags: ['v*']
+    branches:
+      - main
+  # push:
+  #   tags: ['v*']
   workflow_dispatch:
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -259,7 +262,8 @@ jobs:
             liblzma-dev \
             libsqlite3-dev \
             libsecret-1-dev \
-            libjsoncpp-dev
+            libjsoncpp-dev \
+            libayatana-appindicator3-dev
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
