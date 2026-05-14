@@ -14,6 +14,7 @@ permissions:
 jobs:
   publish:
     runs-on: windows-latest
+    timeout-minutes: 60
 
     steps:
       - name: Checkout main
@@ -29,6 +30,7 @@ jobs:
           channel: stable
 
       - name: Install dependencies
+        timeout-minutes: 10
         run: flutter pub get
 
       - name: Create local_secrets.json placeholder
@@ -52,6 +54,7 @@ jobs:
           Import-PfxCertificate -FilePath "$env:CERT_PATH" -CertStoreLocation Cert:\CurrentUser\Root -Password $pwd | Out-Null
 
       - name: Build, package and fix URIs
+        timeout-minutes: 45
         shell: pwsh
         run: |
           .\publish.ps1 `
