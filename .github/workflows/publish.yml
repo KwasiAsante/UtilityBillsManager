@@ -8,13 +8,38 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SETUP CHECKLIST
+# ─────────────────────────────────────────────────────────────────────────────
+# Existing secrets (already configured):
+#   CERT_PFX_BASE64              — Windows MSIX signing cert (base64)
+#   CERT_PASSWORD                — Windows cert password
+#   FIREBASE_SERVICE_ACCOUNT_... — Firebase hosting (used by firebase-hosting-merge.yml)
+#
+# New secrets to add (repo → Settings → Secrets and variables → Actions):
+#   ANDROID_KEYSTORE_BASE64      — base64 of your .keystore/.jks file
+#                                  Generate:  base64 -w 0 release.keystore | pbcopy
+#                                  Windows:   [Convert]::ToBase64String([IO.File]::ReadAllBytes('release.keystore')) | clip
+#   ANDROID_KEYSTORE_PASSWORD    — keystore password
+#   ANDROID_KEY_ALIAS            — key alias (e.g. "upload")
+#   ANDROID_KEY_PASSWORD         — key password
+#
+# One-time Android code setup (do this locally before first Android CI run):
+#   1. Generate a keystore if you don't have one:
+#        keytool -genkey -v -keystore release.keystore -alias upload \
+#          -keyalg RSA -keysize 2048 -validity 10000
+#   2. Edit android/app/build.gradle — add signing config (see README or Flutter docs)
+#   3. Add android/key.properties to .gitignore
+#
+# macOS and Linux require NO signing setup for personal use.
+# ─────────────────────────────────────────────────────────────────────────────
+
 permissions:
-  contents: write   # needed to push the updated docs/ back to main
+  contents: write
 
 jobs:
-  # Builds MSIX, fixes .appinstaller URIs to point at GitHub Pages,
-  # then commits/pushes docs/ so the auto-installer endpoint is live.
-  # Firebase web hosting is handled separately by firebase-hosting-merge.yml.
+
+  # ── Windows: MSIX → GitHub Release + .appinstaller on GitHub Pages ──────────
   publish-windows:
     runs-on: windows-latest
     timeout-minutes: 60
@@ -62,34 +87,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Derive version tag from pubspec.yaml  (e.g. "1.2.2" → "v1.2.2")
-          $version = (Select-String -Path pubspec.yaml -Pattern "^version:\s*(.+)$").Matches[0].Groups[1].Value.Trim()
+          $versionRaw = (Select-String -Path pubspec.yaml -Pattern "^version:\s*(.+)$").Matches[0].Groups[1].Value.Trim()
+          $version = $versionRaw -replace '\+.*', ''
           $tag = "v$version"
-          Write-Host "Version: $version   Tag: $tag" -ForegroundColor Cyan
+          Write-Host "Version: $versionRaw   Tag: $tag" -ForegroundColor Cyan
 
-          # Locate the MSIX that publish.ps1 placed in docs/versions/ (newest first, guards
-          # against any stale files that survived the cleanup)
           $msixFile = Get-ChildItem "docs/versions" -Filter "*.msix" -ErrorAction SilentlyContinue |
             Sort-Object LastWriteTime -Descending | Select-Object -First 1
           if (-not $msixFile) { throw "No MSIX found in docs/versions/ — did publish.ps1 succeed?" }
           Write-Host "MSIX: $($msixFile.Name)" -ForegroundColor Cyan
 
-          # Create the GitHub Release if it doesn't already exist
-          $null = gh release view $tag --repo ${{ github.repository }} 2>$null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $tag `
-              --repo ${{ github.repository }} `
-              --title "Release $tag" `
-              --notes "Automated release $tag"
-          }
+          gh release create $tag --repo ${{ github.repository }} --title "Release $tag" --notes "Automated release $tag" 2>$null; $true
 
-          # Upload (or replace) the MSIX asset on the release
-          gh release upload $tag $msixFile.FullName `
-            --repo ${{ github.repository }} `
-            --clobber
+          gh release upload $tag $msixFile.FullName --repo ${{ github.repository }} --clobber
           Write-Host "Uploaded $($msixFile.Name) to GitHub Release $tag" -ForegroundColor Green
 
-          # Rewrite the MainPackage Uri in .appinstaller to the GitHub Release download URL
           $releaseUri = "https://github.com/${{ github.repository }}/releases/download/$tag/$($msixFile.Name)"
           $appInstaller = Get-ChildItem "docs" -Filter "*.appinstaller" -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($appInstaller) {
@@ -99,8 +111,6 @@ jobs:
             Write-Host "Rewrote .appinstaller MainPackage Uri → $releaseUri" -ForegroundColor Green
           }
 
-          # Remove the MSIX from docs/ — it is now on GitHub Releases, not git/LFS.
-          # GitHub Pages would serve the 133-byte LFS pointer instead of the real binary.
           Remove-Item $msixFile.FullName
           $versionsDir = "docs/versions"
           if ((Get-ChildItem $versionsDir -ErrorAction SilentlyContinue | Measure-Object).Count -eq 0) {
@@ -113,7 +123,6 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/
-          # Only commit if there are staged changes
           $staged = git diff --staged --name-only
           if ($staged) {
             git commit -m "chore: publish release [skip ci]"
@@ -122,3 +131,218 @@ jobs:
           } else {
             Write-Host "No changes in docs/ — nothing to push."
           }
+
+  # ── Android: APK → GitHub Release ───────────────────────────────────────────
+  publish-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        timeout-minutes: 10
+        run: flutter pub get
+
+      - name: Create local_secrets.json placeholder
+        run: mkdir -p assets/config && echo '{}' > assets/config/local_secrets.json
+
+      - name: Configure Android release signing
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=app/release.keystore\n' \
+            "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            "${{ secrets.ANDROID_KEY_PASSWORD }}" \
+            "${{ secrets.ANDROID_KEY_ALIAS }}" \
+            > android/key.properties
+
+      - name: Build APK
+        timeout-minutes: 30
+        run: flutter build apk --release
+
+      - name: Rename APK
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //;s/+.*//')
+          mv build/app/outputs/flutter-apk/app-release.apk \
+             "utility_bills_manager-${VERSION}-android.apk"
+          echo "APK_NAME=utility_bills_manager-${VERSION}-android.apk" >> $GITHUB_ENV
+
+      - name: Upload APK to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //;s/+.*//')
+          TAG="v${VERSION}"
+          gh release create "$TAG" --repo ${{ github.repository }} \
+            --title "Release $TAG" --notes "Automated release $TAG" 2>/dev/null || true
+          gh release upload "$TAG" "$APK_NAME" \
+            --repo ${{ github.repository }} --clobber
+
+  # ── macOS: DMG → GitHub Release ─────────────────────────────────────────────
+  publish-macos:
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        timeout-minutes: 10
+        run: flutter pub get
+
+      - name: Create local_secrets.json placeholder
+        run: mkdir -p assets/config && echo '{}' > assets/config/local_secrets.json
+
+      - name: Build macOS
+        timeout-minutes: 45
+        run: flutter build macos --release
+
+      - name: Create DMG
+        run: |
+          APP_PATH=$(find "build/macos/Build/Products/Release" -maxdepth 1 -name "*.app" | head -1)
+          echo "Found app: $APP_PATH"
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //;s/+.*//')
+          DMG_NAME="utility_bills_manager-${VERSION}-macos.dmg"
+          hdiutil create \
+            -volname "Utility Bill Manager" \
+            -srcfolder "$APP_PATH" \
+            -ov -format UDZO \
+            "$DMG_NAME"
+          echo "DMG_NAME=$DMG_NAME" >> $GITHUB_ENV
+
+      - name: Upload DMG to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //;s/+.*//')
+          TAG="v${VERSION}"
+          gh release create "$TAG" --repo ${{ github.repository }} \
+            --title "Release $TAG" --notes "Automated release $TAG" 2>/dev/null || true
+          gh release upload "$TAG" "$DMG_NAME" \
+            --repo ${{ github.repository }} --clobber
+
+  # ── Linux: tar.gz bundle → GitHub Release ───────────────────────────────────
+  publish-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            ninja-build \
+            cmake \
+            libgtk-3-dev \
+            libblkid-dev \
+            liblzma-dev \
+            libsqlite3-dev \
+            libsecret-1-dev \
+            libjsoncpp-dev
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Install dependencies
+        timeout-minutes: 10
+        run: flutter pub get
+
+      - name: Create local_secrets.json placeholder
+        run: mkdir -p assets/config && echo '{}' > assets/config/local_secrets.json
+
+      - name: Build Linux
+        timeout-minutes: 30
+        run: flutter build linux --release
+
+      - name: Package as tar.gz
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //;s/+.*//')
+          ARCHIVE="utility_bills_manager-${VERSION}-linux-x64.tar.gz"
+          tar -czf "$ARCHIVE" -C build/linux/x64/release bundle/
+          echo "ARCHIVE=$ARCHIVE" >> $GITHUB_ENV
+
+      - name: Upload tar.gz to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //;s/+.*//')
+          TAG="v${VERSION}"
+          gh release create "$TAG" --repo ${{ github.repository }} \
+            --title "Release $TAG" --notes "Automated release $TAG" 2>/dev/null || true
+          gh release upload "$TAG" "$ARCHIVE" \
+            --repo ${{ github.repository }} --clobber
+
+  # ── latest.json: stable URL the app polls to detect updates ─────────────────
+  # Runs after all platform builds complete (succeeds or fails — not cancelled).
+  publish-latest-json:
+    needs: [publish-windows, publish-android, publish-macos, publish-linux]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate docs/latest.json
+        run: |
+          VERSION_RAW=$(grep '^version:' pubspec.yaml | sed 's/version: //')
+          VERSION=$(echo "$VERSION_RAW" | sed 's/+.*//')
+          BUILD=$(echo "$VERSION_RAW" | sed -n 's/.*+\([0-9]*\)$/\1/p')
+          BUILD=${BUILD:-0}
+          TAG="v${VERSION}"
+          REPO="${{ github.repository }}"
+          BASE="https://github.com/${REPO}/releases/download/${TAG}"
+          MSIX_VERSION="${VERSION}.${BUILD}"
+
+          mkdir -p docs
+          cat > docs/latest.json << ENDJSON
+{
+  "version": "${VERSION}",
+  "build": ${BUILD},
+  "tag": "${TAG}",
+  "downloads": {
+    "windows": "${BASE}/utility_bills_manager_${MSIX_VERSION}.msix",
+    "android": "${BASE}/utility_bills_manager-${VERSION}-android.apk",
+    "macos":   "${BASE}/utility_bills_manager-${VERSION}-macos.dmg",
+    "linux":   "${BASE}/utility_bills_manager-${VERSION}-linux-x64.tar.gz"
+  }
+}
+ENDJSON
+          echo "Generated docs/latest.json for ${TAG}:"
+          cat docs/latest.json
+
+      - name: Commit and push docs/latest.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/latest.json
+          git diff --staged --name-only | grep -q . \
+            && git commit -m "chore: update latest.json for $(grep '^version:' pubspec.yaml | sed 's/version: //') [skip ci]" \
+            && git push origin main \
+            || echo "No changes to latest.json — nothing to push."
