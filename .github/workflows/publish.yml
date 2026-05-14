@@ -31,6 +31,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Create local_secrets.json placeholder
+        shell: pwsh
+        run: '"{}" | Out-File -FilePath "assets/config/local_secrets.json" -Encoding utf8'
+
       - name: Restore signing certificate
         shell: pwsh
         run: |
