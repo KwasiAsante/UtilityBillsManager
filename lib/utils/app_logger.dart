@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import '../services/logs/server_log_output.dart';
 
 // ---------------------------------------------------------------------------
 // Filter
@@ -169,7 +170,11 @@ class AppLogger {
 
   AppLogger._internal();
 
-  final Logger _logger = Logger(
+  /// The server log output — exposed so [LogUploadService] can receive the same
+  /// instance that is registered in the logger.
+  final ServerLogOutput serverLogOutput = ServerLogOutput();
+
+  late final Logger _logger = Logger(
     filter: _AllowAllFilter(),
     printer: PrettyPrinter(
       methodCount: 0,
@@ -182,6 +187,7 @@ class AppLogger {
     output: MultiOutput([
       ConsoleOutput(),
       _FileLogOutput(maxFileSizeBytes: _fileMaxBytes),
+      serverLogOutput,
     ]),
   );
 

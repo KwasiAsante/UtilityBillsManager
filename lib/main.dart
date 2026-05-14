@@ -16,6 +16,7 @@ import 'helpers/database/database_helper.dart';
 import 'screens/main_tab_screen.dart';
 import 'services/api/api_service.dart';
 import 'services/auth/auth_service.dart';
+import 'services/logs/log_upload_service.dart';
 import 'utils/app_logger.dart';
 
 /// Application entry point.
@@ -61,6 +62,11 @@ void main() async {
   await pdfrxFlutterInitialize(dismissPdfiumWasmWarnings: true);
 
   await AppConfig.init();
+
+  // Start end-of-day log upload service (file system not available on web)
+  if (!kIsWeb) {
+    LogUploadService(logOutput: AppLogger().serverLogOutput).start();
+  }
 
   AppState().localDB = AppConfig.mode == AppMode.server;
 
