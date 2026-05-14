@@ -53,12 +53,6 @@ jobs:
           [System.IO.File]::WriteAllBytes($certPath, $certBytes)
           "CERT_PATH=$certPath" | Out-File $env:GITHUB_ENV -Append
 
-      - name: Install certificate to trusted root
-        shell: pwsh
-        run: |
-          $pwd = ConvertTo-SecureString -String "${{ secrets.CERT_PASSWORD }}" -AsPlainText -Force
-          Import-PfxCertificate -FilePath "$env:CERT_PATH" -CertStoreLocation Cert:\CurrentUser\Root -Password $pwd | Out-Null
-
       - name: Build, package and fix URIs
         timeout-minutes: 45
         shell: pwsh
