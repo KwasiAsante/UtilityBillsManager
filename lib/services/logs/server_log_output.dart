@@ -101,7 +101,7 @@ class ServerLogOutput extends LogOutput {
 
   static String _format(OutputEvent event) {
     final ts = DateTime.now().toIso8601String();
-    final lvl = event.level.name.toUpperCase().padRight(7);
+    final lvl = event.level.name.toUpperCase().padRight(5);
     final body = event.lines.map(_stripAnsi).join('\n        ');
     return '[$ts] [$lvl] $body\n';
   }
