@@ -154,6 +154,7 @@ msix_config:
   identity_name: com.asante.utility-bills-manager
   certificate_path: C:\Users\Kwasi\UTILBILLMANGR.pfx
   certificate_password: RaijinThor21.2
+  install_certificate: false
   capabilities: internetClient
   logo_path: assets/icon/utility_bills_manager_icon.png
   app_installer:
