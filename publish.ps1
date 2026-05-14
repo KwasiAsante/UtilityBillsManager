@@ -18,7 +18,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$GithubPagesBase = "https://kwasisante.github.io/UtilityBillsManager"
+$GithubPagesBase = "https://kwasiasante.github.io/UtilityBillsManager"
 $PublishFolder   = Join-Path $PSScriptRoot "docs"
 
 # 1. Build
@@ -46,8 +46,16 @@ if (-not $appInstallerFile) {
     Write-Warning "No .appinstaller found in $PublishFolder -- skipping URI fix."
 } else {
     $content = Get-Content $appInstallerFile.FullName -Raw -Encoding UTF8
+
+    # Replace absolute path variant (CI / machines where docs/ didn't pre-exist)
     $content = $content.Replace($PublishFolder, $GithubPagesBase)
 
+    # Replace relative path variant (local: msix package kept "docs\" because the
+    # folder already existed and it resolved as a valid relative path)
+    $relativeName = Split-Path $PublishFolder -Leaf
+    $content = $content -replace "Uri=`"$relativeName[/\\]", "Uri=`"$GithubPagesBase/"
+
+    # Normalise any remaining backslashes inside https:// URL strings
     $pass = 0
     while ($content -match 'Uri="https://[^"]*\\' -and $pass -lt 10) {
         $content = $content -replace '(Uri="https://[^"]*?)\\', '$1/'
