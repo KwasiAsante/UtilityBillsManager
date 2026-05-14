@@ -47,7 +47,18 @@ if ($CertPassword) { $msixArgs += "--certificate-password", $CertPassword }
 & dart @msixArgs
 if ($LASTEXITCODE -ne 0) { throw "msix:publish failed (exit $LASTEXITCODE)" }
 
-# 3. Fix .appinstaller URIs: local Windows path -> GitHub Pages URL
+# 3. Fix index.html install href: msix tool generates an absolute-root path (/file.appinstaller)
+#    which breaks on GitHub Pages (served from a subdirectory). Make it relative instead.
+$indexFile = Join-Path $PublishFolder "index.html"
+if (Test-Path $indexFile) {
+    $html = Get-Content $indexFile -Raw -Encoding UTF8
+    # Change absolute-root href ('/file.appinstaller') to relative ('./file.appinstaller')
+    $html = $html.Replace("a.href = '/", "a.href = './")
+    Set-Content $indexFile $html -Encoding UTF8 -NoNewline
+    Write-Host "Fixed install href in index.html" -ForegroundColor Green
+}
+
+# 4. Fix .appinstaller URIs: local Windows path -> GitHub Pages URL
 $appInstallerFile = Get-ChildItem $PublishFolder -Filter "*.appinstaller" -ErrorAction SilentlyContinue |
     Select-Object -First 1
 
