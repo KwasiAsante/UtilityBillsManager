@@ -165,7 +165,7 @@ jobs:
       - name: Configure Android release signing
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
-          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=app/release.keystore\n' \
+          printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=release.keystore\n' \
             "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
             "${{ secrets.ANDROID_KEY_PASSWORD }}" \
             "${{ secrets.ANDROID_KEY_ALIAS }}" \
