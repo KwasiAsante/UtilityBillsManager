@@ -321,19 +321,17 @@ jobs:
           MSIX_VERSION="${VERSION}.${BUILD}"
 
           mkdir -p docs
-          cat > docs/latest.json << ENDJSON
-{
-  "version": "${VERSION}",
-  "build": ${BUILD},
-  "tag": "${TAG}",
-  "downloads": {
-    "windows": "${BASE}/utility_bills_manager_${MSIX_VERSION}.msix",
-    "android": "${BASE}/utility_bills_manager-${VERSION}-android.apk",
-    "macos":   "${BASE}/utility_bills_manager-${VERSION}-macos.dmg",
-    "linux":   "${BASE}/utility_bills_manager-${VERSION}-linux-x64.tar.gz"
-  }
-}
-ENDJSON
+          jq -n \
+            --arg  version  "$VERSION" \
+            --argjson build  "$BUILD" \
+            --arg  tag      "$TAG" \
+            --arg  windows  "${BASE}/utility_bills_manager_${MSIX_VERSION}.msix" \
+            --arg  android  "${BASE}/utility_bills_manager-${VERSION}-android.apk" \
+            --arg  macos    "${BASE}/utility_bills_manager-${VERSION}-macos.dmg" \
+            --arg  linux    "${BASE}/utility_bills_manager-${VERSION}-linux-x64.tar.gz" \
+            '{version:$version,build:$build,tag:$tag,downloads:{windows:$windows,android:$android,macos:$macos,linux:$linux}}' \
+            > docs/latest.json
+
           echo "Generated docs/latest.json for ${TAG}:"
           cat docs/latest.json
 
