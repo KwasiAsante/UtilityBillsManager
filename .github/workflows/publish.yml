@@ -5,14 +5,20 @@ name: Publish Release
 #   - Or click "Run workflow" in the GitHub Actions tab
 on:
   push:
-    tags: ['v*']
+    branches:
+      - main
+  # push:
+  #   tags: ['v*']
   workflow_dispatch:
 
 permissions:
   contents: write   # needed to push the updated docs/ back to main
 
 jobs:
-  publish:
+  # Builds MSIX, fixes .appinstaller URIs to point at GitHub Pages,
+  # then commits/pushes docs/ so the auto-installer endpoint is live.
+  # Firebase web hosting is handled separately by firebase-hosting-merge.yml.
+  publish-windows:
     runs-on: windows-latest
     timeout-minutes: 60
 
