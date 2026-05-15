@@ -13,6 +13,7 @@ A cross-platform Flutter application for tracking utility bills, managing rentor
 - **Real-time Notifications** — Server-Sent Events (SSE) connection to the companion server pushes `newBill` / `newPayment` events instantly. Firebase Cloud Messaging (FCM) handles push notifications when the app is backgrounded. In-app notification bell with unread badge and slide-in panel.
 - **Settings** — In-app settings accessible from every screen via a gear icon. `AppConfigScreen` lets you update the API base URL with a live reachability indicator. `ServerConfigScreen` lets you update IMAP credentials and email sync scheduling parameters directly from the app.
 - **Local Notifications** — Bill due-date reminders via `flutter_local_notifications`.
+- **In-App Update Checker** — On startup the app fetches `latest.json` from GitHub Pages and compares it to the running version using semver + build-number fallback. When a newer release is available a `MaterialBanner` appears at the top of every screen. Dismissal is per-version (stored in `SharedPreferences`) so the banner reappears only for new releases. On Windows a dialog offers all three installer formats (EXE, MSI, MSIX); on other platforms the platform-appropriate download URL is opened directly.
 - **Cross-platform** — Runs on Android, iOS, macOS, Windows, Linux, and Web.
 
 ## Architecture
@@ -32,9 +33,12 @@ lib/
 │   ├── api/        # ApiService facade + Bills/Rentors/Payments/EmailData/Config/Notification clients
 │   ├── email/      # EmailService with web/native/stub conditional exports
 │   ├── google/     # GoogleAccountService with web/native/stub conditional exports
-│   └── notification/ # NotificationService (abstract interface) + concrete native/web/windows impls; SseService
-├── widgets/        # Reusable widgets: NotificationBellIcon, NotificationPanel, SettingsIconButton
-└── utils/          # Parsers, calculators, export, logger, dialogs
+│   ├── notification/ # NotificationService (abstract interface) + concrete native/web/windows impls; SseService
+│   └── update/     # UpdateService (fetches latest.json, caches result) + UpdateInfo (semver comparison, per-platform download URLs)
+├── widgets/        # Reusable widgets: NotificationBellIcon, NotificationPanel, SettingsIconButton, UpdateBanner
+└── utils/
+    ├── windows/    # DataMigration — one-time APPDATA path migration (com.example → AsanteDevs)
+    └── ...         # Parsers, calculators, export, logger, dialogs
 ```
 
 The app uses **SQLite** (`sqflite` / `sqflite_common_ffi` / `sqflite_common_ffi_web`) for local persistence with manual migrations (currently schema v15). The correct SQLite factory is selected at startup via a platform-conditional `db_factory`. Repositories are `ChangeNotifier` singletons that screens listen to for reactive updates.
@@ -44,6 +48,8 @@ Platform-specific behavior (database initialization, email/IMAP access, Google s
 **Firebase** (`firebase_core`, `firebase_auth`, `firebase_messaging`) is initialized at app startup. FCM handles push notifications when the app is backgrounded.
 
 The app runs exclusively in **client mode**, talking to a companion Dart shelf server (`utility_bills_server`) via `ApiService`. The server exposes REST endpoints for all resources plus `/bill/list/sync`, `/payment/list/sync`, and `/email/list/sync` for on-demand email sync, a `/config` endpoint for managing IMAP credentials remotely, and `POST /device/token` for FCM push notification registration.
+
+**Windows branding** — `Runner.rc` sets `CompanyName` to `AsanteDevs` and `ProductName` to `Utility Bills Manager`. These values drive the `%APPDATA%` path used by `path_provider` (`%APPDATA%\AsanteDevs\Utility Bills Manager\`). On first launch after upgrading from an older build, `DataMigration.runIfNeeded()` automatically moves data from the old path (`%APPDATA%\com.example\utility_bills_manager\`) to the new one so no data is lost.
 
 ## Getting Started
 
@@ -109,6 +115,23 @@ flutter build windows \
 
 The `--dart-define=BUILD_TARGET=windows` flag is required on Windows to select the correct notification service (`notification_service_windows.dart` uses `flutter_local_notifications_windows`; omitting it silently falls back to the native service which skips notifications on Windows).
 
+#### Windows installers
+
+Two installer scripts live in `windows/installer/`:
+
+| File | Tool | Notes |
+|------|------|-------|
+| `setup.iss` | [InnoSetup](https://jrsoftware.org/isinfo.php) | Recommended for most users. Produces a single EXE. Prompts to remove user data on uninstall (default: keep). |
+| `product.wxs` | [WiX Toolset v4](https://wixtoolset.org/) | Produces an MSI suitable for enterprise / IT deployment. Pass `REMOVE_USERDATA=1` to `msiexec` to opt in to data removal on uninstall. |
+
+Both installers:
+- Let the user choose the install directory.
+- Detect an existing installation and offer an in-place upgrade.
+- Close a running instance of the app automatically before upgrading.
+- Store user data at `%APPDATA%\AsanteDevs\Utility Bills Manager\` (preserved across upgrades).
+
+The CI workflow (`publish.yml`) builds both the EXE and MSI (as well as the MSIX package for the auto-update flow) and attaches them to the GitHub Release.
+
 #### Android release signing
 
 A keystore is required for release builds. The file `android/upload-keystore.jks` should exist locally (not in git). `android/key.properties` (also gitignored) must point to it:
@@ -165,6 +188,8 @@ flutter run --dart-define=SECRETS_KEY=<key>
 | `firebase_messaging` | FCM push notifications (Android, iOS, macOS, Web) |
 | `uuid` | Unique IDs for `AppNotification` instances |
 | `cryptography` | AES-256-GCM encryption/decryption for `local_secrets.json` values |
+| `package_info_plus` | Reads the running app's version for the update checker |
+| `url_launcher` | Opens download URLs from `UpdateBanner` in the system browser / file manager |
 
 ## License
 

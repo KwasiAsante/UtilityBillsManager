@@ -176,8 +176,8 @@ class NativeNotificationService
 
   void _reconnectSseIfNeeded() async {
     if (SseService.instance.isConnected) return;
-    AppLogger().d('[SSE] App resumed — reconnecting');
-    await SseService.instance.connect(
+    AppLogger().d('[SSE] App resumed — force reconnecting');
+    await SseService.instance.forceReconnect(
       AppConfig.apiBaseUrl,
       await AppConfig.deviceId,
     );
@@ -496,6 +496,7 @@ class NativeNotificationService
       title: message.notification?.title ?? '',
       body: message.notification?.body ?? '',
     );
+    reloadRepository(eventType);
   }
 
   SseEventType? _eventTypeFromString(String? type) => switch (type) {

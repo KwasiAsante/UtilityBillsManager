@@ -86,8 +86,8 @@ class WindowsNotificationService
 
   void _reconnectSseIfNeeded() async {
     if (SseService.instance.isConnected) return;
-    AppLogger().d('[SSE] App resumed — reconnecting');
-    await SseService.instance.connect(
+    AppLogger().d('[SSE] App resumed — force reconnecting');
+    await SseService.instance.forceReconnect(
       AppConfig.apiBaseUrl,
       await AppConfig.deviceId,
     );

@@ -44,7 +44,9 @@ class _FileLogOutput extends LogOutput {
   Future<void> _initAsync() async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
-      _logsDir = Directory('${appDir.path}/logs');
+      _logsDir = (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+          ? Directory('${appDir.path}/Utility Bills Manager/logs')
+          : Directory('${appDir.path}/logs');
       await _logsDir!.create(recursive: true);
     } catch (_) {
       // If we cannot create the directory, disable file logging silently.

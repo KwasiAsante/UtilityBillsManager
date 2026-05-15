@@ -18,22 +18,20 @@ import 'services/api/api_service.dart';
 import 'services/auth/auth_service.dart';
 import 'services/logs/log_upload_service.dart';
 import 'utils/app_logger.dart';
+import 'utils/windows/data_migration.dart';
 
 /// Application entry point.
 ///
 /// Startup sequence:
 /// 1. Initialise Flutter bindings.
-/// 2. Initialise the `pdfrx` WASM engine (used for PDF email-attachment parsing).
-/// 3. Load optional `local_secrets.json` configuration via [AppConfig.init].
-/// 4. Set up the correct `sqflite` database factory for the current platform
-///    (web → FFI web, desktop → FFI, mobile → default native).
-/// 5. Open the database (runs migrations if needed).
-/// 6. Set [AppState.localDB] and configure [ApiService.baseUrl].
-/// 7. Start the local shelf HTTP server when running in server mode.
-/// 8. Launch the Flutter widget tree.
+/// 2. On Windows: init window manager (shows the window) and tray manager.
+/// 3. Call runApp() immediately so the window renders a loading screen.
+/// 4. AppInitializer widget completes the rest of the startup sequence:
+///    pdfrx, Firebase, sqflite, config, notifications.
 
 final navigatorKey = GlobalKey<NavigatorState>();
 final notificationService = createNotificationService();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -41,63 +39,117 @@ void main() async {
 
   if (kIsWeb) {
     AppLogger().i('Running on web platform');
-  }
-  else {
+  } else {
     AppLogger().i('Running on ${defaultTargetPlatform.name} platform');
     if (defaultTargetPlatform == TargetPlatform.windows) {
+      await DataMigration.runIfNeeded();
       await initWindowManager();
       await initTrayManager();
     }
   }
 
-  // Firebase is not configured for Linux. Wrap in a platform guard to avoid
-  // a runtime exception when running on Linux during development.
-  if (defaultTargetPlatform != TargetPlatform.linux) {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  }
-
-  // PDF text extraction (email attachments) uses pdfrx on web/mobile/desktop
-  await pdfrxFlutterInitialize(dismissPdfiumWasmWarnings: true);
-
-  await AppConfig.init();
-
-  // Start end-of-day log upload service (file system not available on web)
-  if (!kIsWeb) {
-    LogUploadService(logOutput: AppLogger().serverLogOutput).start();
-  }
-
-  AppState().localDB = AppConfig.mode == AppMode.server;
-
-  initDb(); // automatically picks the right implementation
-
-  // Initialize local database on all platforms (including web with FFI web)
-  await DatabaseHelper().database;
-
-  await AppConfig.load();
-
-  ApiService.configure(baseUrl: AppConfig.apiBaseUrl);
-  await AuthService().loadFromPrefs();
-
-  await ServerConfiguration.init();
-
-  await notificationService.initialize();
-
-  notificationService.setNavigatorKey(navigatorKey);
-  await notificationService.handleLaunchNotification();
-
+  // runApp is called here so the window immediately renders a loading screen
+  // instead of staying blank while async initialization runs.
   runApp(const MyApp());
 }
 
-// add this function to your web-specific dart files
 dynamic addAppMeta() async {
-  // Get the package info
   PackageInfo packageInfo = await PackageInfo.fromPlatform();
   String version = packageInfo.version;
   String buildNum = packageInfo.buildNumber;
-
   AppLogger().i('App version: $version.$buildNum');
+}
+
+/// Runs all async startup steps inside the widget tree.
+///
+/// Wrapping initialization here means the window always shows real content
+/// (a loading spinner) rather than a blank white screen while awaiting
+/// network-dependent calls like Firebase or pdfrx.
+class AppInitializer extends StatefulWidget {
+  const AppInitializer({super.key});
+
+  @override
+  State<AppInitializer> createState() => _AppInitializerState();
+}
+
+class _AppInitializerState extends State<AppInitializer> {
+  late final Future<void> _initFuture = _initialize();
+
+  Future<void> _initialize() async {
+    // Firebase is not configured for Linux.
+    if (defaultTargetPlatform != TargetPlatform.linux) {
+      try {
+        AppLogger().d('[AppInitializer] Firebase init...');
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        ).timeout(const Duration(seconds: 15));
+        AppLogger().d('[AppInitializer] Firebase init done');
+      } catch (e) {
+        AppLogger().w('[AppInitializer] Firebase init failed or timed out: $e');
+      }
+    }
+
+    try {
+      AppLogger().d('[AppInitializer] pdfrx init...');
+      await pdfrxFlutterInitialize(dismissPdfiumWasmWarnings: true)
+          .timeout(const Duration(seconds: 15));
+      AppLogger().d('[AppInitializer] pdfrx init done');
+    } catch (e) {
+      AppLogger().w('[AppInitializer] pdfrx init failed or timed out: $e');
+    }
+
+    AppLogger().d('[AppInitializer] AppConfig init...');
+    await AppConfig.init();
+
+    // Start end-of-day log upload service (file system not available on web)
+    if (!kIsWeb) {
+      LogUploadService(logOutput: AppLogger().serverLogOutput).start();
+    }
+
+    AppState().localDB = AppConfig.mode == AppMode.server;
+
+    initDb();
+
+    AppLogger().d('[AppInitializer] Database open...');
+    await DatabaseHelper().database;
+    AppLogger().d('[AppInitializer] Database open done');
+
+    await AppConfig.load();
+
+    ApiService.configure(baseUrl: AppConfig.apiBaseUrl);
+    await AuthService().loadFromPrefs();
+
+    AppLogger().d('[AppInitializer] ServerConfiguration init...');
+    await ServerConfiguration.init();
+
+    AppLogger().d('[AppInitializer] Notification service init...');
+    await notificationService.initialize();
+    notificationService.setNavigatorKey(navigatorKey);
+    await notificationService.handleLaunchNotification();
+    AppLogger().d('[AppInitializer] Startup complete');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _initFuture,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          AppLogger().e(
+            '[AppInitializer] Fatal init error: ${snapshot.error}',
+            error: snapshot.error,
+            stackTrace: snapshot.stackTrace,
+          );
+        }
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return const MainTabScreen();
+      },
+    );
+  }
 }
 
 /// Root [StatelessWidget] that configures the [MaterialApp] and injects
@@ -138,55 +190,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const MainTabScreen(),
-    );
-  }
-}
-
-/// Unused Flutter starter-template scaffold — kept for reference only.
-/// The app's real entry point is [MainTabScreen].
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
+      home: const AppInitializer(),
     );
   }
 }

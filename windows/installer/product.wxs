@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Utility Bills Manager - WiX v4 MSI installer
+  =============================================
+  CI build:
+    wix build product.wxs -d Version=x.y.z -d SourceDir=<abs-Release-path> \
+      -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -out app.msi
+
+  Install WiX:
+    dotnet tool install -g wix
+    wix extension add WixToolset.UI.wixext WixToolset.Util.wixext --global
+
+  Upgrade behaviour
+  -----------------
+  MajorUpgrade removes the old MSI before installing the new one.
+  User data in %APPDATA%\AsanteDevs\Utility Bills Manager\ is NOT touched
+  during an upgrade — it belongs to the user profile, not the MSI.
+
+  Uninstall behaviour
+  -------------------
+  Standard uninstall removes only the files that were installed.
+  User data is preserved by default.
+  To also remove user data, run:
+    msiexec /x <product-code> REMOVE_USERDATA=1
+
+  UpgradeCode MUST remain constant across all releases — never change it.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="Utility Bills Manager"
+           Language="1033"
+           Version="$(var.Version)"
+           Manufacturer="AsanteDevs"
+           UpgradeCode="8B4F7E2A-1C3D-4E5F-9ABC-DEF012345678"
+           Scope="perMachine">
+
+    <!--
+      Upgrade: remove the old version automatically.
+      Schedule="afterInstallInitialize" means the old MSI is uninstalled
+      before the new files are laid down, preserving a clean upgrade.
+      Downgrade is blocked with an error message.
+    -->
+    <MajorUpgrade
+      Schedule="afterInstallInitialize"
+      DowngradeErrorMessage="A newer version of [ProductName] is already installed. Please uninstall it first." />
+
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Directory-selection UI (user can change the install folder) -->
+    <ui:WixUI Id="WixUI_InstallDir" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+
+    <!-- Close the app if it is running before the upgrade proceeds -->
+    <util:CloseApplication
+      Id="CloseApp"
+      Target="utility_bills_manager.exe"
+      RebootPrompt="no"
+      ElevatedCloseMessage="no" />
+
+    <!-- Install location -->
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="Utility Bills Manager" />
+    </StandardDirectory>
+
+    <!--
+      REMOVE_USERDATA property (default 0 = keep data).
+      Set to 1 on the command line to also remove user data on uninstall:
+        msiexec /x {product-guid} REMOVE_USERDATA=1
+    -->
+    <Property Id="REMOVE_USERDATA" Value="0" />
+
+    <!--
+      User-data directory — set from the environment during install so the
+      RemoveFolderEx action can reference it at uninstall time.
+      Path: %APPDATA%\AsanteDevs\Utility Bills Manager
+    -->
+    <Property Id="USERDATA_PATH">
+      <RegistrySearch Id="SearchUserData"
+                      Root="HKCU"
+                      Key="SOFTWARE\AsanteDevs\UtilityBillsManager"
+                      Name="DataPath"
+                      Type="raw" />
+    </Property>
+
+    <!--
+      Persist the data path to the registry on install so that uninstall
+      can find it even if %APPDATA% resolves differently.
+    -->
+    <Component Id="StoreDataPath" Directory="INSTALLFOLDER" Guid="*">
+      <RegistryValue Root="HKCU"
+                     Key="SOFTWARE\AsanteDevs\UtilityBillsManager"
+                     Name="DataPath"
+                     Value="[AppDataFolder]AsanteDevs\Utility Bills Manager"
+                     Type="string"
+                     KeyPath="yes" />
+      <!--
+        RemoveFolderEx: removes the data directory recursively on uninstall,
+        but ONLY when REMOVE_USERDATA=1 is passed to msiexec.
+      -->
+      <util:RemoveFolderEx Id="RemoveUserData"
+                           On="uninstall"
+                           Property="USERDATA_PATH"
+                           Condition="REMOVE_USERDATA = 1" />
+    </Component>
+
+    <!--
+      Application files — recursively includes the entire Flutter release bundle.
+      WiX v4 auto-generates component GUIDs and recreates subdirectory structure.
+    -->
+    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
+      <Files Source="$(var.SourceDir)\**\*.*" />
+    </ComponentGroup>
+
+    <Feature Id="Complete" Title="Utility Bills Manager" Level="1">
+      <ComponentRef Id="StoreDataPath" />
+      <ComponentGroupRef Id="AppFiles" />
+    </Feature>
+
+  </Package>
+</Wix>

@@ -35,6 +35,14 @@ class SseService extends SseServiceBase {
       _activeChannel = channel;
 
       channel.ready
+          .timeout(
+            const Duration(seconds: 15),
+            onTimeout: () {
+              AppLogger().w('[SSE] Connection handshake timed out after 15s');
+              close();
+              onClosed();
+            },
+          )
           .then((_) {
             AppLogger().d('[SSE] Connected — sending deviceId');
             // Identify this device to the server as the first message.

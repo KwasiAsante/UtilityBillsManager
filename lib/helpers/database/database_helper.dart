@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../../data/models/bill.dart';
@@ -57,8 +60,17 @@ class DatabaseHelper {
   /// Web persists under a logical name only (IndexedDB); mobile/desktop use
   /// [getDatabasesPath] + file name.
   Future<Database> _initDatabase() async {
-    final path =
-        kIsWeb ? _databaseName : join(await getDatabasesPath(), _databaseName);
+    final desktopDir = (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+        ? await getApplicationSupportDirectory()
+    : null;
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      desktopDir!.create(recursive: true);
+    }
+    final path = kIsWeb
+        ? _databaseName
+        : (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+          ? join(desktopDir!.path, _databaseName)
+          : join(await getDatabasesPath(), _databaseName);
     return await openDatabase(
       path,
       version: _databaseVersion,

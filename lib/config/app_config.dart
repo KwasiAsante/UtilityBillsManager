@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/models/app_configuration.dart';
@@ -101,11 +100,6 @@ class AppConfig {
     String? apiUrl = Preferences.getString('API_BASE_URL');
 
     if (apiUrl != null && apiUrl.isNotEmpty) {
-      if (apiUrl == 'http://192.168.2.172:8080' &&
-          (defaultTargetPlatform != TargetPlatform.android ||
-              defaultTargetPlatform != TargetPlatform.iOS)) {
-        apiUrl = 'http://127.0.0.1:8080';
-      }
       return apiUrl;
     }
 
@@ -114,12 +108,6 @@ class AppConfig {
       'API_BASE_URL',
       defaultValue: _defaultApiBaseUrl,
     );
-
-    if (apiUrl == 'http://192.168.2.172:8080' &&
-        (defaultTargetPlatform != TargetPlatform.android ||
-        defaultTargetPlatform != TargetPlatform.iOS)) {
-      apiUrl = 'http://127.0.0.1:8080';
-    }
 
     return apiUrl;
   }

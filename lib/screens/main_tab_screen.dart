@@ -13,6 +13,7 @@ import '../config/app_config.dart';
 import '../services/auth/auth_service.dart';
 import '../services/google/google_account_service_native.dart';
 import '../utils/app_breakpoints.dart';
+import '../widgets/update_banner.dart';
 
 /// The root shell of the app.
 ///
@@ -132,7 +133,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
     final wide = AppBreakpoints.isWide(context);
 
     if (wide) {
-      return Scaffold(
+      return UpdateBanner(child: Scaffold(
         body: Row(
           children: [
             NavigationRail(
@@ -189,10 +190,10 @@ class _MainTabScreenState extends State<MainTabScreen> {
             ),
           ],
         ),
-      );
+      ));
     }
 
-    return Scaffold(
+    return UpdateBanner(child: Scaffold(
       appBar: AppBar(
         toolbarHeight: 48,
         actions: [_buildAvatarButton()],
@@ -229,6 +230,6 @@ class _MainTabScreenState extends State<MainTabScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
 }
