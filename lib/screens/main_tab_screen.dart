@@ -11,6 +11,7 @@ import 'settings/settings_screen.dart';
 import '../config/app_config.dart';
 import '../services/google/google_account_service_native.dart';
 import '../utils/app_breakpoints.dart';
+import '../widgets/update_banner.dart';
 
 /// The root shell of the app.
 ///
@@ -74,7 +75,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
     final wide = AppBreakpoints.isWide(context);
 
     if (wide) {
-      return Scaffold(
+      return UpdateBanner(child: Scaffold(
         body: Row(
           children: [
             NavigationRail(
@@ -126,10 +127,10 @@ class _MainTabScreenState extends State<MainTabScreen> {
             ),
           ],
         ),
-      );
+      ));
     }
 
-    return Scaffold(
+    return UpdateBanner(child: Scaffold(
       body: IndexedStack(index: _selectedIndex, children: screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
@@ -162,6 +163,6 @@ class _MainTabScreenState extends State<MainTabScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
 }

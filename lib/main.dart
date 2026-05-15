@@ -16,6 +16,7 @@ import 'helpers/database/database_helper.dart';
 import 'screens/main_tab_screen.dart';
 import 'services/api/api_service.dart';
 import 'utils/app_logger.dart';
+import 'utils/windows/data_migration.dart';
 
 /// Application entry point.
 ///
@@ -39,6 +40,7 @@ void main() async {
   } else {
     AppLogger().i('Running on ${defaultTargetPlatform.name} platform');
     if (defaultTargetPlatform == TargetPlatform.windows) {
+      await DataMigration.runIfNeeded();
       await initWindowManager();
       await initTrayManager();
     }

@@ -4,11 +4,11 @@ name: Publish Release
 #   - Push a version tag:  git tag v1.2.1 && git push --tags
 #   - Or click "Run workflow" in the GitHub Actions tab
 on:
-  push:
-    branches:
-      - main
   # push:
-  #   tags: ['v*']
+  #   branches:
+  #     - main
+  push:
+    tags: ['v*']
   workflow_dispatch:
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -119,6 +119,74 @@ jobs:
           if ((Get-ChildItem $versionsDir -ErrorAction SilentlyContinue | Measure-Object).Count -eq 0) {
             Remove-Item $versionsDir
           }
+
+      - name: Build InnoSetup EXE installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $versionRaw = (Select-String -Path pubspec.yaml -Pattern "^version:\s*(.+)$").Matches[0].Groups[1].Value.Trim()
+          $version = $versionRaw -replace '\+.*', ''
+          $tag = "v$version"
+
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            Write-Host "InnoSetup not found — installing via Chocolatey..." -ForegroundColor Yellow
+            choco install innosetup -y --no-progress | Out-Null
+          }
+
+          $sourceDir  = (Resolve-Path "build\windows\x64\runner\Release").Path
+          $outputDir  = (Get-Location).Path
+          $outputFile = "utility_bills_manager-$version-setup"
+
+          & $iscc `
+            "/DMyAppVersion=$version" `
+            "/DMyAppSourceDir=$sourceDir" `
+            "/DMyAppOutputDir=$outputDir" `
+            "/DMyAppOutputFilename=$outputFile" `
+            "windows\installer\setup.iss"
+          if ($LASTEXITCODE -ne 0) { throw "InnoSetup build failed (exit $LASTEXITCODE)" }
+
+          $exeName = "$outputFile.exe"
+          Write-Host "Built: $exeName" -ForegroundColor Green
+
+          gh release upload $tag $exeName --repo ${{ github.repository }} --clobber
+          Write-Host "Uploaded $exeName to $tag" -ForegroundColor Green
+
+      - name: Install WiX v4 toolset
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix 2>&1 | Out-Null
+          $LASTEXITCODE = 0   # ignore "already installed" non-zero exit
+          wix extension add WixToolset.UI.wixext   --global 2>&1 | Out-Null
+          $LASTEXITCODE = 0
+          wix extension add WixToolset.Util.wixext --global 2>&1 | Out-Null
+          $LASTEXITCODE = 0   # ignore "already added" non-zero exit
+          Write-Host "WiX v4 toolset ready" -ForegroundColor Green
+
+      - name: Build WiX MSI installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $versionRaw = (Select-String -Path pubspec.yaml -Pattern "^version:\s*(.+)$").Matches[0].Groups[1].Value.Trim()
+          $version = $versionRaw -replace '\+.*', ''
+          $tag = "v$version"
+
+          $sourceDir = (Resolve-Path "build\windows\x64\runner\Release").Path
+          $msiName   = "utility_bills_manager-$version-setup.msi"
+
+          wix build "windows\installer\product.wxs" `
+            -d "Version=$version" `
+            -d "SourceDir=$sourceDir" `
+            -ext WixToolset.UI.wixext `
+            -ext WixToolset.Util.wixext `
+            -out $msiName
+          if ($LASTEXITCODE -ne 0) { throw "WiX MSI build failed (exit $LASTEXITCODE)" }
+          Write-Host "Built: $msiName" -ForegroundColor Green
+
+          gh release upload $tag $msiName --repo ${{ github.repository }} --clobber
+          Write-Host "Uploaded $msiName to $tag" -ForegroundColor Green
 
       - name: Commit and push docs/
         shell: pwsh
@@ -326,14 +394,16 @@ jobs:
 
           mkdir -p docs
           jq -n \
-            --arg  version  "$VERSION" \
-            --argjson build  "$BUILD" \
-            --arg  tag      "$TAG" \
-            --arg  windows  "${BASE}/utility_bills_manager_${MSIX_VERSION}.msix" \
-            --arg  android  "${BASE}/utility_bills_manager-${VERSION}-android.apk" \
-            --arg  macos    "${BASE}/utility_bills_manager-${VERSION}-macos.dmg" \
-            --arg  linux    "${BASE}/utility_bills_manager-${VERSION}-linux-x64.tar.gz" \
-            '{version:$version,build:$build,tag:$tag,downloads:{windows:$windows,android:$android,macos:$macos,linux:$linux}}' \
+            --arg  version      "$VERSION" \
+            --argjson build      "$BUILD" \
+            --arg  tag          "$TAG" \
+            --arg  win_msix     "${BASE}/utility_bills_manager_${MSIX_VERSION}.msix" \
+            --arg  win_exe      "${BASE}/utility_bills_manager-${VERSION}-setup.exe" \
+            --arg  win_msi      "${BASE}/utility_bills_manager-${VERSION}-setup.msi" \
+            --arg  android      "${BASE}/utility_bills_manager-${VERSION}-android.apk" \
+            --arg  macos        "${BASE}/utility_bills_manager-${VERSION}-macos.dmg" \
+            --arg  linux        "${BASE}/utility_bills_manager-${VERSION}-linux-x64.tar.gz" \
+            '{version:$version,build:$build,tag:$tag,downloads:{windows_msix:$win_msix,windows_exe:$win_exe,windows_msi:$win_msi,android:$android,macos:$macos,linux:$linux}}' \
             > docs/latest.json
 
           echo "Generated docs/latest.json for ${TAG}:"
