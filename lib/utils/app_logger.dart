@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:utility_bills_manager/config/app_config.dart';
 import 'dart:io';
 import '../services/logs/server_log_output.dart';
 
@@ -141,6 +142,19 @@ class _FileLogOutput extends LogOutput {
   }
 }
 
+class _ServerPrinter extends LogPrinter {
+  String _deviceId = '';
+
+  _ServerPrinter() {
+    AppConfig.deviceId.then((id) => _deviceId = id);
+  }
+
+  @override
+  List<String> log(LogEvent event) {
+    return ['[$_deviceId] ${event.message}'];
+  }
+}
+
 // ---------------------------------------------------------------------------
 // AppLogger
 // ---------------------------------------------------------------------------
@@ -179,7 +193,6 @@ class AppLogger {
 
   /// The server log output — exposed so [LogUploadService] can receive the same
   /// instance that is registered in the logger.
-  final ServerLogOutput serverLogOutput = ServerLogOutput();
 
   static PrettyPrinter get _printer => PrettyPrinter(
     methodCount: 0,
@@ -204,15 +217,8 @@ class AppLogger {
 
   late final Logger _serverLogger = Logger(
     filter: _AllowAllFilter(),
-    printer: PrettyPrinter(
-      methodCount: 0,
-      errorMethodCount: 5,
-      lineLength: 1000, // avoid line breaks in server logs
-      colors: false, // strip ANSI color codes for server logs
-      printEmojis: false, // avoid emojis in server logs
-      dateTimeFormat: DateTimeFormat.onlyTimeAndSinceStart,
-    ),
-    output: serverLogOutput,
+    printer: _ServerPrinter(),
+    output: ServerLogOutput(),
   );
 
   // --- caller resolution ----------------------------------------------------

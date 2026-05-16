@@ -2,12 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
-import 'package:utility_bills_manager/services/api/api_service.dart';
 
 import '../../config/app_config.dart';
-import '../../data/models/result.dart' show Result;
+import '../../services/api/api_service.dart';
 
 /// Streams log events to the remote Loki endpoint via `POST /logs/device`.
 ///
@@ -23,17 +21,15 @@ import '../../data/models/result.dart' show Result;
 class ServerLogOutput extends LogOutput {
   ServerLogOutput({
     Future<String> Function()? getDeviceId,
-    http.Client? client,
-  })  : _getDeviceId = getDeviceId ?? (() => AppConfig.deviceId),
-        _client = client;
+  })  : _getDeviceId = getDeviceId ?? (() => AppConfig.deviceId);
 
-  final http.Client? _client;
   final Future<String> Function() _getDeviceId;
 
   final List<String> _buffer = [];
   int _byteOffset = 0;
   Timer? _timer;
   bool _flushing = false;
+  Level get level => Level.all;
 
   static const _flushInterval = Duration(seconds: 3);
   static const _bufferMaxLines = 20;
@@ -69,26 +65,10 @@ class ServerLogOutput extends LogOutput {
 
     try {
       final deviceId = await _getDeviceId();
-      bool success;
 
-      if (_client != null) {
-        final response = await _client!
-            .post(
-              Uri.parse('${ApiService.baseUrl}/logs/device'),
-              body: jsonEncode(lines),
-              headers: {
-                'Content-Type': 'application/json',
-                'x-device-id': deviceId,
-              },
-            )
-            .timeout(const Duration(seconds: 10));
-        success = response.statusCode == 200;
-      } else {
-        final result = await ApiService.log().deviceLog(deviceId, lines);
-        success = result.isSuccess;
-      }
+      final result = await ApiService.log().deviceLog(deviceId, lines, level);
 
-      if (success) {
+      if (result.isSuccess) {
         final byteCount = lines.fold<int>(
           0,
           (sum, line) => sum + utf8.encode(line).length,

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:utility_bills_manager/services/api/api_service.dart';
 import 'package:utility_bills_manager/services/logs/server_log_output.dart';
 import 'package:logger/logger.dart';
 
@@ -25,10 +26,16 @@ class _FakeHttpClient extends http.BaseClient {
       'body': body,
     });
     return http.StreamedResponse(
-      Stream.fromIterable(<List<int>>[]),
+      Stream.fromIterable(<List<int>>[utf8.encode('ok')]),
       statusCode,
     );
   }
+}
+
+class _FailingHttpClient extends http.BaseClient {
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) =>
+      Future.error(Exception('network unavailable'));
 }
 
 // ---------------------------------------------------------------------------
@@ -44,12 +51,13 @@ OutputEvent _infoEvent(String message) =>
 
 void main() {
   group('ServerLogOutput', () {
+    tearDown(() => ApiService.resetHttpClient());
+
     test('does not flush when buffer has fewer than 20 lines', () async {
       final fake = _FakeHttpClient();
-      final output = ServerLogOutput(
-        getDeviceId: () async => 'dev-1',
-        client: fake,
-      );
+      ApiService.overrideHttpClient(fake);
+
+      final output = ServerLogOutput(getDeviceId: () async => 'dev-1');
       addTearDown(output.destroy);
 
       for (var i = 0; i < 19; i++) {
@@ -63,12 +71,12 @@ void main() {
           reason: 'should not flush with fewer than 20 lines');
     });
 
-    test('flushes when buffer reaches 20 lines and advances byteOffset', () async {
+    test('flushes when buffer reaches 20 lines and advances byteOffset',
+        () async {
       final fake = _FakeHttpClient(statusCode: 200);
-      final output = ServerLogOutput(
-        getDeviceId: () async => 'dev-1',
-        client: fake,
-      );
+      ApiService.overrideHttpClient(fake);
+
+      final output = ServerLogOutput(getDeviceId: () async => 'dev-1');
       addTearDown(output.destroy);
 
       for (var i = 0; i < 20; i++) {
@@ -93,10 +101,9 @@ void main() {
 
     test('does not advance byteOffset on non-200 response', () async {
       final fake = _FakeHttpClient(statusCode: 500);
-      final output = ServerLogOutput(
-        getDeviceId: () async => 'dev-1',
-        client: fake,
-      );
+      ApiService.overrideHttpClient(fake);
+
+      final output = ServerLogOutput(getDeviceId: () async => 'dev-1');
       addTearDown(output.destroy);
 
       for (var i = 0; i < 20; i++) {
@@ -109,11 +116,9 @@ void main() {
     });
 
     test('is silent on network error', () async {
-      final failingClient = _FailingHttpClient();
-      final output = ServerLogOutput(
-        getDeviceId: () async => 'dev-1',
-        client: failingClient,
-      );
+      ApiService.overrideHttpClient(_FailingHttpClient());
+
+      final output = ServerLogOutput(getDeviceId: () async => 'dev-1');
       addTearDown(output.destroy);
 
       for (var i = 0; i < 20; i++) {
@@ -129,10 +134,9 @@ void main() {
 
     test('destroy flushes partial buffer', () async {
       final fake = _FakeHttpClient(statusCode: 200);
-      final output = ServerLogOutput(
-        getDeviceId: () async => 'dev-1',
-        client: fake,
-      );
+      ApiService.overrideHttpClient(fake);
+
+      final output = ServerLogOutput(getDeviceId: () async => 'dev-1');
 
       // Add fewer than 20 lines (would not auto-flush)
       for (var i = 0; i < 5; i++) {
@@ -147,10 +151,4 @@ void main() {
       expect((jsonDecode(fake.captured.first['body'] as String) as List).length, 5);
     });
   });
-}
-
-class _FailingHttpClient extends http.BaseClient {
-  @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) =>
-      Future.error(Exception('network unavailable'));
 }

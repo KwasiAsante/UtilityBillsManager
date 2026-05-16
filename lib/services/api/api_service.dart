@@ -1,7 +1,8 @@
 import 'dart:convert';
 
-import 'package:googleapis/admob/v1.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:logger/logger.dart';
 
 import '../../data/models/auth_session.dart';
 import '../../data/models/bill.dart';
@@ -108,8 +109,19 @@ class LoggingHttpClient extends http.BaseClient {
 
 class ApiService {
   static String baseUrl = 'http://127.0.0.1:8080';
-  static final http.Client _client = LoggingHttpClient();
+  static http.Client _client = LoggingHttpClient();
   static String? _authToken;
+
+  /// Replaces the HTTP client used by all API services.
+  ///
+  /// For use in tests only — inject a fake/mock client to intercept requests
+  /// without hitting a real server. Always call [resetHttpClient] in tearDown.
+  @visibleForTesting
+  static void overrideHttpClient(http.Client client) => _client = client;
+
+  /// Restores the default [LoggingHttpClient] after a test override.
+  @visibleForTesting
+  static void resetHttpClient() => _client = LoggingHttpClient();
 
   /// Called by [LoggingHttpClient] when any response has status 403.
   /// Register this from [AuthService] to avoid a circular import.
@@ -1442,13 +1454,40 @@ class LogApiService {
 
   String baseUrl = '';
 
-  Future<Result<String>> deviceLog(String deviceId, List<String> logLines) async {
+  Future<Result<String>> deviceLog(String deviceId, List<String> logLines, Level level) async {
     try {
       final response = await ApiService._client.post(
         Uri.parse('$baseUrl/logs/device'),
         body: jsonEncode(logLines),
-        headers: {'Content-Type': 'application/json', 'x-device-id': deviceId},
+        headers: {
+          'Content-Type': 'application/json',
+          'x-device-id': deviceId,
+          'x-level': level.name.toUpperCase(),
+        },
       ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return Result.success(message: response.body);
+      } else {
+        AppLogger().e('Failed to register: ${response.statusCode} - ${_errorBody(response)}', toServer: false);
+        return Result.error(errorMessage: _errorBody(response));
+      }
+    } catch (e) {
+      AppLogger().e('Error registering: $e', toServer: false);
+      return Result.error(errorMessage: e.toString());
+    }
+  }
+
+  Future<Result<String>> uploadDeviceLog(String deviceId, String chunk) async {
+    try {
+      final response = await ApiService._client.post(
+        Uri.parse('$baseUrl/logs/device/upload'),
+        body: chunk,
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'x-device-id': deviceId
+        },
+      ).timeout(const Duration(seconds: 30));
 
       if (response.statusCode == 200) {
         return Result.success(message: response.body);

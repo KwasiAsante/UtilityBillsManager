@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
-import '../../config/app_config.dart';
 import 'server_log_output.dart';
+import '../../config/app_config.dart';
+import '../../services/api/api_service.dart';
 
 /// Fires at midnight each day and uploads any log lines from [logOutput.byteOffset]
 /// to EOF in today's log file, filling gaps left by failed real-time pushes.
@@ -16,20 +16,14 @@ import 'server_log_output.dart';
 class LogUploadService {
   LogUploadService({
     required ServerLogOutput logOutput,
-    http.Client? client,
     Future<String> Function()? getDeviceId,
-    String Function()? getBaseUrl,
     Future<String> Function()? getLogsDir,
   })  : _logOutput = logOutput,
-        _client = client ?? http.Client(),
         _getDeviceId = getDeviceId ?? (() => AppConfig.deviceId),
-        _getBaseUrl = getBaseUrl ?? (() => AppConfig.apiBaseUrl),
         _getLogsDir = getLogsDir ?? _defaultLogsDir;
 
   final ServerLogOutput _logOutput;
-  final http.Client _client;
   final Future<String> Function() _getDeviceId;
-  final String Function() _getBaseUrl;
   final Future<String> Function() _getLogsDir;
 
   Timer? _timer;
@@ -73,21 +67,10 @@ class LogUploadService {
       final chunk = utf8.decode(bytes, allowMalformed: true);
 
       final deviceId = await _getDeviceId();
-      final baseUrl = _getBaseUrl();
-      final uri = Uri.parse('$baseUrl/logs/device/upload');
 
-      final response = await _client
-          .post(
-            uri,
-            headers: {
-              'Content-Type': 'text/plain; charset=utf-8',
-              'x-device-id': deviceId,
-            },
-            body: chunk,
-          )
-          .timeout(const Duration(seconds: 30));
+      final result = await ApiService.log().uploadDeviceLog(deviceId, chunk);
 
-      if (response.statusCode == 200) {
+      if (result.isSuccess) {
         _logOutput.resetByteOffset();
       }
     } catch (_) {

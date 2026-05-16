@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:utility_bills_manager/services/logs/server_log_output.dart';
 
 import 'firebase_options.dart';
 import 'config/app_config.dart';
@@ -36,6 +37,12 @@ AppLogger _logger = AppLogger();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  _logger.d('[AppInitializer] AppConfig init...', toFile: true, toServer: false);
+  await AppConfig.init();
+
+  var deviceId = await AppConfig.deviceId;
+  _logger.i("Device Id: $deviceId", toFile: false, toServer: false);
+
   await addAppMeta();
 
   if (kIsWeb) {
@@ -48,9 +55,6 @@ void main() async {
       await initTrayManager();
     }
   }
-
-  var deviceId = await AppConfig.deviceId;
-  _logger.i("Device Id: $deviceId", toFile: false, toServer: false);
 
   // runApp is called here so the window immediately renders a loading screen
   // instead of staying blank while async initialization runs.
@@ -102,12 +106,9 @@ class _AppInitializerState extends State<AppInitializer> {
      _logger.w('[AppInitializer] pdfrx init failed or timed out: $e');
     }
 
-   _logger.d('[AppInitializer] AppConfig init...');
-    await AppConfig.init();
-
     // Start end-of-day log upload service (file system not available on web)
     if (!kIsWeb) {
-      LogUploadService(logOutput:_logger.serverLogOutput).start();
+      LogUploadService(logOutput:ServerLogOutput()).start();
     }
 
     AppState().localDB = AppConfig.mode == AppMode.server;

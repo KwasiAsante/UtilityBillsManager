@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:utility_bills_manager/services/api/api_service.dart';
 import 'package:utility_bills_manager/services/logs/log_upload_service.dart';
 import 'package:utility_bills_manager/services/logs/server_log_output.dart';
 
@@ -54,6 +55,7 @@ void main() {
 
     tearDown(() {
       tempDir.deleteSync(recursive: true);
+      ApiService.resetHttpClient();
     });
 
     test('POSTs content from byteOffset to EOF', () async {
@@ -63,17 +65,15 @@ void main() {
       file.writeAsStringSync('line1\nline2\nline3\n');
       // 'line1\n' = 6 bytes in UTF-8
 
-      final logOutput = ServerLogOutput(
-        getDeviceId: () async => '',
-      );
+      final logOutput = ServerLogOutput(getDeviceId: () async => '');
       logOutput.setByteOffset(6); // simulate 'line1\n' already sent
 
       final fakeClient = _FakeHttpClient(statusCode: 200);
+      ApiService.overrideHttpClient(fakeClient);
+
       final service = LogUploadService(
         logOutput: logOutput,
-        client: fakeClient,
         getDeviceId: () async => 'my-device',
-        getBaseUrl: () => 'http://server',
         getLogsDir: () async => tempDir.path,
       );
 
@@ -92,16 +92,14 @@ void main() {
       final file = File('${tempDir.path}/$today.log');
       file.writeAsStringSync('line1\nline2\n');
 
-      final logOutput = ServerLogOutput(
-        getDeviceId: () async => '',
-      );
+      final logOutput = ServerLogOutput(getDeviceId: () async => '');
       logOutput.setByteOffset(6);
+
+      ApiService.overrideHttpClient(_FakeHttpClient(statusCode: 200));
 
       final service = LogUploadService(
         logOutput: logOutput,
-        client: _FakeHttpClient(statusCode: 200),
         getDeviceId: () async => 'dev',
-        getBaseUrl: () => 'http://server',
         getLogsDir: () async => tempDir.path,
       );
 
@@ -115,16 +113,14 @@ void main() {
       final file = File('${tempDir.path}/$today.log');
       file.writeAsStringSync('line1\nline2\n');
 
-      final logOutput = ServerLogOutput(
-        getDeviceId: () async => '',
-      );
+      final logOutput = ServerLogOutput(getDeviceId: () async => '');
       logOutput.setByteOffset(6);
+
+      ApiService.overrideHttpClient(_FakeHttpClient(statusCode: 500));
 
       final service = LogUploadService(
         logOutput: logOutput,
-        client: _FakeHttpClient(statusCode: 500),
         getDeviceId: () async => 'dev',
-        getBaseUrl: () => 'http://server',
         getLogsDir: () async => tempDir.path,
       );
 
@@ -134,16 +130,13 @@ void main() {
     });
 
     test('is a no-op when log file does not exist', () async {
-      final logOutput = ServerLogOutput(
-        getDeviceId: () async => '',
-      );
+      final logOutput = ServerLogOutput(getDeviceId: () async => '');
       final fakeClient = _FakeHttpClient();
+      ApiService.overrideHttpClient(fakeClient);
 
       final service = LogUploadService(
         logOutput: logOutput,
-        client: fakeClient,
         getDeviceId: () async => 'dev',
-        getBaseUrl: () => 'http://server',
         getLogsDir: () async => tempDir.path, // empty dir — no log file
       );
 
@@ -157,17 +150,15 @@ void main() {
       final file = File('${tempDir.path}/$today.log');
       file.writeAsStringSync('line1\n');
 
-      final logOutput = ServerLogOutput(
-        getDeviceId: () async => '',
-      );
+      final logOutput = ServerLogOutput(getDeviceId: () async => '');
       logOutput.setByteOffset(6); // whole file already sent
 
       final fakeClient = _FakeHttpClient();
+      ApiService.overrideHttpClient(fakeClient);
+
       final service = LogUploadService(
         logOutput: logOutput,
-        client: fakeClient,
         getDeviceId: () async => 'dev',
-        getBaseUrl: () => 'http://server',
         getLogsDir: () async => tempDir.path,
       );
 

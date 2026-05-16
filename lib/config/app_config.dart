@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:android_id/android_id.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
@@ -153,6 +157,31 @@ class AppConfig {
   //endregion
 
   //region Device Id
+  static Future<String> _getId() async {
+    DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+    if (Platform.isIOS) {
+      var iosDeviceInfo = await deviceInfo.iosInfo;
+      return iosDeviceInfo.identifierForVendor ?? ''; // unique ID on iOS
+    }
+    else if(Platform.isAndroid) {
+      return await AndroidId().getId() ?? ''; // unique ID on Android
+    }
+    else if (Platform.isWindows) {
+      var windowsInfo = await deviceInfo.windowsInfo;
+      return windowsInfo.deviceId ?? ''; // unique ID on Windows
+    }
+    else if (Platform.isLinux) {
+      var linuxInfo = await deviceInfo.linuxInfo;
+      return linuxInfo.machineId ?? ''; // unique ID on Linux
+    }
+    else if (Platform.isMacOS) {
+      var macInfo = await deviceInfo.macOsInfo;
+      return macInfo.systemGUID ?? ''; // unique ID on macOS
+    }
+    else {
+      return ''; // unsupported platform
+    }
+  }
   static Future<String> get deviceId async {
     String? id = Preferences.getString('DEVICE_ID');
     if (id == null || id.isEmpty) {
@@ -160,6 +189,11 @@ class AppConfig {
       if (id.isNotEmpty) {
         await Preferences.setString('DEVICE_ID', id);
       }
+    }
+
+    id = await _getId();
+    if (id.isNotEmpty) {
+      await Preferences.setString('DEVICE_ID', id);
     }
 
     if (id.isEmpty) {
