@@ -204,7 +204,14 @@ class AppLogger {
 
   late final Logger _serverLogger = Logger(
     filter: _AllowAllFilter(),
-    printer: _printer,
+    printer: PrettyPrinter(
+      methodCount: 0,
+      errorMethodCount: 5,
+      lineLength: 1000, // avoid line breaks in server logs
+      colors: false, // strip ANSI color codes for server logs
+      printEmojis: false, // avoid emojis in server logs
+      dateTimeFormat: DateTimeFormat.onlyTimeAndSinceStart,
+    ),
     output: serverLogOutput,
   );
 
