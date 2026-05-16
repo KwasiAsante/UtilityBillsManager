@@ -47,9 +47,8 @@ void main() {
     test('does not flush when buffer has fewer than 20 lines', () async {
       final fake = _FakeHttpClient();
       final output = ServerLogOutput(
-        client: fake,
         getDeviceId: () async => 'dev-1',
-        getBaseUrl: () => 'http://localhost',
+        client: fake,
       );
       addTearDown(output.destroy);
 
@@ -67,9 +66,8 @@ void main() {
     test('flushes when buffer reaches 20 lines and advances byteOffset', () async {
       final fake = _FakeHttpClient(statusCode: 200);
       final output = ServerLogOutput(
-        client: fake,
         getDeviceId: () async => 'dev-1',
-        getBaseUrl: () => 'http://localhost',
+        client: fake,
       );
       addTearDown(output.destroy);
 
@@ -96,9 +94,8 @@ void main() {
     test('does not advance byteOffset on non-200 response', () async {
       final fake = _FakeHttpClient(statusCode: 500);
       final output = ServerLogOutput(
-        client: fake,
         getDeviceId: () async => 'dev-1',
-        getBaseUrl: () => 'http://localhost',
+        client: fake,
       );
       addTearDown(output.destroy);
 
@@ -114,9 +111,8 @@ void main() {
     test('is silent on network error', () async {
       final failingClient = _FailingHttpClient();
       final output = ServerLogOutput(
-        client: failingClient,
         getDeviceId: () async => 'dev-1',
-        getBaseUrl: () => 'http://localhost',
+        client: failingClient,
       );
       addTearDown(output.destroy);
 
@@ -134,9 +130,8 @@ void main() {
     test('destroy flushes partial buffer', () async {
       final fake = _FakeHttpClient(statusCode: 200);
       final output = ServerLogOutput(
-        client: fake,
         getDeviceId: () async => 'dev-1',
-        getBaseUrl: () => 'http://localhost',
+        client: fake,
       );
 
       // Add fewer than 20 lines (would not auto-flush)

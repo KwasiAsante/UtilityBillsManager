@@ -65,7 +65,6 @@ void main() {
 
       final logOutput = ServerLogOutput(
         getDeviceId: () async => '',
-        getBaseUrl: () => '',
       );
       logOutput.setByteOffset(6); // simulate 'line1\n' already sent
 
@@ -95,7 +94,6 @@ void main() {
 
       final logOutput = ServerLogOutput(
         getDeviceId: () async => '',
-        getBaseUrl: () => '',
       );
       logOutput.setByteOffset(6);
 
@@ -119,7 +117,6 @@ void main() {
 
       final logOutput = ServerLogOutput(
         getDeviceId: () async => '',
-        getBaseUrl: () => '',
       );
       logOutput.setByteOffset(6);
 
@@ -139,7 +136,6 @@ void main() {
     test('is a no-op when log file does not exist', () async {
       final logOutput = ServerLogOutput(
         getDeviceId: () async => '',
-        getBaseUrl: () => '',
       );
       final fakeClient = _FakeHttpClient();
 
@@ -163,7 +159,6 @@ void main() {
 
       final logOutput = ServerLogOutput(
         getDeviceId: () async => '',
-        getBaseUrl: () => '',
       );
       logOutput.setByteOffset(6); // whole file already sent
 

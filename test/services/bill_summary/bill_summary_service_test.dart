@@ -227,8 +227,9 @@ void main() {
       // (90 * 50/100).round() = 45
       final msg = service.generateMessage(rentor, [bill],
           now: DateTime(2026, 4, 15, 8));
+      // now=Apr 15 → ref.day=15 >= 13 → floorDay=27; avgDay=15 < 27 → April 27th
       expect(msg,
-          equals('Good morning Alex, the electric bill is \$45.00 due April 15th.'));
+          equals('Good morning Alex, the electric bill is \$45.00 due April 27th.'));
     });
 
     test('two regular bills joined with "and", no comma', () {
@@ -239,14 +240,14 @@ void main() {
           dueDate: DateTime(2026, 4, 10));
       final gas = makeBill(
           type: BillType.gas, amount: 60.0, dueDate: DateTime(2026, 4, 20));
-      // avg day = (10+20)/2 = 15 → April 15th
+      // avg day = (10+20)/2 = 15; now=Apr 1 → floorDay=20; 15 < 20 → April 20th
       // electric: 45.00, gas: 30.00
       final msg = service.generateMessage(rentor, [electric, gas],
           now: DateTime(2026, 4, 1, 8));
       expect(
           msg,
           equals(
-              'Good morning Alex, the electric bill is \$45.00 and gas bill is \$30.00 due April 15th.'));
+              'Good morning Alex, the electric bill is \$45.00 and gas bill is \$30.00 due April 20th.'));
     });
 
     test('three regular bills: Oxford comma before last', () {
@@ -262,12 +263,13 @@ void main() {
           amount: 50.0,
           dueDate: DateTime(2026, 4, 15));
       // electric: 45.00, gas: 30.00, internet: 25.00
+      // now=Apr 1 → floorDay=20; avgDay=15 < 20 → April 20th
       final msg = service.generateMessage(rentor, [electric, gas, internet],
           now: DateTime(2026, 4, 1, 8));
       expect(
           msg,
           equals(
-              'Good morning Alex, the electric bill is \$45.00, gas bill is \$30.00, and internet bill is \$25.00 due April 15th.'));
+              'Good morning Alex, the electric bill is \$45.00, gas bill is \$30.00, and internet bill is \$25.00 due April 20th.'));
     });
 
     test('water bill only', () {
@@ -291,55 +293,68 @@ void main() {
           type: BillType.water, amount: 80.0, dueDate: DateTime(2026, 5, 1));
       final msg = service.generateMessage(rentor, [electric, water],
           now: DateTime(2026, 4, 15, 8));
+      // now=Apr 15 → floorDay=27; avgDay=15 < 27 → April 27th for regular bills
       expect(
           msg,
           equals(
-              'Good morning Alex, the electric bill is \$45.00 due April 15th. The water bill is \$40.00 due May 1st.'));
+              'Good morning Alex, the electric bill is \$45.00 due April 27th. The water bill is \$40.00 due May 1st.'));
     });
   });
 
   group('generateMessage — ordinal date suffixes', () {
+    // Regular electric bills: floor logic applies (floor = 20 when ref.day < 13,
+    // 27 when ref.day >= 13). Use for due days >= 20.
     Bill billDue(int day) => makeBill(
         type: BillType.electric,
         amount: 90.0,
         dueDate: DateTime(2026, 4, day));
+
+    // Water bills due in May: no floor applied, so the literal due date appears
+    // in the message. Used to test ordinal suffixes for days < 20 (1–13).
+    Bill waterBillDueInMay(int day) => makeBill(
+        type: BillType.water,
+        amount: 90.0,
+        dueDate: DateTime(2026, 5, day));
+
     final rentor = makeRentor(defaultPercentage: 50.0);
 
+    // Days 1–13 get floored for regular bills, so we use water bills (due in
+    // the following month) which preserve the literal dueDate.
     test('1st', () {
       expect(
-          service.generateMessage(rentor, [billDue(1)],
+          service.generateMessage(rentor, [waterBillDueInMay(1)],
               now: DateTime(2026, 4, 1, 8)),
-          contains('April 1st'));
+          contains('May 1st'));
     });
     test('2nd', () {
       expect(
-          service.generateMessage(rentor, [billDue(2)],
+          service.generateMessage(rentor, [waterBillDueInMay(2)],
               now: DateTime(2026, 4, 1, 8)),
-          contains('April 2nd'));
+          contains('May 2nd'));
     });
     test('3rd', () {
       expect(
-          service.generateMessage(rentor, [billDue(3)],
+          service.generateMessage(rentor, [waterBillDueInMay(3)],
               now: DateTime(2026, 4, 1, 8)),
-          contains('April 3rd'));
+          contains('May 3rd'));
     });
     test('11th (special case)', () {
       expect(
-          service.generateMessage(rentor, [billDue(11)],
+          service.generateMessage(rentor, [waterBillDueInMay(11)],
               now: DateTime(2026, 4, 1, 8)),
-          contains('April 11th'));
+          contains('May 11th'));
     });
     test('12th (special case)', () {
       expect(
-          service.generateMessage(rentor, [billDue(12)],
+          service.generateMessage(rentor, [waterBillDueInMay(12)],
               now: DateTime(2026, 4, 1, 8)),
-          contains('April 12th'));
+          contains('May 12th'));
     });
     test('13th (special case)', () {
       expect(
-          service.generateMessage(rentor, [billDue(13)],
+          service.generateMessage(rentor, [waterBillDueInMay(13)],
               now: DateTime(2026, 4, 1, 8)),
-          contains('April 13th'));
+          contains('May 13th'));
     });
     test('21st', () {
       expect(

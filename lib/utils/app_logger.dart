@@ -44,9 +44,10 @@ class _FileLogOutput extends LogOutput {
   Future<void> _initAsync() async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
-      _logsDir = (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
-          ? Directory('${appDir.path}/Utility Bills Manager/logs')
-          : Directory('${appDir.path}/logs');
+      _logsDir =
+          (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+              ? Directory('${appDir.path}/Utility Bills Manager/logs')
+              : Directory('${appDir.path}/logs');
       await _logsDir!.create(recursive: true);
     } catch (_) {
       // If we cannot create the directory, disable file logging silently.
@@ -144,12 +145,19 @@ class _FileLogOutput extends LogOutput {
 // AppLogger
 // ---------------------------------------------------------------------------
 
-/// Singleton logger that writes to two destinations simultaneously:
+/// Singleton logger with three independent output destinations:
 ///
-/// 1. **Console (stdout)** – coloured [PrettyPrinter] output.
+/// 1. **Console (stdout)** – always active, coloured [PrettyPrinter] output.
 /// 2. **File** – plain-text daily-rotating files under
 ///    `<documents>/logs/yyyy-MM-dd[_N].log`.  A new file is created once the
 ///    current one reaches [_fileMaxBytes] (default 5 MB).
+/// 3. **Server** – forwarded to [ServerLogOutput] for remote upload.
+///
+/// Every log method accepts two optional routing flags in addition to the
+/// standard `error` / `stackTrace` parameters:
+///
+/// - `toFile` (default `true`) — write this message to the log file.
+/// - `toServer` (default `true`) — forward this message to the server.
 ///
 /// Use the level helpers matching the severity of each message:
 /// - [t] – trace / extremely verbose
@@ -158,9 +166,6 @@ class _FileLogOutput extends LogOutput {
 /// - [w] – warnings / unexpected-but-recoverable situations
 /// - [e] – errors that need investigation
 /// - [f] – fatal / unrecoverable failures
-///
-/// The underlying [Logger] uses the default [DevelopmentFilter], so debug
-/// output is suppressed automatically in release builds.
 ///
 /// Each message is automatically prefixed with the calling class/method name,
 /// e.g. `[ApiService.fetchBills] Error fetching bills`.
@@ -176,21 +181,31 @@ class AppLogger {
   /// instance that is registered in the logger.
   final ServerLogOutput serverLogOutput = ServerLogOutput();
 
-  late final Logger _logger = Logger(
+  static PrettyPrinter get _printer => PrettyPrinter(
+    methodCount: 0,
+    errorMethodCount: 5,
+    lineLength: 80,
+    colors: true,
+    printEmojis: true,
+    dateTimeFormat: DateTimeFormat.onlyTimeAndSinceStart,
+  );
+
+  late final Logger _consoleLogger = Logger(
     filter: _AllowAllFilter(),
-    printer: PrettyPrinter(
-      methodCount: 0,
-      errorMethodCount: 5,
-      lineLength: 80,
-      colors: true,
-      printEmojis: true,
-      dateTimeFormat: DateTimeFormat.onlyTimeAndSinceStart,
-    ),
-    output: MultiOutput([
-      ConsoleOutput(),
-      _FileLogOutput(maxFileSizeBytes: _fileMaxBytes),
-      serverLogOutput,
-    ]),
+    printer: _printer,
+    output: ConsoleOutput(),
+  );
+
+  late final Logger _fileLogger = Logger(
+    filter: _AllowAllFilter(),
+    printer: _printer,
+    output: _FileLogOutput(maxFileSizeBytes: _fileMaxBytes),
+  );
+
+  late final Logger _serverLogger = Logger(
+    filter: _AllowAllFilter(),
+    printer: _printer,
+    output: serverLogOutput,
   );
 
   // --- caller resolution ----------------------------------------------------
@@ -212,9 +227,9 @@ class AppLogger {
       if (vmMatch != null) return '[${vmMatch.group(1)}] ';
 
       // Web DDC format: package:path/to/file.dart line:col   methodName
-      final webMatch =
-          RegExp(r'package:[^\s]+/([^/]+)\.dart\s+\d+:\d+\s+(.+)$')
-              .firstMatch(frame);
+      final webMatch = RegExp(
+        r'package:[^\s]+/([^/]+)\.dart\s+\d+:\d+\s+(.+)$',
+      ).firstMatch(frame);
       if (webMatch != null) {
         return '[${webMatch.group(1)!}.${webMatch.group(2)!}] ';
       }
@@ -222,35 +237,105 @@ class AppLogger {
     return '';
   }
 
+  void _log(
+    void Function(Logger) logFn, {
+    required bool toFile,
+    required bool toServer,
+  }) {
+    logFn(_consoleLogger);
+    if (toFile) logFn(_fileLogger);
+    if (toServer) logFn(_serverLogger);
+  }
+
   // --- public API -----------------------------------------------------------
 
-  void t(dynamic message, {Object? error, StackTrace? stackTrace}) {
-    final caller = _caller(StackTrace.current);
-    _logger.t('$caller$message', error: error, stackTrace: stackTrace);
+  void t(
+    dynamic message, {
+    Object? error,
+    StackTrace? stackTrace,
+    bool toFile = true,
+    bool toServer = true,
+  }) {
+    final msg = '${_caller(StackTrace.current)}$message';
+    _log(
+      (l) => l.t(msg, error: error, stackTrace: stackTrace),
+      toFile: toFile,
+      toServer: toServer,
+    );
   }
 
-  void d(dynamic message, {Object? error, StackTrace? stackTrace}) {
-    final caller = _caller(StackTrace.current);
-    _logger.d('$caller$message', error: error, stackTrace: stackTrace);
+  void d(
+    dynamic message, {
+    Object? error,
+    StackTrace? stackTrace,
+    bool toFile = true,
+    bool toServer = true,
+  }) {
+    final msg = '${_caller(StackTrace.current)}$message';
+    _log(
+      (l) => l.d(msg, error: error, stackTrace: stackTrace),
+      toFile: toFile,
+      toServer: toServer,
+    );
   }
 
-  void i(dynamic message, {Object? error, StackTrace? stackTrace}) {
-    final caller = _caller(StackTrace.current);
-    _logger.i('$caller$message', error: error, stackTrace: stackTrace);
+  void i(
+    dynamic message, {
+    Object? error,
+    StackTrace? stackTrace,
+    bool toFile = true,
+    bool toServer = true,
+  }) {
+    final msg = '${_caller(StackTrace.current)}$message';
+    _log(
+      (l) => l.i(msg, error: error, stackTrace: stackTrace),
+      toFile: toFile,
+      toServer: toServer,
+    );
   }
 
-  void w(dynamic message, {Object? error, StackTrace? stackTrace}) {
-    final caller = _caller(StackTrace.current);
-    _logger.w('$caller$message', error: error, stackTrace: stackTrace);
+  void w(
+    dynamic message, {
+    Object? error,
+    StackTrace? stackTrace,
+    bool toFile = true,
+    bool toServer = true,
+  }) {
+    final msg = '${_caller(StackTrace.current)}$message';
+    _log(
+      (l) => l.w(msg, error: error, stackTrace: stackTrace),
+      toFile: toFile,
+      toServer: toServer,
+    );
   }
 
-  void e(dynamic message, {Object? error, StackTrace? stackTrace}) {
-    final caller = _caller(StackTrace.current);
-    _logger.e('$caller$message', error: error, stackTrace: stackTrace);
+  void e(
+    dynamic message, {
+    Object? error,
+    StackTrace? stackTrace,
+    bool toFile = true,
+    bool toServer = true,
+  }) {
+    final msg = '${_caller(StackTrace.current)}$message';
+    _log(
+      (l) => l.e(msg, error: error, stackTrace: stackTrace),
+      toFile: toFile,
+      toServer: toServer,
+    );
   }
 
-  void f(dynamic message, {Object? error, StackTrace? stackTrace}) {
-    final caller = _caller(StackTrace.current);
-    _logger.f('$caller$message', error: error, stackTrace: stackTrace);
+  void f(
+    dynamic message, {
+    Object? error,
+    StackTrace? stackTrace,
+    bool toFile = true,
+    bool toServer = true,
+  }) {
+    final msg = '${_caller(StackTrace.current)}$message';
+    _log(
+      (l) => l.f(msg, error: error, stackTrace: stackTrace),
+      toFile: toFile,
+      toServer: toServer,
+    );
   }
 }

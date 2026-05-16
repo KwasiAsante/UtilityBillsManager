@@ -31,6 +31,7 @@ import 'utils/windows/data_migration.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 final notificationService = createNotificationService();
+AppLogger _logger = AppLogger();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,15 +39,18 @@ void main() async {
   await addAppMeta();
 
   if (kIsWeb) {
-    AppLogger().i('Running on web platform');
+   _logger.i('Running on web platform');
   } else {
-    AppLogger().i('Running on ${defaultTargetPlatform.name} platform');
+   _logger.i('Running on ${defaultTargetPlatform.name} platform');
     if (defaultTargetPlatform == TargetPlatform.windows) {
       await DataMigration.runIfNeeded();
       await initWindowManager();
       await initTrayManager();
     }
   }
+
+  var deviceId = await AppConfig.deviceId;
+  _logger.i("Device Id: $deviceId", toFile: false, toServer: false);
 
   // runApp is called here so the window immediately renders a loading screen
   // instead of staying blank while async initialization runs.
@@ -57,7 +61,7 @@ dynamic addAppMeta() async {
   PackageInfo packageInfo = await PackageInfo.fromPlatform();
   String version = packageInfo.version;
   String buildNum = packageInfo.buildNumber;
-  AppLogger().i('App version: $version.$buildNum');
+ _logger.i('App version: $version.$buildNum');
 }
 
 /// Runs all async startup steps inside the widget tree.
@@ -79,54 +83,54 @@ class _AppInitializerState extends State<AppInitializer> {
     // Firebase is not configured for Linux.
     if (defaultTargetPlatform != TargetPlatform.linux) {
       try {
-        AppLogger().d('[AppInitializer] Firebase init...');
+       _logger.d('[AppInitializer] Firebase init...');
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         ).timeout(const Duration(seconds: 15));
-        AppLogger().d('[AppInitializer] Firebase init done');
+       _logger.d('[AppInitializer] Firebase init done');
       } catch (e) {
-        AppLogger().w('[AppInitializer] Firebase init failed or timed out: $e');
+       _logger.w('[AppInitializer] Firebase init failed or timed out: $e');
       }
     }
 
     try {
-      AppLogger().d('[AppInitializer] pdfrx init...');
+     _logger.d('[AppInitializer] pdfrx init...');
       await pdfrxFlutterInitialize(dismissPdfiumWasmWarnings: true)
           .timeout(const Duration(seconds: 15));
-      AppLogger().d('[AppInitializer] pdfrx init done');
+     _logger.d('[AppInitializer] pdfrx init done');
     } catch (e) {
-      AppLogger().w('[AppInitializer] pdfrx init failed or timed out: $e');
+     _logger.w('[AppInitializer] pdfrx init failed or timed out: $e');
     }
 
-    AppLogger().d('[AppInitializer] AppConfig init...');
+   _logger.d('[AppInitializer] AppConfig init...');
     await AppConfig.init();
 
     // Start end-of-day log upload service (file system not available on web)
     if (!kIsWeb) {
-      LogUploadService(logOutput: AppLogger().serverLogOutput).start();
+      LogUploadService(logOutput:_logger.serverLogOutput).start();
     }
 
     AppState().localDB = AppConfig.mode == AppMode.server;
 
     initDb();
 
-    AppLogger().d('[AppInitializer] Database open...');
+   _logger.d('[AppInitializer] Database open...');
     await DatabaseHelper().database;
-    AppLogger().d('[AppInitializer] Database open done');
+   _logger.d('[AppInitializer] Database open done');
 
     await AppConfig.load();
 
     ApiService.configure(baseUrl: AppConfig.apiBaseUrl);
     await AuthService().loadFromPrefs();
 
-    AppLogger().d('[AppInitializer] ServerConfiguration init...');
+   _logger.d('[AppInitializer] ServerConfiguration init...');
     await ServerConfiguration.init();
 
-    AppLogger().d('[AppInitializer] Notification service init...');
+   _logger.d('[AppInitializer] Notification service init...');
     await notificationService.initialize();
     notificationService.setNavigatorKey(navigatorKey);
     await notificationService.handleLaunchNotification();
-    AppLogger().d('[AppInitializer] Startup complete');
+   _logger.d('[AppInitializer] Startup complete');
   }
 
   @override
@@ -135,7 +139,7 @@ class _AppInitializerState extends State<AppInitializer> {
       future: _initFuture,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          AppLogger().e(
+         _logger.e(
             '[AppInitializer] Fatal init error: ${snapshot.error}',
             error: snapshot.error,
             stackTrace: snapshot.stackTrace,

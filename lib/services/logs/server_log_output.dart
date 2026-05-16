@@ -4,8 +4,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
+import 'package:utility_bills_manager/services/api/api_service.dart';
 
 import '../../config/app_config.dart';
+import '../../data/models/result.dart' show Result;
 
 /// Streams log events to the remote Loki endpoint via `POST /logs/device`.
 ///
@@ -20,16 +22,13 @@ import '../../config/app_config.dart';
 ///   [byteOffset] byte counts align with the on-device log file bytes.
 class ServerLogOutput extends LogOutput {
   ServerLogOutput({
-    http.Client? client,
     Future<String> Function()? getDeviceId,
-    String Function()? getBaseUrl,
-  })  : _client = client ?? http.Client(),
-        _getDeviceId = getDeviceId ?? (() => AppConfig.deviceId),
-        _getBaseUrl = getBaseUrl ?? (() => AppConfig.apiBaseUrl);
+    http.Client? client,
+  })  : _getDeviceId = getDeviceId ?? (() => AppConfig.deviceId),
+        _client = client;
 
-  final http.Client _client;
+  final http.Client? _client;
   final Future<String> Function() _getDeviceId;
-  final String Function() _getBaseUrl;
 
   final List<String> _buffer = [];
   int _byteOffset = 0;
@@ -70,22 +69,26 @@ class ServerLogOutput extends LogOutput {
 
     try {
       final deviceId = await _getDeviceId();
-      final baseUrl = _getBaseUrl();
-      final uri = Uri.parse('$baseUrl/logs/device');
+      bool success;
 
-      final payload = jsonEncode(lines);
-      final response = await _client
-          .post(
-            uri,
-            headers: {
-              'Content-Type': 'application/json',
-              'x-device-id': deviceId,
-            },
-            body: payload,
-          )
-          .timeout(const Duration(seconds: 10));
+      if (_client != null) {
+        final response = await _client!
+            .post(
+              Uri.parse('${ApiService.baseUrl}/logs/device'),
+              body: jsonEncode(lines),
+              headers: {
+                'Content-Type': 'application/json',
+                'x-device-id': deviceId,
+              },
+            )
+            .timeout(const Duration(seconds: 10));
+        success = response.statusCode == 200;
+      } else {
+        final result = await ApiService.log().deviceLog(deviceId, lines);
+        success = result.isSuccess;
+      }
 
-      if (response.statusCode == 200) {
+      if (success) {
         final byteCount = lines.fold<int>(
           0,
           (sum, line) => sum + utf8.encode(line).length,
