@@ -1,108 +1,469 @@
 # Utility Bills Manager
 
-A cross-platform Flutter application for tracking utility bills, managing rentor payments, and syncing bill data from Gmail — with CSV and PDF export.
+A cross-platform Flutter application for tracking utility bills, managing rentor payments, and syncing bill data from Gmail — with CSV and PDF export, real-time push notifications, and an in-app auto-update checker.
+
+Runs on **Android, iOS, macOS, Windows, Linux, and Web**.
+
+---
+
+## Table of Contents
+
+- [Features](#features)
+- [System Architecture](#system-architecture)
+- [App Startup Flow](#app-startup-flow)
+- [Code Structure](#code-structure)
+- [Data Layer](#data-layer)
+- [Notification & Real-Time Flow](#notification--real-time-flow)
+- [Update Checker](#update-checker)
+- [Getting Started](#getting-started)
+- [Deployment & Release](#deployment--release)
+- [Key Dependencies](#key-dependencies)
+
+---
 
 ## Features
 
-- **Bill Management** — Create, edit, and delete utility bills (electric, gas, water, internet). Track due dates, amounts, and payment status (paid / partial / unpaid).
-- **Payment Tracking** — Log payments, assign them to specific bills and rentors, and automatically reverse applied amounts when a payment is deleted.
-- **Rentor Management** — Manage rentors, assign them to bills, track how much each owes, and record their last payment date. The add/edit form includes a **Calculate Amount Owed** button: select a month from periods that have unpaid or partial bills, and the app shows a per-bill-type breakdown of what the rentor still owes (accounting for their percentage overrides, excluded bill types, and payments already made). The calculated total is saved to a read-only field on the form.
-- **Email Sync (Gmail)** — Sign in with Google to pull bill-related emails from your inbox. Parsed emails are matched to bills and payments automatically.
-- **Summary Screen** — Monthly overview grouped by bill type, with "considered paid" threshold logic (e.g. electric/gas/water ≤ 30% unpaid treated as paid). Toggle visibility of actual unpaid amounts. A **Rentors Owed** card at the top of the screen shows what each rentor owes toward the current month's unpaid bills, broken down by bill type.
+- **Bill Management** — Create, edit, and delete utility bills (electric, gas, water, internet, credit card). Track due dates, amounts, and payment status (paid / partial / unpaid).
+- **Payment Tracking** — Log payments, assign them to specific bills and rentors. Deleting a payment automatically reverses applied amounts.
+- **Rentor Management** — Manage rentors, assign percentage splits per bill type, exclude bill types, and track what each rentor owes. The **Calculate Amount Owed** button shows a per-bill-type breakdown accounting for percentages, exclusions, and prior payments.
+- **Email Sync (Gmail / IMAP)** — Sign in with Google (web) or connect via IMAP (native) to pull bill-related emails. Parsed emails are matched to bills and payments automatically. Sync can be triggered on-demand or run on a schedule.
+- **Summary Screen** — Monthly overview grouped by bill type with "considered paid" threshold logic. A **Rentors Owed** card at the top shows what each rentor owes for the current month.
+- **Bill Summary Messages** — Select bills, preview a generated message (using a configurable template), and share directly to WhatsApp or any messaging app.
 - **Export** — Export summaries as CSV or PDF, including per-bill rentor contributions.
-- **Real-time Notifications** — Server-Sent Events (SSE) connection to the companion server pushes `newBill` / `newPayment` events instantly. Firebase Cloud Messaging (FCM) handles push notifications when the app is backgrounded. In-app notification bell with unread badge and slide-in panel.
-- **Settings** — In-app settings accessible from every screen via a gear icon. `AppConfigScreen` lets you update the API base URL with a live reachability indicator. `ServerConfigScreen` lets you update IMAP credentials and email sync scheduling parameters directly from the app.
-- **Local Notifications** — Bill due-date reminders via `flutter_local_notifications`.
-- **In-App Update Checker** — On startup the app fetches `latest.json` from GitHub Pages and compares it to the running version using semver + build-number fallback. When a newer release is available a `MaterialBanner` appears at the top of every screen. Dismissal is per-version (stored in `SharedPreferences`) so the banner reappears only for new releases. On Windows a dialog offers all three installer formats (EXE, MSI, MSIX); on other platforms the platform-appropriate download URL is opened directly.
-- **Cross-platform** — Runs on Android, iOS, macOS, Windows, Linux, and Web.
+- **Real-Time Notifications** — Server-Sent Events (SSE) push `newBill` / `newPayment` events instantly. Firebase Cloud Messaging (FCM) handles push when the app is backgrounded. In-app notification bell with unread badge and slide-in panel.
+- **In-App Update Checker** — Polls `latest.json` from GitHub Pages on startup. When a newer version is found, a `MaterialBanner` appears on every screen. On Windows a dialog offers all three installer formats (EXE, MSI, MSIX).
+- **Settings** — API base URL with live reachability check; IMAP credentials and sync schedule configurable from within the app.
+- **Windows Extras** — System tray icon, window lifecycle management, InnoSetup EXE and WiX MSI installers, MSIX auto-update via `.appinstaller`.
 
-## Architecture
+---
+
+## System Architecture
+
+The app always runs in **client mode**, talking to a companion Dart shelf server (`utility_bills_server`) over HTTP. The server manages the SQLite database, email sync, and FCM token registration.
+
+```mermaid
+graph TD
+    subgraph Client["Flutter App (Client)"]
+        UI[Screens / Widgets]
+        Repo[Repositories<br/>ChangeNotifier singletons]
+        Helper[Helpers<br/>bill · payment · rentor · email]
+        API[ApiService<br/>HTTP facade]
+        SSE[SseService<br/>persistent connection]
+        FCM[Firebase SDK<br/>background push]
+        Update[UpdateService<br/>latest.json]
+    end
+
+    subgraph Server["utility_bills_server (Dart shelf)"]
+        REST[REST Endpoints]
+        SyncEngine[Email Sync Engine<br/>IMAP / Gmail API]
+        SSESrv[SSE /connect]
+        DB[(SQLite)]
+    end
+
+    subgraph External
+        Gmail[Gmail / IMAP]
+        GHPages[GitHub Pages<br/>latest.json<br/>.appinstaller]
+        FCMCloud[Firebase Cloud Messaging]
+    end
+
+    UI --> Repo --> Helper --> API --> REST
+    REST --> DB
+    SSE -- persistent GET /connect --> SSESrv
+    SSESrv -- push events --> SSE
+    SSE --> Repo
+    SyncEngine --> Gmail
+    REST --> SyncEngine
+    FCMCloud --> FCM
+    FCM --> UI
+    Update --> GHPages
+```
+
+### Request / Response Flow
+
+```mermaid
+sequenceDiagram
+    participant Screen
+    participant Repository
+    participant Helper
+    participant ApiService
+    participant Server
+
+    Screen->>Repository: create / update / delete
+    Repository->>Helper: delegate
+    Helper->>ApiService: POST / PUT / DELETE
+    ApiService->>Server: HTTP + Bearer token
+    Server-->>ApiService: 200 JSON
+    ApiService-->>Helper: Result<T>
+    Helper-->>Repository: success
+    Repository->>Repository: reload()
+    Repository-->>Screen: notifyListeners()
+```
+
+---
+
+## App Startup Flow
+
+```mermaid
+flowchart TD
+    A([App Launch]) --> B[Flutter bindings init]
+    B --> C[AppConfig.init\nload SharedPreferences]
+    C --> D{Windows?}
+    D -- Yes --> E[WindowManager init\nTrayManager init]
+    D -- No --> F
+    E --> F[runApp — show loading spinner]
+    F --> G[AppInitializer]
+    G --> H[Firebase.initializeApp]
+    H --> I[pdfrx init]
+    I --> J[DatabaseHelper.database\nopen SQLite · run migrations]
+    J --> K[AppConfig.load\nread app_configuration table]
+    K --> L[ServerConfiguration.load\nread IMAP config + decrypt secrets]
+    L --> M[NotificationServiceFactory\ncreate platform-correct impl]
+    M --> N[FCM token → POST /device/token]
+    N --> O[DataMigration.runIfNeeded\nWindows APPDATA path migration]
+    O --> P[UpdateService.check\nfetch latest.json]
+    P --> Q[SseService.connect\nopen /connect stream]
+    Q --> R([Home Screen — MainTabScreen])
+```
+
+---
+
+## Code Structure
 
 ```
 lib/
-├── config/         # AppConfig (dart-define + encrypted local_secrets.json)
+├── config/
+│   ├── app_config.dart           # Mode, API URL, device ID, message template
+│   └── server_configuration.dart # IMAP config + AES-256-GCM secret decryption
+│
 ├── data/
-│   ├── models/     # Bill, Payment, Rentor, EmailData, ServerConfig, AppState
-│   └── repositories/ # ChangeNotifier singletons (Bills, Payments, Rentors, EmailData, ServerConfig)
-├── database/       # db_factory with web/native/stub conditional exports
+│   ├── models/                   # Bill, Payment, Rentor, EmailData,
+│   │   └── ...                   # AppConfiguration, ServerConfig, AuthSession,
+│   │                             # AppState, AppNotification, SseEvent, Result<T>
+│   └── repositories/             # ChangeNotifier singletons (one per domain)
+│       ├── bills_repository.dart
+│       ├── payments_repository.dart
+│       ├── rentors_repository.dart
+│       ├── email_data_repository.dart
+│       └── server_config_repository.dart
+│
+├── database/                     # SQLite factory — platform-conditional exports
+│   ├── db_factory.dart           # Public export (selects correct impl at compile time)
+│   ├── db_factory_native.dart    # sqflite_common_ffi (Windows / Linux / macOS)
+│   ├── db_factory_web.dart       # sqflite_common_ffi_web
+│   └── db_factory_stub.dart
+│
 ├── factory/
-│   └── notification/ # NotificationServiceFactory — createNotificationService() returns platform-correct impl
-├── helpers/        # Database, Bills, Payments, Rentors, Email, Configuration helpers
-├── screens/        # UI screens per domain (bills, payments, rentors, emails, summary, settings)
+│   ├── notification/             # createNotificationService() — platform factory
+│   └── windows/                  # WindowManager + TrayManager factories
+│
+├── helpers/                      # Business logic — bridge between Repository and storage
+│   ├── database/database_helper.dart   # Low-level CRUD; schema v18; migrations
+│   ├── bills/bills_helper.dart
+│   ├── payments/payments_helper.dart
+│   ├── rentors/rentors_helper.dart
+│   ├── email/email_data_helper.dart
+│   ├── configuration/
+│   │   ├── app_config_helper.dart
+│   │   └── server_config_helper.dart
+│   └── bill_readiness/bill_notification_tracker_helper.dart
+│
+├── screens/
+│   ├── auth/                     # login_screen · register_screen
+│   ├── base/                     # GoogleSignInScreenState mixin
+│   ├── bills/                    # bill_list_screen · add_edit_bill_screen
+│   ├── rentors/                  # rentor_list_screen · add_edit_rentor_screen
+│   ├── payments/                 # payment_list_screen · add_edit_payment_screen
+│   ├── emails/                   # email_list_screen · edit_email_data_screen
+│   ├── summary/                  # summary_screen
+│   ├── bill_summary/             # bill_selection_screen · message_preview_screen
+│   ├── settings/                 # settings_screen · app_config_screen · server_config_screen
+│   └── main_tab_screen.dart      # Root navigation shell (IndexedStack)
+│
 ├── services/
-│   ├── api/        # ApiService facade + Bills/Rentors/Payments/EmailData/Config/Notification clients
-│   ├── email/      # EmailService with web/native/stub conditional exports
-│   ├── google/     # GoogleAccountService with web/native/stub conditional exports
-│   ├── notification/ # NotificationService (abstract interface) + concrete native/web/windows impls; SseService
-│   └── update/     # UpdateService (fetches latest.json, caches result) + UpdateInfo (semver comparison, per-platform download URLs)
-├── widgets/        # Reusable widgets: NotificationBellIcon, NotificationPanel, SettingsIconButton, UpdateBanner
-└── utils/
-    ├── windows/    # DataMigration — one-time APPDATA path migration (com.example → AsanteDevs)
-    └── ...         # Parsers, calculators, export, logger, dialogs
+│   ├── api/api_service.dart      # HTTP facade + 8 domain service classes
+│   ├── auth/auth_service.dart    # Bearer token, login/logout, SharedPreferences
+│   ├── email/                    # IMAP (native) · Gmail API (web) · stub
+│   ├── google/                   # Google sign-in — native · web · stub
+│   ├── notification/             # Abstract interface + native/web/windows impls
+│   │   ├── sse_service*.dart     # SSE — dart:io (native) · EventSource (web)
+│   │   └── app_notification_store.dart   # In-app bell + slide-in panel
+│   ├── update/                   # UpdateService · UpdateInfo (semver comparison)
+│   ├── bill_readiness/           # Due-date reminder logic
+│   ├── bill_summary/             # Rentor message generation (pure functions)
+│   ├── windows/                  # WindowManagerService · TrayManagerService
+│   └── logs/                     # ServerLogOutput · LogUploadService
+│
+├── utils/
+│   ├── app_logger.dart           # Structured logging (local + optional server upload)
+│   ├── export_utils.dart         # CSV / PDF export
+│   ├── preferences.dart          # SharedPreferences wrapper
+│   ├── bills/bills_parser.dart
+│   ├── email/email_parser.dart
+│   ├── payments/payments_parser.dart
+│   ├── files/                    # file_utils · native_pdf_text_extractor
+│   ├── windows/                  # DataMigration · AppWindowsListener
+│   └── dialogs/                  # SyncOptionsDialog · DueDateFilterSheet
+│
+├── widgets/
+│   ├── notification_bell_icon.dart
+│   ├── notification_panel.dart
+│   ├── update_banner.dart
+│   └── responsive_constraint.dart
+│
+├── main.dart                     # Entry point + AppInitializer
+└── firebase_options.dart
 ```
 
-The app uses **SQLite** (`sqflite` / `sqflite_common_ffi` / `sqflite_common_ffi_web`) for local persistence with manual migrations (currently schema v15). The correct SQLite factory is selected at startup via a platform-conditional `db_factory`. Repositories are `ChangeNotifier` singletons that screens listen to for reactive updates.
+### Platform Conditional Exports
 
-Platform-specific behavior (database initialization, email/IMAP access, Google sign-in, SSE streaming, local notifications) is isolated behind conditional-export files (`_web`, `_native`, `_stub` variants) so the same codebase compiles cleanly on Android, iOS, macOS, Windows, Linux, and Web. The notification service uses a factory pattern: `NotificationService` is an abstract interface, and `createNotificationService()` (in `lib/factory/notification/`) returns the correct concrete implementation for each platform at startup.
+Platform-specific code is isolated via Dart's `if (dart.library.*)` conditional exports. The same public interface compiles correctly on all six platforms:
 
-**Firebase** (`firebase_core`, `firebase_auth`, `firebase_messaging`) is initialized at app startup. FCM handles push notifications when the app is backgrounded.
+| Interface | Native impl | Web impl | Stub |
+|---|---|---|---|
+| `db_factory` | `sqflite_common_ffi` | `sqflite_common_ffi_web` | — |
+| `EmailService` | `enough_mail` IMAP | Gmail REST API | no-op |
+| `GoogleAccountService` | `google_sign_in` native | `google_sign_in_web` | no-op |
+| `NotificationService` | `flutter_local_notifications` | Firebase web | Windows-specific |
+| `SseService` | `dart:io` HttpClient | `EventSource` API | — |
 
-The app runs exclusively in **client mode**, talking to a companion Dart shelf server (`utility_bills_server`) via `ApiService`. The server exposes REST endpoints for all resources plus `/bill/list/sync`, `/payment/list/sync`, and `/email/list/sync` for on-demand email sync, a `/config` endpoint for managing IMAP credentials remotely, and `POST /device/token` for FCM push notification registration.
+---
 
-**Windows branding** — `Runner.rc` sets `CompanyName` to `AsanteDevs` and `ProductName` to `Utility Bills Manager`. These values drive the `%APPDATA%` path used by `path_provider` (`%APPDATA%\AsanteDevs\Utility Bills Manager\`). On first launch after upgrading from an older build, `DataMigration.runIfNeeded()` automatically moves data from the old path (`%APPDATA%\com.example\utility_bills_manager\`) to the new one so no data is lost.
+## Data Layer
+
+### Database Schema (v18)
+
+```mermaid
+erDiagram
+    bills {
+        int id PK
+        string billId UK
+        string company
+        string type
+        float amount
+        string dueDate
+        string status
+        string notes
+        float amountPaid
+    }
+    rentors {
+        int id PK
+        string rentorId UK
+        string name
+        string email
+        string phone
+        float defaultPercentage
+        json billPercentages
+        json excludedBillTypes
+        string lastPaymentDate
+    }
+    payments {
+        int id PK
+        string paymentId UK
+        string rentorId FK
+        float amountPaid
+        string paymentDate
+    }
+    payment_bills {
+        int id PK
+        string paymentId FK
+        string billId FK
+        int applied
+        float appliedAmount
+    }
+    email_data {
+        int id PK
+        string emailDataId UK
+        string emailSubject
+        string emailBody
+        string emailId
+        string billId FK
+        string paymentId FK
+        int processed
+    }
+    configuration {
+        int id PK
+        string configId
+        string emailAddress
+        string emailPassword
+        string emailImapServer
+        int emailImapPort
+        int emailImapSecure
+        string emailEarliestDate
+        int emailSyncDelayDuration
+        int emailSyncInterval
+    }
+    app_configuration {
+        int id PK
+        string configId
+        string baseWebAPI
+        string messageTemplate
+    }
+    bill_notification_tracker {
+        int id PK
+        string rentorId FK
+        string billId FK
+        string billType
+        int month
+        int year
+        string receivedAt
+    }
+
+    rentors ||--o{ payments : "makes"
+    payments ||--o{ payment_bills : "covers"
+    bills ||--o{ payment_bills : "paid by"
+    bills ||--o{ email_data : "linked to"
+    payments ||--o{ email_data : "linked to"
+    rentors ||--o{ bill_notification_tracker : "tracked for"
+    bills ||--o{ bill_notification_tracker : "tracked by"
+```
+
+### Repository Pattern
+
+All repositories are `ChangeNotifier` singletons. Screens subscribe via `addListener()` and re-render when data changes. Write operations (create / update / delete) automatically call `reload()` on success.
+
+```mermaid
+flowchart LR
+    Screen -->|addListener| Repository
+    Repository -->|notifyListeners| Screen
+    Screen -->|create·update·delete| Repository
+    Repository --> Helper
+    Helper -->|client mode| ApiService
+    Helper -->|server mode| SQLite
+    ApiService --> Server
+```
+
+---
+
+## Notification & Real-Time Flow
+
+```mermaid
+flowchart TD
+    subgraph Server
+        DB[(SQLite)]
+        IMAP[Email Sync\nIMAP / Gmail]
+        SSESrv[SSE /connect]
+        FCMSrv[FCM Registration\nPOST /device/token]
+    end
+
+    subgraph App
+        SseClient[SseService\npersistent connection]
+        FCMClient[Firebase SDK]
+        NotifStore[AppNotificationStore\nChangeNotifier]
+        Bell[NotificationBell\nWidget]
+        LocalNotif[LocalNotification\ndue-date reminder]
+    end
+
+    FCMCloud[Firebase Cloud Messaging]
+
+    DB -- newBill / newPayment event --> SSESrv
+    SSESrv -- SSE stream --> SseClient
+    SseClient -- parsed SseEvent --> NotifStore
+    NotifStore -- notifyListeners --> Bell
+    SseClient -- triggers --> LocalNotif
+
+    FCMCloud -- push when backgrounded --> FCMClient
+    FCMClient -- notification tap --> App
+    FCMSrv --> FCMCloud
+```
+
+SSE events that can arrive from the server:
+
+| Event | Effect |
+|---|---|
+| `newBill` | Reloads BillsRepository, shows notification |
+| `newPayment` | Reloads PaymentsRepository, shows notification |
+| `newEmail` | Reloads EmailDataRepository |
+| `billUpdated` / `paymentUpdated` / `emailUpdated` | Targeted repository reload |
+
+---
+
+## Update Checker
+
+```mermaid
+flowchart TD
+    A([App startup]) --> B[UpdateService.check]
+    B --> C[GET kwasiasante.github.io/UtilityBillsManager/latest.json]
+    C --> D{newer version?}
+    D -- No --> E([Done — no banner])
+    D -- Yes --> F{already dismissed\nfor this version?}
+    F -- Yes --> E
+    F -- No --> G[Show UpdateBanner\non every screen]
+    G --> H{Platform?}
+    H -- Windows --> I[Dialog: choose EXE · MSI · MSIX]
+    H -- Other --> J[Open platform download URL\nin system browser]
+    I --> K[url_launcher opens installer]
+    J --> K
+```
+
+`latest.json` lives in the `gh-pages` branch and is updated automatically by CI on every release:
+
+```json
+{
+  "version": "1.2.3",
+  "build": 42,
+  "tag": "v1.2.3",
+  "downloads": {
+    "windows_msix": "https://github.com/.../utility_bills_manager_1.2.3.42.msix",
+    "windows_exe":  "https://github.com/.../utility_bills_manager-1.2.3-setup.exe",
+    "windows_msi":  "https://github.com/.../utility_bills_manager-1.2.3-setup.msi",
+    "android":      "https://github.com/.../utility_bills_manager-1.2.3-android.apk",
+    "macos":        "https://github.com/.../utility_bills_manager-1.2.3-macos.dmg",
+    "linux":        "https://github.com/.../utility_bills_manager-1.2.3-linux-x64.tar.gz"
+  }
+}
+```
+
+---
 
 ## Getting Started
 
 ### Prerequisites
 
-- Flutter SDK `^3.7.0`
-- Dart SDK `^3.7.0`
+- Flutter SDK `^3.7.0` / Dart `^3.7.0`
+- A running instance of `utility_bills_server`
 
 ### Configuration
 
-The app reads secrets from `assets/config/local_secrets.json` (highest priority), `--dart-define` flags, or falls back to safe defaults.
+The app reads config from three sources in priority order:
 
-#### Secrets file (first-time setup)
+1. `assets/config/local_secrets.json` (highest — never committed)
+2. `--dart-define` flags
+3. Hard-coded defaults
 
-Create `assets/config/local_secrets.json` with your plaintext values:
+#### Secrets file
+
+Create `assets/config/local_secrets.json`:
 
 ```json
 {
-  "EMAIL_ADDRESS": "you@example.com",
-  "EMAIL_PASSWORD": "your-app-password",
+  "EMAIL_ADDRESS":     "you@example.com",
+  "EMAIL_PASSWORD":    "your-app-password",
   "EMAIL_IMAP_SERVER": "imap.gmail.com",
-  "EMAIL_IMAP_PORT": 993,
+  "EMAIL_IMAP_PORT":   993,
   "EMAIL_IMAP_SECURE": true
 }
 ```
 
-`local_secrets.json` is in `.gitignore` — it is never committed.
-
-#### Encrypting the secrets
-
-String values are encrypted at rest using AES-256-GCM. You need a 32-character key. Choose one and keep it safe (e.g. in a password manager).
-
-Run the encryption script once from the project root:
+#### Encrypting secrets (optional but recommended)
 
 ```sh
 dart run scripts/encrypt_secrets.dart --key=<your-32-char-key>
 ```
 
-This overwrites `local_secrets.json` in place. String values become `enc:...` tokens; int/bool fields are left as-is. Re-running the script is safe — already-encrypted values are skipped.
+String values become `enc:…` tokens; int/bool fields are left as-is. Pass the key at every build:
 
-After encrypting, pass the key at every build and run via `--dart-define=SECRETS_KEY=<your-32-char-key>`.
+```sh
+--dart-define=SECRETS_KEY=<your-32-char-key>
+```
 
 #### Platform build commands
 
 ```sh
-# Android (debug — install directly on device)
+# Android debug
 flutter run --dart-define=SECRETS_KEY=<key>
 
-# Android (release APK)
+# Android release APK
 flutter build apk --dart-define=SECRETS_KEY=<key>
-
-# Android (Play Store bundle)
-flutter build appbundle --dart-define=SECRETS_KEY=<key>
 
 # Web
 flutter build web --dart-define=SECRETS_KEY=<key>
@@ -113,28 +474,11 @@ flutter build windows \
   --dart-define=SECRETS_KEY=<key>
 ```
 
-The `--dart-define=BUILD_TARGET=windows` flag is required on Windows to select the correct notification service (`notification_service_windows.dart` uses `flutter_local_notifications_windows`; omitting it silently falls back to the native service which skips notifications on Windows).
-
-#### Windows installers
-
-Two installer scripts live in `windows/installer/`:
-
-| File | Tool | Notes |
-|------|------|-------|
-| `setup.iss` | [InnoSetup](https://jrsoftware.org/isinfo.php) | Recommended for most users. Produces a single EXE. Prompts to remove user data on uninstall (default: keep). |
-| `product.wxs` | [WiX Toolset v4](https://wixtoolset.org/) | Produces an MSI suitable for enterprise / IT deployment. Pass `REMOVE_USERDATA=1` to `msiexec` to opt in to data removal on uninstall. |
-
-Both installers:
-- Let the user choose the install directory.
-- Detect an existing installation and offer an in-place upgrade.
-- Close a running instance of the app automatically before upgrading.
-- Store user data at `%APPDATA%\AsanteDevs\Utility Bills Manager\` (preserved across upgrades).
-
-The CI workflow (`publish.yml`) builds both the EXE and MSI (as well as the MSIX package for the auto-update flow) and attaches them to the GitHub Release.
+> `--dart-define=BUILD_TARGET=windows` is required on Windows to select the correct notification service (`notification_service_windows.dart`).
 
 #### Android release signing
 
-A keystore is required for release builds. The file `android/upload-keystore.jks` should exist locally (not in git). `android/key.properties` (also gitignored) must point to it:
+Create `android/key.properties` (gitignored):
 
 ```properties
 storePassword=<keystore-password>
@@ -143,7 +487,7 @@ keyAlias=upload
 storeFile=../upload-keystore.jks
 ```
 
-To generate a new keystore:
+Generate a new keystore if needed:
 
 ```sh
 keytool -genkey -v \
@@ -152,44 +496,134 @@ keytool -genkey -v \
   -alias upload
 ```
 
+#### Firebase setup
+
+| Platform | Required file |
+|---|---|
+| Android | `android/app/google-services.json` |
+| iOS | `ios/Runner/GoogleService-Info.plist` |
+| macOS | `macos/Runner/GoogleService-Info.plist` |
+| Linux | Firebase skipped at startup; SSE still works |
+
 #### VS Code
 
-`.vscode/launch.json` contains pre-configured run targets for Web (Chrome) and Windows. Update the `SECRETS_KEY` value in both args arrays to match your key if you regenerate it.
-
-#### Firebase
-
-- **Android** — `android/app/google-services.json` must be present (download from Firebase Console → Project settings → Android app).
-- **iOS / macOS** — `ios/Runner/GoogleService-Info.plist` and `macos/Runner/GoogleService-Info.plist` must be present (download from Firebase Console → iOS/macOS app).
-- **Linux** — Firebase is skipped at startup; SSE still works.
+`.vscode/launch.json` has pre-configured run targets for Chrome and Windows. Update `SECRETS_KEY` in both targets after regenerating a key.
 
 ### Running
 
 ```sh
-# Install dependencies
 flutter pub get
-
-# Run on a connected device / emulator (add --dart-define flags as above)
 flutter run --dart-define=SECRETS_KEY=<key>
 ```
+
+---
+
+## Deployment & Release
+
+### Web — Firebase Hosting (automatic)
+
+Triggered on every push to `main`. No manual steps required.
+
+```mermaid
+flowchart LR
+    Push[Push to main] --> CI[firebase-hosting-merge.yml]
+    CI --> Build[flutter build web --release]
+    Build --> Deploy[Firebase Hosting\nlive channel]
+```
+
+### Desktop & Mobile — GitHub Actions (tag-triggered)
+
+```mermaid
+flowchart TD
+    Tag["git tag vX.Y.Z\ngit push --tags"] --> Trigger[publish.yml triggered]
+
+    Trigger --> W[publish-windows\nwindows-latest]
+    Trigger --> A[publish-android\nubuntu-latest]
+    Trigger --> M[publish-macos\nmacos-latest]
+    Trigger --> L[publish-linux\nubuntu-latest]
+
+    W --> WOut[MSIX + EXE + MSI\n→ GitHub Release]
+    W --> WPages[.appinstaller\n→ gh-pages branch]
+    A --> AOut[APK → GitHub Release]
+    M --> MOut[DMG → GitHub Release]
+    L --> LOut[tar.gz → GitHub Release]
+
+    WOut & AOut & MOut & LOut --> JSON[publish-latest-json\nubuntu-latest]
+    JSON --> LatestJSON[latest.json\n→ gh-pages branch]
+```
+
+**What the Windows job does:**
+
+1. Checks out `main` + the `gh-pages` branch side by side
+2. Runs `publish.ps1` — builds Flutter Windows, packages as MSIX, rewrites `.appinstaller` URIs
+3. Uploads MSIX to the GitHub Release; rewrites `.appinstaller` to point to the release download URL
+4. Builds an EXE installer (InnoSetup) and uploads to GitHub Release
+5. Builds an MSI installer (WiX v4) and uploads to GitHub Release
+6. Commits the updated `.appinstaller` to the `gh-pages` branch
+
+**Windows installers:**
+
+| File | Tool | Format | Notes |
+|---|---|---|---|
+| `windows/installer/setup.iss` | [InnoSetup](https://jrsoftware.org/isinfo.php) | EXE | Recommended for most users |
+| `windows/installer/product.wxs` | [WiX Toolset v4](https://wixtoolset.org/) | MSI | Enterprise / IT deployment |
+
+Both installers detect an existing installation and offer in-place upgrade, auto-close a running instance, and preserve user data at `%APPDATA%\AsanteDevs\Utility Bills Manager\`.
+
+### Local Windows release
+
+```sh
+.\publish.ps1
+# Auto-sets up the gh-pages worktree if it doesn't exist, then:
+
+git -C gh-pages add .
+git -C gh-pages commit -m "chore: release vX.Y.Z"
+git -C gh-pages push origin gh-pages
+```
+
+### Branches
+
+| Branch | Purpose |
+|---|---|
+| `main` | Source code + CI workflows |
+| `gh-pages` | GitHub Pages — `latest.json`, `.appinstaller`, install page |
+
+### Triggering a release
+
+```sh
+# 1. Bump version in pubspec.yaml (version: X.Y.Z+BUILD)
+# 2. Commit and push to main
+# 3. Tag and push — this triggers publish.yml
+git tag vX.Y.Z
+git push --tags
+```
+
+---
 
 ## Key Dependencies
 
 | Package | Purpose |
-|---------|---------|
+|---|---|
 | `sqflite` / `sqflite_common_ffi` / `sqflite_common_ffi_web` | Cross-platform SQLite |
 | `google_sign_in` / `googleapis` | Gmail OAuth & API access |
-| `enough_mail` | IMAP email fetching |
+| `enough_mail` | IMAP email fetching (native) |
+| `firebase_core` / `firebase_auth` / `firebase_messaging` | Firebase init, auth, FCM push |
+| `flutter_local_notifications` | Due-date reminders |
 | `pdf` / `pdfrx` | PDF generation and parsing |
 | `share_plus` | File sharing / export |
-| `flutter_local_notifications` | Due-date reminders |
-| `intl` | Date/number formatting |
+| `cryptography` | AES-256-GCM encryption for `local_secrets.json` |
 | `logger` | Structured logging via `AppLogger` |
-| `firebase_core` / `firebase_auth` | Firebase initialization and authentication |
-| `firebase_messaging` | FCM push notifications (Android, iOS, macOS, Web) |
-| `uuid` | Unique IDs for `AppNotification` instances |
-| `cryptography` | AES-256-GCM encryption/decryption for `local_secrets.json` values |
-| `package_info_plus` | Reads the running app's version for the update checker |
-| `url_launcher` | Opens download URLs from `UpdateBanner` in the system browser / file manager |
+| `package_info_plus` | Reads running version for update checker |
+| `url_launcher` | Opens download URLs from `UpdateBanner` |
+| `device_info_plus` / `android_id` | Platform-native device IDs |
+| `tray_manager` / `window_manager` | Windows system tray and window lifecycle |
+| `msix` | MSIX installer packaging |
+| `intl` | Date / number formatting |
+| `uuid` | UUID generation |
+| `shared_preferences` | Lightweight key-value persistence |
+| `sse` / `sse_channel` | Server-Sent Events (real-time push) |
+
+---
 
 ## License
 
