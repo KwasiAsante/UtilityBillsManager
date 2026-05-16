@@ -7,8 +7,10 @@ import 'payments/payment_list_screen.dart';
 import 'emails/email_list_screen.dart';
 import 'summary/summary_screen.dart';
 import 'settings/settings_screen.dart';
+import 'auth/login_screen.dart';
 
 import '../config/app_config.dart';
+import '../services/auth/auth_service.dart';
 import '../services/google/google_account_service_native.dart';
 import '../utils/app_breakpoints.dart';
 import '../widgets/update_banner.dart';
@@ -32,10 +34,12 @@ class MainTabScreen extends StatefulWidget {
 
 class _MainTabScreenState extends State<MainTabScreen> {
   int _selectedIndex = 2;
+  final _authService = AuthService();
 
   @override
   void initState() {
     super.initState();
+    _authService.addListener(_onAuthChanged);
     if (kIsWeb && AppConfig.mode == AppMode.server) {
       _initGoogleSignInForWeb();
     }
@@ -43,7 +47,24 @@ class _MainTabScreenState extends State<MainTabScreen> {
 
   @override
   void dispose() {
+    _authService.removeListener(_onAuthChanged);
     super.dispose();
+  }
+
+  void _onAuthChanged() {
+    if (_authService.pendingUnauthorized) {
+      _authService.clearUnauthorized();
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const LoginScreen(),
+            fullscreenDialog: true,
+          ),
+        );
+      }
+    }
+    if (mounted) setState(() {});
   }
 
   /// Initialises Google Sign-In once on the web platform so that the
@@ -60,6 +81,43 @@ class _MainTabScreenState extends State<MainTabScreen> {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  Widget _buildAvatarButton() {
+    if (!_authService.isLoggedIn) return const SizedBox.shrink();
+    final initial = (_authService.email ?? '?')[0].toUpperCase();
+    return PopupMenuButton<String>(
+      tooltip: 'Account',
+      offset: const Offset(0, 48),
+      onSelected: (value) async {
+        if (value == 'logout') await _authService.logout();
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem<String>(
+          enabled: false,
+          child: Text(
+            _authService.email ?? '',
+            style: const TextStyle(color: Colors.grey),
+          ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'logout',
+          child: Text('Sign out', style: TextStyle(color: Colors.red)),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: CircleAvatar(
+          radius: 16,
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          child: Text(
+            initial,
+            style: const TextStyle(
+                color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -97,6 +155,11 @@ class _MainTabScreenState extends State<MainTabScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        if (_authService.isLoggedIn)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: _buildAvatarButton(),
+                          ),
                         const Divider(),
                         InkWell(
                           borderRadius: BorderRadius.circular(8),
@@ -131,6 +194,10 @@ class _MainTabScreenState extends State<MainTabScreen> {
     }
 
     return UpdateBanner(child: Scaffold(
+      appBar: AppBar(
+        toolbarHeight: 48,
+        actions: [_buildAvatarButton()],
+      ),
       body: IndexedStack(index: _selectedIndex, children: screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,

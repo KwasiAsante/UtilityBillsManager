@@ -1,3 +1,8 @@
+import 'dart:io';
+
+import 'package:android_id/android_id.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/models/app_configuration.dart';
@@ -51,6 +56,9 @@ class AppConfig {
     }
   }
 
+  static bool debugMode = const bool.fromEnvironment('DEBUG_MODE', defaultValue: false);
+
+  //region App Mode
   /// Parses the `APP_MODE` dart-define string into an [AppMode] enum value,
   /// defaulting to [AppMode.client] for any unrecognised value.
   static AppMode get mode {
@@ -67,13 +75,15 @@ class AppConfig {
 
     return AppMode.client;
   }
-
   static bool get isServer => mode == AppMode.server;
   static bool get isClient => mode == AppMode.client;
+
   static Future<void> setMode(AppMode newMode) async {
     await Preferences.setString('APP_MODE', newMode.name);
   }
+  //endregion
 
+  //region Api Base URL
   static const String _defaultApiBaseUrl = 'https://kwasi-utilitybills.duckdns.org';
 
   /// Base URL used by the app when it needs to call the API.
@@ -86,7 +96,7 @@ class AppConfig {
   ///
   /// - Server mode always returns localhost regardless of stored value.
   static String get apiBaseUrl {
-    if (mode == AppMode.server) {
+    if ((mode == AppMode.server) || (debugMode && kDebugMode)) {
       return 'http://127.0.0.1:8080';
     }
 
@@ -122,7 +132,9 @@ class AppConfig {
     // Keep SharedPreferences in sync for any legacy consumers.
     await Preferences.setString('API_BASE_URL', newUrl);
   }
+  //endregion
 
+  //region Message Template
   /// Template used to generate per-rentor bill summary messages.
   ///
   /// Falls back to [AppConfiguration.defaultMessageTemplate] when no custom
@@ -142,11 +154,46 @@ class AppConfig {
     await AppConfigHelper().saveConfiguration(config);
     _appConfig = config;
   }
+  //endregion
 
+  //region Device Id
+  static Future<String> _getId() async {
+    DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+    if (Platform.isIOS) {
+      var iosDeviceInfo = await deviceInfo.iosInfo;
+      return iosDeviceInfo.identifierForVendor ?? ''; // unique ID on iOS
+    }
+    else if(Platform.isAndroid) {
+      return await AndroidId().getId() ?? ''; // unique ID on Android
+    }
+    else if (Platform.isWindows) {
+      var windowsInfo = await deviceInfo.windowsInfo;
+      return windowsInfo.deviceId; // unique ID on Windows
+    }
+    else if (Platform.isLinux) {
+      var linuxInfo = await deviceInfo.linuxInfo;
+      return linuxInfo.machineId ?? ''; // unique ID on Linux
+    }
+    else if (Platform.isMacOS) {
+      var macInfo = await deviceInfo.macOsInfo;
+      return macInfo.systemGUID ?? ''; // unique ID on macOS
+    }
+    else {
+      return ''; // unsupported platform
+    }
+  }
   static Future<String> get deviceId async {
     String? id = Preferences.getString('DEVICE_ID');
     if (id == null || id.isEmpty) {
       id = const String.fromEnvironment('DEVICE_ID', defaultValue: '');
+      if (id.isNotEmpty) {
+        await Preferences.setString('DEVICE_ID', id);
+      }
+    }
+
+    if (id.isNotEmpty && !debugMode) {
+      id = await _getId();
+      id = id.replaceAll(RegExp(r'[{}]'), '');
       if (id.isNotEmpty) {
         await Preferences.setString('DEVICE_ID', id);
       }
@@ -159,7 +206,9 @@ class AppConfig {
 
     return id;
   }
+  //endregion
 
+  //region Firebase Web Push Public Key
   static const String _firebaseWebPushPublicKeyDefault =
       'BKSTBtACsIXdvpTa9VsMuv6b_kwJLkdmoGBWPY8_Y7aia8xaDj7Is0O1iV0MobqhuSa7W_yYQliUmPJP6dXIm0A';
   static Future<String> get firebaseWebPushPublicKey async {
@@ -183,4 +232,5 @@ class AppConfig {
 
     return key;
   }
+//endregion
 }
