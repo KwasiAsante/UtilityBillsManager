@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-/// Download URLs for every platform as published in `docs/latest.json`.
+/// Download URLs for every platform as published in `gh-pages/latest.json`.
 class UpdateDownloads {
   final String? windowsMsix;
   final String? windowsExe;
@@ -46,7 +46,7 @@ class UpdateDownloads {
   bool get hasPlatformDownload => forPlatform != null;
 }
 
-/// Parsed representation of `docs/latest.json`, enriched with the app's
+/// Parsed representation of `gh-pages/latest.json`, enriched with the app's
 /// currently running version so callers can determine whether an update is
 /// available without any extra work.
 class UpdateInfo {

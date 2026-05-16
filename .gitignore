@@ -1,3 +1,6 @@
+# gh-pages worktree (local only — not tracked in main)
+/gh-pages/
+
 # Miscellaneous
 *.class
 *.lock

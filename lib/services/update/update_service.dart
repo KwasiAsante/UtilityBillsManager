@@ -6,7 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../utils/app_logger.dart';
 import 'update_info.dart';
 
-/// Fetches `docs/latest.json` from GitHub Pages and compares it with the
+/// Fetches `latest.json` from the gh-pages branch and compares it with the
 /// version currently running.
 ///
 /// Results are cached for the lifetime of the process so subsequent calls

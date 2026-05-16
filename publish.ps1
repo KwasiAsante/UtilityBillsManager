@@ -1,7 +1,8 @@
 # publish.ps1
 # Builds a Windows release, packages it as MSIX, and rewrites the generated
 # .appinstaller file so its Uri attributes point to GitHub Pages instead of
-# local Windows paths.  Commit and push docs/ after running this script.
+# local Windows paths.  Output lands in the gh-pages/ git worktree; push that
+# branch to publish the update.
 #
 # Local usage:
 #   .\publish.ps1              # full build + publish (uses cert from pubspec.yaml)
@@ -19,7 +20,14 @@ param(
 $ErrorActionPreference = "Stop"
 
 $GithubPagesBase = "https://kwasiasante.github.io/UtilityBillsManager"
-$PublishFolder   = Join-Path $PSScriptRoot "docs"
+$PublishFolder   = Join-Path $PSScriptRoot "gh-pages"
+
+# Set up the gh-pages worktree automatically if it doesn't already exist.
+if (-not (Test-Path $PublishFolder)) {
+    Write-Host "Setting up gh-pages worktree..." -ForegroundColor Cyan
+    git worktree add gh-pages gh-pages
+    if ($LASTEXITCODE -ne 0) { throw "Failed to add gh-pages worktree — does the gh-pages branch exist?" }
+}
 
 # 1. Build
 if (-not $SkipBuild) {
@@ -70,8 +78,8 @@ if (-not $appInstallerFile) {
     # Replace absolute path variant (CI / machines where docs/ didn't pre-exist)
     $content = $content.Replace($PublishFolder, $GithubPagesBase)
 
-    # Replace relative path variant (local: msix package kept "docs\" because the
-    # folder already existed and it resolved as a valid relative path)
+    # Replace relative path variant (local: msix package kept "gh-pages\" because
+    # the folder already existed and it resolved as a valid relative path)
     $relativeName = Split-Path $PublishFolder -Leaf
     $content = $content -replace "Uri=`"$relativeName[/\\]", "Uri=`"$GithubPagesBase/"
 
@@ -89,10 +97,10 @@ if (-not $appInstallerFile) {
 # 4. Summary
 Write-Host "`n--- Done ---" -ForegroundColor Green
 Write-Host ""
-Write-Host "Commit and push docs/ to publish the update:" -ForegroundColor Yellow
-Write-Host "  git add docs/"
-Write-Host '  git commit -m "chore: release vX.Y.Z"'
-Write-Host "  git push"
+Write-Host "Commit and push the gh-pages branch to publish the update:" -ForegroundColor Yellow
+Write-Host "  git -C gh-pages add ."
+Write-Host '  git -C gh-pages commit -m "chore: release vX.Y.Z"'
+Write-Host "  git -C gh-pages push origin gh-pages"
 Write-Host ""
 $endpoint = $GithubPagesBase + "/utility_bills_manager.appinstaller"
 Write-Host "Auto-update endpoint:" -ForegroundColor Yellow

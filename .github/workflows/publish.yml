@@ -54,6 +54,13 @@ jobs:
           ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -95,9 +102,9 @@ jobs:
           $tag = "v$version"
           Write-Host "Version: $versionRaw   Tag: $tag" -ForegroundColor Cyan
 
-          $msixFile = Get-ChildItem "docs/versions" -Filter "*.msix" -ErrorAction SilentlyContinue |
+          $msixFile = Get-ChildItem "gh-pages/versions" -Filter "*.msix" -ErrorAction SilentlyContinue |
             Sort-Object LastWriteTime -Descending | Select-Object -First 1
-          if (-not $msixFile) { throw "No MSIX found in docs/versions/ — did publish.ps1 succeed?" }
+          if (-not $msixFile) { throw "No MSIX found in gh-pages/versions/ — did publish.ps1 succeed?" }
           Write-Host "MSIX: $($msixFile.Name)" -ForegroundColor Cyan
 
           gh release create $tag --repo ${{ github.repository }} --title "Release $tag" --notes "Automated release $tag" 2>$null; $true
@@ -106,7 +113,7 @@ jobs:
           Write-Host "Uploaded $($msixFile.Name) to GitHub Release $tag" -ForegroundColor Green
 
           $releaseUri = "https://github.com/${{ github.repository }}/releases/download/$tag/$($msixFile.Name)"
-          $appInstaller = Get-ChildItem "docs" -Filter "*.appinstaller" -ErrorAction SilentlyContinue | Select-Object -First 1
+          $appInstaller = Get-ChildItem "gh-pages" -Filter "*.appinstaller" -ErrorAction SilentlyContinue | Select-Object -First 1
           if ($appInstaller) {
             $xml = Get-Content $appInstaller.FullName -Raw -Encoding UTF8
             $xml = $xml -replace '(?i)Uri="https://kwasiasante\.github\.io/[^"]*\.msix"', "Uri=`"$releaseUri`""
@@ -115,7 +122,7 @@ jobs:
           }
 
           Remove-Item $msixFile.FullName
-          $versionsDir = "docs/versions"
+          $versionsDir = "gh-pages/versions"
           if ((Get-ChildItem $versionsDir -ErrorAction SilentlyContinue | Measure-Object).Count -eq 0) {
             Remove-Item $versionsDir
           }
@@ -188,19 +195,19 @@ jobs:
           gh release upload $tag $msiName --repo ${{ github.repository }} --clobber
           Write-Host "Uploaded $msiName to $tag" -ForegroundColor Green
 
-      - name: Commit and push docs/
+      - name: Commit and push gh-pages branch
         shell: pwsh
         run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/
-          $staged = git diff --staged --name-only
+          git -C gh-pages config user.name  "github-actions[bot]"
+          git -C gh-pages config user.email "github-actions[bot]@users.noreply.github.com"
+          git -C gh-pages add .
+          $staged = git -C gh-pages diff --staged --name-only
           if ($staged) {
-            git commit -m "chore: publish release [skip ci]"
-            git push origin main
-            Write-Host "Pushed updated docs/ to main" -ForegroundColor Green
+            git -C gh-pages commit -m "chore: publish release [skip ci]"
+            git -C gh-pages push origin gh-pages
+            Write-Host "Pushed updated gh-pages branch" -ForegroundColor Green
           } else {
-            Write-Host "No changes in docs/ — nothing to push."
+            Write-Host "No changes in gh-pages — nothing to push."
           }
 
   # ── Android: APK → GitHub Release ───────────────────────────────────────────
@@ -381,7 +388,14 @@ jobs:
           ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate docs/latest.json
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate gh-pages/latest.json
         run: |
           VERSION_RAW=$(grep '^version:' pubspec.yaml | sed 's/version: //')
           VERSION=$(echo "$VERSION_RAW" | sed 's/+.*//')
@@ -392,7 +406,6 @@ jobs:
           BASE="https://github.com/${REPO}/releases/download/${TAG}"
           MSIX_VERSION="${VERSION}.${BUILD}"
 
-          mkdir -p docs
           jq -n \
             --arg  version      "$VERSION" \
             --argjson build      "$BUILD" \
@@ -404,17 +417,17 @@ jobs:
             --arg  macos        "${BASE}/utility_bills_manager-${VERSION}-macos.dmg" \
             --arg  linux        "${BASE}/utility_bills_manager-${VERSION}-linux-x64.tar.gz" \
             '{version:$version,build:$build,tag:$tag,downloads:{windows_msix:$win_msix,windows_exe:$win_exe,windows_msi:$win_msi,android:$android,macos:$macos,linux:$linux}}' \
-            > docs/latest.json
+            > gh-pages/latest.json
 
-          echo "Generated docs/latest.json for ${TAG}:"
-          cat docs/latest.json
+          echo "Generated gh-pages/latest.json for ${TAG}:"
+          cat gh-pages/latest.json
 
-      - name: Commit and push docs/latest.json
+      - name: Commit and push gh-pages/latest.json
         run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/latest.json
-          git diff --staged --name-only | grep -q . \
-            && git commit -m "chore: update latest.json for $(grep '^version:' pubspec.yaml | sed 's/version: //') [skip ci]" \
-            && git push origin main \
+          git -C gh-pages config user.name  "github-actions[bot]"
+          git -C gh-pages config user.email "github-actions[bot]@users.noreply.github.com"
+          git -C gh-pages add latest.json
+          git -C gh-pages diff --staged --name-only | grep -q . \
+            && git -C gh-pages commit -m "chore: update latest.json for $(grep '^version:' pubspec.yaml | sed 's/version: //') [skip ci]" \
+            && git -C gh-pages push origin gh-pages \
             || echo "No changes to latest.json — nothing to push."
