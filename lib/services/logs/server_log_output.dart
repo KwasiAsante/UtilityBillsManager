@@ -29,7 +29,7 @@ class ServerLogOutput extends LogOutput {
   int _byteOffset = 0;
   Timer? _timer;
   bool _flushing = false;
-  Level get level => Level.all;
+  Level _level = Level.all;
 
   static const _flushInterval = Duration(seconds: 3);
   static const _bufferMaxLines = 20;
@@ -52,6 +52,7 @@ class ServerLogOutput extends LogOutput {
     if (kIsWeb) return;
     final entry = _format(event);
     _buffer.add(entry);
+    _level = event.level;
     _timer ??= Timer.periodic(_flushInterval, (_) => _flush());
     if (_buffer.length >= _bufferMaxLines) _flush();
   }
@@ -66,7 +67,7 @@ class ServerLogOutput extends LogOutput {
     try {
       final deviceId = await _getDeviceId();
 
-      final result = await ApiService.log().deviceLog(deviceId, lines, level);
+      final result = await ApiService.log().deviceLog(deviceId, lines, _level);
 
       if (result.isSuccess) {
         final byteCount = lines.fold<int>(

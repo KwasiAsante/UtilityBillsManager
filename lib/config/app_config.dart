@@ -56,7 +56,7 @@ class AppConfig {
     }
   }
 
-  static bool debugMode = const bool.fromEnvironment('DEBUG_MODE', defaultValue: true);
+  static bool debugMode = const bool.fromEnvironment('DEBUG_MODE', defaultValue: false);
 
   //region App Mode
   /// Parses the `APP_MODE` dart-define string into an [AppMode] enum value,
@@ -168,7 +168,7 @@ class AppConfig {
     }
     else if (Platform.isWindows) {
       var windowsInfo = await deviceInfo.windowsInfo;
-      return windowsInfo.deviceId ?? ''; // unique ID on Windows
+      return windowsInfo.deviceId; // unique ID on Windows
     }
     else if (Platform.isLinux) {
       var linuxInfo = await deviceInfo.linuxInfo;
@@ -191,9 +191,12 @@ class AppConfig {
       }
     }
 
-    id = await _getId();
-    if (id.isNotEmpty) {
-      await Preferences.setString('DEVICE_ID', id);
+    if (id.isNotEmpty && !debugMode) {
+      id = await _getId();
+      id = id.replaceAll(RegExp(r'[{}]'), '');
+      if (id.isNotEmpty) {
+        await Preferences.setString('DEVICE_ID', id);
+      }
     }
 
     if (id.isEmpty) {
