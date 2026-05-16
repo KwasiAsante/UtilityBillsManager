@@ -75,7 +75,7 @@ if (-not $appInstallerFile) {
 } else {
     $content = Get-Content $appInstallerFile.FullName -Raw -Encoding UTF8
 
-    # Replace absolute path variant (CI / machines where docs/ didn't pre-exist)
+    # Replace absolute path variant (CI / machines where gh-pages/ didn't pre-exist)
     $content = $content.Replace($PublishFolder, $GithubPagesBase)
 
     # Replace relative path variant (local: msix package kept "gh-pages\" because
