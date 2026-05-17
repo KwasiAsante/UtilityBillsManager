@@ -201,8 +201,15 @@ jobs:
           & $heat.FullName dir "$sourceDir" -ag -cg AppFiles -dr INSTALLFOLDER -srd -o AppFiles.wxs
           if ($LASTEXITCODE -ne 0) { throw "heat harvest failed (exit $LASTEXITCODE)" }
 
-          # Patch generated WXS: update namespace v3 → v4 and remove File/@KeyPath
-          # which was deleted in WiX v4 (File is implicitly the keypath).
+          # Patch generated WXS:
+          #   1. Update namespace v3 → v4.
+          #   2. Remove File/@KeyPath (implicit in WiX v4).
+          #   3. Remove File/@DiskId (removed in WiX v4).
+          #   4. Replace the literal "SourceDir\" placeholder with the real
+          #      release directory path.  heat.exe v3 writes Source="SourceDir\file"
+          #      using a backslash, which WiX v4 treats as a literal folder name
+          #      (not a bind-path variable), so we must substitute the real path
+          #      before compiling.
           $wxs = Get-Content AppFiles.wxs -Raw
           $wxs = $wxs -replace 'xmlns="http://schemas\.microsoft\.com/wix/2006/wi"', `
                                 'xmlns="http://wixtoolset.org/schemas/v4/wxs"'
@@ -210,11 +217,11 @@ jobs:
                                 "xmlns='http://wixtoolset.org/schemas/v4/wxs'"
           $wxs = $wxs -replace '\s+KeyPath="yes"', ''
           $wxs = $wxs -replace '\s+DiskId="\d+"', ''
+          $wxs = $wxs.Replace('SourceDir\', "$sourceDir\")
           Set-Content AppFiles.wxs $wxs -Encoding UTF8 -NoNewline
 
           wix build "windows\installer\product.wxs" AppFiles.wxs `
             -d "Version=$version" `
-            -b "SourceDir=$sourceDir" `
             -ext WixToolset.UI.wixext `
             -ext WixToolset.Util.wixext `
             -out $msiName
