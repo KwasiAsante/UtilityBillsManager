@@ -110,7 +110,9 @@
       WiX v4 auto-generates component GUIDs and recreates subdirectory structure.
     -->
     <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
-      <Files Source="$(var.SourceDir)\**\*.*" />
+      <Component Guid="*">
+        <Files Source="$(var.SourceDir)\**\*.*" />
+      </Component>
     </ComponentGroup>
 
     <Feature Id="Complete" Title="Utility Bills Manager" Level="1">
