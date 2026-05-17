@@ -291,9 +291,15 @@ jobs:
         run: |
           printf 'APP_MODE=client\nDEBUG_MODE=false\nAPI_BASE_URL=https://kwasi-utilitybills.duckdns.org\n' > .env
 
+      - name: Install SQLite (use system lib, avoid CI download failure)
+        run: brew install sqlite3
+
       - name: Build macOS
         timeout-minutes: 45
-        run: flutter build macos --release
+        run: |
+          export SQLITE3_INCLUDE_DIR=$(brew --prefix sqlite3)/include
+          export SQLITE3_LIB_DIR=$(brew --prefix sqlite3)/lib
+          flutter build macos --release
 
       - name: Create DMG
         run: |

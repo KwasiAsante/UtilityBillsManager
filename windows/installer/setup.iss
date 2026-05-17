@@ -112,8 +112,7 @@ begin
 
   if not HasData then Exit;
 
-  Msg := 'Application data was found (bills history, database, settings):' + #13#10 +
-         #13#10;
+  Msg := 'Application data was found (bills history, database, settings):' + #13#10 + #13#10;
   if DirExists(RoamPath)  then Msg := Msg + '  ' + RoamPath  + #13#10;
   if DirExists(LocalPath) then Msg := Msg + '  ' + LocalPath + #13#10;
   Msg := Msg + #13#10 +
