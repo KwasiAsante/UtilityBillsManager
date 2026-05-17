@@ -106,23 +106,24 @@ sequenceDiagram
 ```mermaid
 flowchart TD
     A([App Launch]) --> B[Flutter bindings init]
-    B --> C[AppConfig.init\nload SharedPreferences]
-    C --> D{Windows?}
-    D -- Yes --> E[WindowManager init\nTrayManager init]
-    D -- No --> F
-    E --> F[runApp — show loading spinner]
-    F --> G[AppInitializer]
-    G --> H[Firebase.initializeApp]
-    H --> I[pdfrx init]
-    I --> J[DatabaseHelper.database\nopen SQLite · run migrations]
-    J --> K[AppConfig.load\nread app_configuration table]
-    K --> L[ServerConfiguration.load\nread IMAP config + decrypt secrets]
-    L --> M[NotificationServiceFactory\ncreate platform-correct impl]
-    M --> N[FCM token → POST /device/token]
-    N --> O[DataMigration.runIfNeeded\nWindows APPDATA path migration]
-    O --> P[UpdateService.check\nfetch latest.json]
-    P --> Q[SseService.connect\nopen /connect stream]
-    Q --> R([Home Screen — MainTabScreen])
+    B --> C[dotenv.load\nread .env asset]
+    C --> D[AppConfig.init\nload SharedPreferences]
+    D --> E{Windows?}
+    E -- Yes --> F[WindowManager init\nTrayManager init]
+    E -- No --> G
+    F --> G[runApp — show loading spinner]
+    G --> H[AppInitializer]
+    H --> I[Firebase.initializeApp]
+    I --> J[pdfrx init]
+    J --> K[DatabaseHelper.database\nopen SQLite · run migrations]
+    K --> L[AppConfig.load\nread app_configuration table]
+    L --> M[ServerConfiguration.init\nload IMAP config from DB\nseed from .env on first run]
+    M --> N[NotificationServiceFactory\ncreate platform-correct impl]
+    N --> O[FCM token → POST /device/token]
+    O --> P[DataMigration.runIfNeeded\nWindows APPDATA path migration]
+    P --> Q[UpdateService.check\nfetch latest.json]
+    Q --> R[SseService.connect\nopen /connect stream]
+    R --> S([Home Screen — MainTabScreen])
 ```
 
 ---
@@ -133,7 +134,7 @@ flowchart TD
 lib/
 ├── config/
 │   ├── app_config.dart           # Mode, API URL, device ID, message template
-│   └── server_configuration.dart # IMAP config + AES-256-GCM secret decryption
+│   └── server_configuration.dart # IMAP config, seeded from .env on first run
 │
 ├── data/
 │   ├── models/                   # Bill, Payment, Rentor, EmailData,
@@ -424,57 +425,46 @@ flowchart TD
 
 ### Configuration
 
-The app reads config from three sources in priority order:
+Configuration is loaded from `.env` — a Flutter asset that is bundled at build time but never committed to the repository. Copy `.env.example` to `.env` and fill in your values:
 
-1. `assets/config/local_secrets.json` (highest — never committed)
-2. `--dart-define` flags
+```sh
+cp .env.example .env
+```
+
+```ini
+APP_MODE=client
+DEBUG_MODE=false
+API_BASE_URL=https://your-api-url.example.com
+EMAIL_ADDRESS=you@example.com
+EMAIL_PASSWORD=your-app-password
+EMAIL_IMAP_SERVER=imap.gmail.com
+EMAIL_IMAP_PORT=993
+EMAIL_IMAP_SECURE=true
+```
+
+At runtime, config resolves in this priority order (highest first):
+
+1. SQLite / SharedPreferences — values saved via the app's Settings screen
+2. `.env` — seeded into the DB on first run (server mode always re-seeds)
 3. Hard-coded defaults
-
-#### Secrets file
-
-Create `assets/config/local_secrets.json`:
-
-```json
-{
-  "EMAIL_ADDRESS":     "you@example.com",
-  "EMAIL_PASSWORD":    "your-app-password",
-  "EMAIL_IMAP_SERVER": "imap.gmail.com",
-  "EMAIL_IMAP_PORT":   993,
-  "EMAIL_IMAP_SECURE": true
-}
-```
-
-#### Encrypting secrets (optional but recommended)
-
-```sh
-dart run scripts/encrypt_secrets.dart --key=<your-32-char-key>
-```
-
-String values become `enc:…` tokens; int/bool fields are left as-is. Pass the key at every build:
-
-```sh
---dart-define=SECRETS_KEY=<your-32-char-key>
-```
 
 #### Platform build commands
 
 ```sh
-# Android debug
-flutter run --dart-define=SECRETS_KEY=<key>
+# Run (development)
+flutter run
 
 # Android release APK
-flutter build apk --dart-define=SECRETS_KEY=<key>
+flutter build apk --release
 
 # Web
-flutter build web --dart-define=SECRETS_KEY=<key>
+flutter build web --release
 
 # Windows
-flutter build windows \
-  --dart-define=BUILD_TARGET=windows \
-  --dart-define=SECRETS_KEY=<key>
+flutter build windows --release
 ```
 
-> `--dart-define=BUILD_TARGET=windows` is required on Windows to select the correct notification service (`notification_service_windows.dart`).
+> **VS Code**: `.vscode/launch.json` has pre-configured run targets for Chrome and Windows. No extra `--dart-define` flags are required — all values come from `.env`.
 
 #### Android release signing
 
@@ -505,15 +495,11 @@ keytool -genkey -v \
 | macOS | `macos/Runner/GoogleService-Info.plist` |
 | Linux | Firebase skipped at startup; SSE still works |
 
-#### VS Code
-
-`.vscode/launch.json` has pre-configured run targets for Chrome and Windows. Update `SECRETS_KEY` in both targets after regenerating a key.
-
 ### Running
 
 ```sh
 flutter pub get
-flutter run --dart-define=SECRETS_KEY=<key>
+flutter run
 ```
 
 ---
@@ -611,7 +597,7 @@ git push --tags
 | `flutter_local_notifications` | Due-date reminders |
 | `pdf` / `pdfrx` | PDF generation and parsing |
 | `share_plus` | File sharing / export |
-| `cryptography` | AES-256-GCM encryption for `local_secrets.json` |
+| `flutter_dotenv` | Loads `.env` asset at runtime for build-time configuration |
 | `logger` | Structured logging via `AppLogger` |
 | `package_info_plus` | Reads running version for update checker |
 | `url_launcher` | Opens download URLs from `UpdateBanner` |
