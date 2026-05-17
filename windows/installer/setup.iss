@@ -116,8 +116,7 @@ begin
   if DirExists(RoamPath)  then Msg := Msg + '  ' + RoamPath  + #13#10;
   if DirExists(LocalPath) then Msg := Msg + '  ' + LocalPath + #13#10;
   Msg := Msg + #13#10 +
-         'Remove this data?' + #13#10 +
-         #13#10 +
+         'Remove this data?' + #13#10 + #13#10 +
          'Yes — delete everything (cannot be undone).' + #13#10 +
          'No  — keep data (safe to reinstall later without losing history).';
 
