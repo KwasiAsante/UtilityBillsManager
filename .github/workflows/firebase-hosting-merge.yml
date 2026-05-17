@@ -20,10 +20,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Create local_secrets.json placeholder
+      - name: Create .env
         run: |
-          mkdir -p assets/config
-          echo '{}' > assets/config/local_secrets.json
+          printf 'APP_MODE=client\nDEBUG_MODE=false\nAPI_BASE_URL=https://kwasi-utilitybills.duckdns.org\n' > .env
 
       - name: Build Flutter web
         run: flutter build web --release

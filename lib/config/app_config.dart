@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:android_id/android_id.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:uuid/uuid.dart';
 
 import '../data/models/app_configuration.dart';
@@ -25,10 +26,9 @@ extension AppModeExtension on AppMode {
   }
 }
 
-/// Static configuration resolved from three sources (highest priority first):
-/// 1. `assets/config/local_secrets.json` (loaded at startup via [init])
-/// 2. `--dart-define` compile-time constants
-/// 3. Hard-coded defaults
+/// Static configuration resolved from two sources (highest priority first):
+/// 1. `--dart-define` / `--dart-define-from-file=.env` compile-time constants
+/// 2. Hard-coded defaults
 ///
 /// Provides [mode], [apiBaseUrl], and all email credential getters.
 class AppConfig {
@@ -56,7 +56,7 @@ class AppConfig {
     }
   }
 
-  static bool debugMode = const bool.fromEnvironment('DEBUG_MODE', defaultValue: false);
+  static bool get debugMode => dotenv.env['DEBUG_MODE']?.toLowerCase() == 'true';
 
   //region App Mode
   /// Parses the `APP_MODE` dart-define string into an [AppMode] enum value,
@@ -64,10 +64,7 @@ class AppConfig {
   static AppMode get mode {
     String? modeRaw = Preferences.getString('APP_MODE');
     if (modeRaw == null || modeRaw.isEmpty) {
-      modeRaw = const String.fromEnvironment(
-        'APP_MODE',
-        defaultValue: 'client',
-      );
+      modeRaw = dotenv.env['APP_MODE'] ?? 'client';
     }
 
     final normalized = modeRaw.trim().toLowerCase();
@@ -113,11 +110,8 @@ class AppConfig {
       return apiUrl;
     }
 
-    // 3. dart-define / hardcoded default
-    apiUrl = const String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: _defaultApiBaseUrl,
-    );
+    // 3. .env / hardcoded default
+    apiUrl = dotenv.env['API_BASE_URL'] ?? _defaultApiBaseUrl;
 
     return apiUrl;
   }
@@ -185,7 +179,7 @@ class AppConfig {
   static Future<String> get deviceId async {
     String? id = Preferences.getString('DEVICE_ID');
     if (id == null || id.isEmpty) {
-      id = const String.fromEnvironment('DEVICE_ID', defaultValue: '');
+      id = dotenv.env['DEVICE_ID'] ?? '';
       if (id.isNotEmpty) {
         await Preferences.setString('DEVICE_ID', id);
       }
@@ -214,10 +208,7 @@ class AppConfig {
   static Future<String> get firebaseWebPushPublicKey async {
     String? key = Preferences.getString('FIREBASE_WEB_PUSH_PUBLIC_KEY');
     if (key == null || key.isEmpty) {
-      key = const String.fromEnvironment(
-        'FIREBASE_WEB_PUSH_PUBLIC_KEY',
-        defaultValue: '',
-      );
+      key = dotenv.env['FIREBASE_WEB_PUSH_PUBLIC_KEY'] ?? '';
 
       if (key.isEmpty) {
         key = _firebaseWebPushPublicKeyDefault;

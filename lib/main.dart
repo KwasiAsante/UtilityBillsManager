@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:utility_bills_manager/services/logs/server_log_output.dart';
@@ -36,6 +37,12 @@ AppLogger _logger = AppLogger();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (_) {
+    // No .env asset — all config falls back to hard-coded defaults.
+  }
 
   _logger.d('[AppInitializer] AppConfig init...', toFile: true, toServer: false);
   await AppConfig.init();

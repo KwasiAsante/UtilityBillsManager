@@ -70,11 +70,11 @@ jobs:
         timeout-minutes: 10
         run: flutter pub get
 
-      - name: Create local_secrets.json placeholder
+      - name: Create .env
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force "assets/config" | Out-Null
-          '{}' | Out-File -FilePath "assets/config/local_secrets.json" -Encoding utf8
+          "APP_MODE=client`nDEBUG_MODE=false`nAPI_BASE_URL=https://kwasi-utilitybills.duckdns.org`n" |
+            Out-File -FilePath ".env" -Encoding utf8 -NoNewline
 
       - name: Restore signing certificate
         shell: pwsh
@@ -234,8 +234,9 @@ jobs:
         timeout-minutes: 10
         run: flutter pub get
 
-      - name: Create local_secrets.json placeholder
-        run: mkdir -p assets/config && echo '{}' > assets/config/local_secrets.json
+      - name: Create .env
+        run: |
+          printf 'APP_MODE=client\nDEBUG_MODE=false\nAPI_BASE_URL=https://kwasi-utilitybills.duckdns.org\n' > .env
 
       - name: Configure Android release signing
         run: |
@@ -286,8 +287,9 @@ jobs:
         timeout-minutes: 10
         run: flutter pub get
 
-      - name: Create local_secrets.json placeholder
-        run: mkdir -p assets/config && echo '{}' > assets/config/local_secrets.json
+      - name: Create .env
+        run: |
+          printf 'APP_MODE=client\nDEBUG_MODE=false\nAPI_BASE_URL=https://kwasi-utilitybills.duckdns.org\n' > .env
 
       - name: Build macOS
         timeout-minutes: 45
@@ -349,8 +351,9 @@ jobs:
         timeout-minutes: 10
         run: flutter pub get
 
-      - name: Create local_secrets.json placeholder
-        run: mkdir -p assets/config && echo '{}' > assets/config/local_secrets.json
+      - name: Create .env
+        run: |
+          printf 'APP_MODE=client\nDEBUG_MODE=false\nAPI_BASE_URL=https://kwasi-utilitybills.duckdns.org\n' > .env
 
       - name: Build Linux
         timeout-minutes: 30

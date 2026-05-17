@@ -2,7 +2,7 @@
 ///
 /// Stores the IMAP email credentials and sync scheduling parameters managed by
 /// the remote utility-bills server.  All fields are nullable — the server owns
-/// the defaults (populated from its own `AppConfig` / `local_secrets.json`).
+/// the defaults (populated from its own `AppConfig` / `.env` dart-defines).
 ///
 /// Serialised to / from the same JSON shape as the server's `Configuration`
 /// so that [ConfigApiService] and [DatabaseHelper] can share one codec.
