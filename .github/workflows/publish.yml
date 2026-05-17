@@ -191,10 +191,26 @@ jobs:
           $sourceDir = (Resolve-Path "build\windows\x64\runner\Release").Path
           $msiName   = "utility_bills_manager-$version-setup.msi"
 
-          # Harvest all Flutter build output into a generated WXS fragment.
-          # wix harvest dir is the WiX v4 equivalent of heat.exe dir.
-          wix harvest dir "$sourceDir" -ag -cg AppFiles -dr INSTALLFOLDER -srd -o AppFiles.wxs
-          if ($LASTEXITCODE -ne 0) { throw "WiX harvest failed (exit $LASTEXITCODE)" }
+          # Harvest: heat.exe (WiX v3, pre-installed on the runner) generates a
+          # per-directory component list. wix harvest dir does NOT exist in WiX v4.
+          $heat = Get-ChildItem "C:\Program Files (x86)" -Filter "heat.exe" -Recurse `
+                    -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $heat) { throw "heat.exe not found — WiX v3 not installed on runner" }
+          Write-Host "heat.exe: $($heat.FullName)"
+
+          & $heat.FullName dir "$sourceDir" -ag -cg AppFiles -dr INSTALLFOLDER -srd -o AppFiles.wxs
+          if ($LASTEXITCODE -ne 0) { throw "heat harvest failed (exit $LASTEXITCODE)" }
+
+          # Patch generated WXS: update namespace v3 → v4 and remove File/@KeyPath
+          # which was deleted in WiX v4 (File is implicitly the keypath).
+          $wxs = Get-Content AppFiles.wxs -Raw
+          $wxs = $wxs -replace 'xmlns="http://schemas\.microsoft\.com/wix/2006/wi"', `
+                                'xmlns="http://wixtoolset.org/schemas/v4/wxs"'
+          $wxs = $wxs -replace "xmlns='http://schemas\.microsoft\.com/wix/2006/wi'", `
+                                "xmlns='http://wixtoolset.org/schemas/v4/wxs'"
+          $wxs = $wxs -replace '\s+KeyPath="yes"', ''
+          $wxs = $wxs -replace '\s+DiskId="\d+"', ''
+          Set-Content AppFiles.wxs $wxs -Encoding UTF8 -NoNewline
 
           wix build "windows\installer\product.wxs" AppFiles.wxs `
             -d "Version=$version" `
