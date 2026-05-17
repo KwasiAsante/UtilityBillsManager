@@ -8,7 +8,7 @@
 
   Install WiX:
     dotnet tool install -g wix
-    wix extension add WixToolset.UI.wixext WixToolset.Util.wixext --global
+    wix extension add WixToolset.UI.wixext WixToolset.Util.wixext -g
 
   Upgrade behaviour
   -----------------
