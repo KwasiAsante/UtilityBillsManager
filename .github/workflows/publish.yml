@@ -163,12 +163,11 @@ jobs:
       - name: Install WiX v4 toolset
         shell: pwsh
         run: |
-          dotnet tool install --global wix 2>&1 | Out-Null
-          $LASTEXITCODE = 0   # ignore "already installed" non-zero exit
-          wix extension add WixToolset.UI.wixext   --global 2>&1 | Out-Null
-          $LASTEXITCODE = 0
-          wix extension add WixToolset.Util.wixext --global 2>&1 | Out-Null
-          $LASTEXITCODE = 0   # ignore "already added" non-zero exit
+          dotnet tool install --global wix
+          if ($LASTEXITCODE -ne 0) { dotnet tool update --global wix }
+          $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
+          wix extension add WixToolset.UI.wixext   --global
+          wix extension add WixToolset.Util.wixext --global
           Write-Host "WiX v4 toolset ready" -ForegroundColor Green
 
       - name: Build WiX MSI installer
@@ -176,6 +175,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
           $versionRaw = (Select-String -Path pubspec.yaml -Pattern "^version:\s*(.+)$").Matches[0].Groups[1].Value.Trim()
           $version = $versionRaw -replace '\+.*', ''
           $tag = "v$version"
