@@ -106,14 +106,10 @@
     </Component>
 
     <!--
-      Application files — recursively includes the entire Flutter release bundle.
-      WiX v4 auto-generates component GUIDs and recreates subdirectory structure.
+      AppFiles ComponentGroup is generated at build time by:
+        wix harvest dir <Release-path> -ag -cg AppFiles -dr INSTALLFOLDER -srd -o AppFiles.wxs
+      The generated AppFiles.wxs is passed as a second input to wix build.
     -->
-    <ComponentGroup Id="AppFiles" Directory="INSTALLFOLDER">
-      <Component Guid="*" Directory="INSTALLFOLDER">
-        <Files Source="$(var.SourceDir)\**\*" />
-      </Component>
-    </ComponentGroup>
 
     <Feature Id="Complete" Title="Utility Bills Manager" Level="1">
       <ComponentRef Id="StoreDataPath" />

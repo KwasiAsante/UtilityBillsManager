@@ -191,9 +191,13 @@ jobs:
           $sourceDir = (Resolve-Path "build\windows\x64\runner\Release").Path
           $msiName   = "utility_bills_manager-$version-setup.msi"
 
-          wix build "windows\installer\product.wxs" `
+          # Harvest all Flutter build output into a generated WXS fragment.
+          # wix harvest dir is the WiX v4 equivalent of heat.exe dir.
+          wix harvest dir "$sourceDir" -ag -cg AppFiles -dr INSTALLFOLDER -srd -o AppFiles.wxs
+          if ($LASTEXITCODE -ne 0) { throw "WiX harvest failed (exit $LASTEXITCODE)" }
+
+          wix build "windows\installer\product.wxs" AppFiles.wxs `
             -d "Version=$version" `
-            -d "SourceDir=$sourceDir" `
             -ext WixToolset.UI.wixext `
             -ext WixToolset.Util.wixext `
             -out $msiName
