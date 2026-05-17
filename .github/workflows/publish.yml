@@ -163,8 +163,8 @@ jobs:
       - name: Install WiX v4 toolset
         shell: pwsh
         run: |
-          dotnet tool install --global wix
-          if ($LASTEXITCODE -ne 0) { dotnet tool update --global wix }
+          dotnet tool install --global wix --version "4.*"
+          if ($LASTEXITCODE -ne 0) { dotnet tool update --global wix --version "4.*" }
           # Persist dotnet tools dir to PATH for all subsequent steps
           "$env:USERPROFILE\.dotnet\tools" | Out-File -Append $env:GITHUB_PATH
           # Also make it active in this step's session
