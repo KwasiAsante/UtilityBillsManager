@@ -214,6 +214,7 @@ jobs:
 
           wix build "windows\installer\product.wxs" AppFiles.wxs `
             -d "Version=$version" `
+            -b "SourceDir=$sourceDir" `
             -ext WixToolset.UI.wixext `
             -ext WixToolset.Util.wixext `
             -out $msiName

@@ -3,7 +3,7 @@
   Utility Bills Manager - WiX v4 MSI installer
   =============================================
   CI build:
-    wix build product.wxs -d Version=x.y.z -d SourceDir=<abs-Release-path> \
+    wix build product.wxs AppFiles.wxs -d Version=x.y.z -b SourceDir=<abs-Release-path> \
       -ext WixToolset.UI.wixext -ext WixToolset.Util.wixext -out app.msi
 
   Install WiX:
