@@ -11,13 +11,13 @@
     wix extension add WixToolset.UI.wixext WixToolset.Util.wixext -g
 
   Upgrade behaviour
-  -----------------
+  =================
   MajorUpgrade removes the old MSI before installing the new one.
   User data in %APPDATA%\AsanteDevs\Utility Bills Manager\ is NOT touched
   during an upgrade — it belongs to the user profile, not the MSI.
 
   Uninstall behaviour
-  -------------------
+  ===================
   Standard uninstall removes only the files that were installed.
   User data is preserved by default.
   To also remove user data, run:
