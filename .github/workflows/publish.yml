@@ -169,10 +169,14 @@ jobs:
           "$env:USERPROFILE\.dotnet\tools" | Out-File -Append $env:GITHUB_PATH
           # Also make it active in this step's session
           $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
-          wix extension add WixToolset.UI.wixext   --global
-          if ($LASTEXITCODE -ne 0) { throw "Failed to add WixToolset.UI.wixext" }
-          wix extension add WixToolset.Util.wixext --global
-          if ($LASTEXITCODE -ne 0) { throw "Failed to add WixToolset.Util.wixext" }
+          # Pin extension versions to match the installed WiX tool so NuGet
+          # doesn't pull the latest (v7+) which is incompatible with v4
+          $wixVersion = wix --version
+          Write-Host "WiX tool version: $wixVersion"
+          wix extension add "WixToolset.UI.wixext/$wixVersion"   --global
+          if ($LASTEXITCODE -ne 0) { throw "Failed to add WixToolset.UI.wixext/$wixVersion" }
+          wix extension add "WixToolset.Util.wixext/$wixVersion" --global
+          if ($LASTEXITCODE -ne 0) { throw "Failed to add WixToolset.Util.wixext/$wixVersion" }
           Write-Host "WiX v4 toolset ready" -ForegroundColor Green
 
       - name: Build WiX MSI installer
