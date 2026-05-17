@@ -171,7 +171,7 @@ jobs:
           $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
           # Pin extension versions to match the installed WiX tool so NuGet
           # doesn't pull the latest (v7+) which is incompatible with v4
-          $wixVersion = wix --version
+          $wixVersion = (wix --version).Trim()
           Write-Host "WiX tool version: $wixVersion"
           wix extension add "WixToolset.UI.wixext/$wixVersion"   --global
           if ($LASTEXITCODE -ne 0) { throw "Failed to add WixToolset.UI.wixext/$wixVersion" }
