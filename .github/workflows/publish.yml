@@ -165,9 +165,14 @@ jobs:
         run: |
           dotnet tool install --global wix
           if ($LASTEXITCODE -ne 0) { dotnet tool update --global wix }
+          # Persist dotnet tools dir to PATH for all subsequent steps
+          "$env:USERPROFILE\.dotnet\tools" | Out-File -Append $env:GITHUB_PATH
+          # Also make it active in this step's session
           $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
           wix extension add WixToolset.UI.wixext   --global
+          if ($LASTEXITCODE -ne 0) { throw "Failed to add WixToolset.UI.wixext" }
           wix extension add WixToolset.Util.wixext --global
+          if ($LASTEXITCODE -ne 0) { throw "Failed to add WixToolset.Util.wixext" }
           Write-Host "WiX v4 toolset ready" -ForegroundColor Green
 
       - name: Build WiX MSI installer
@@ -175,7 +180,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
           $versionRaw = (Select-String -Path pubspec.yaml -Pattern "^version:\s*(.+)$").Matches[0].Groups[1].Value.Trim()
           $version = $versionRaw -replace '\+.*', ''
           $tag = "v$version"
