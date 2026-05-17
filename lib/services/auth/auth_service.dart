@@ -30,7 +30,7 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Restores session from SharedPreferences and registers the 403 callback.
+  /// Restores session from SharedPreferences and registers the 401/403 callback.
   /// Call once at app startup after [ApiService.configure].
   Future<void> loadFromPrefs() async {
     final prefs = await SharedPreferences.getInstance();

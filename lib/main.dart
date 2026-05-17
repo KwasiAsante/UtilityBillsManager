@@ -47,6 +47,10 @@ void main() async {
   _logger.d('[AppInitializer] AppConfig init...', toFile: true, toServer: false);
   await AppConfig.init();
 
+  // // Wire the 401/403 → login prompt callback before any UI or API call runs,
+  // // so it fires even if _initialize() throws before AuthService.loadFromPrefs().
+  // ApiService.onUnauthorized = AuthService().notifyUnauthorized;
+
   var deviceId = await AppConfig.deviceId;
   _logger.i("Device Id: $deviceId", toFile: false, toServer: false);
 

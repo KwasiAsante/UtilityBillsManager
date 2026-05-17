@@ -7,6 +7,7 @@ import '../rentors/add_edit_rentor_screen.dart';
 import '../../data/models/rentor.dart';
 import '../../data/repositories/rentors_repository.dart';
 import '../../helpers/rentors/rentors_helper.dart';
+import '../base/auth_reload_mixin.dart';
 import '../../utils/comparable_utils.dart';
 import '../../utils/app_breakpoints.dart';
 import '../../widgets/notification_bell_icon.dart';
@@ -29,7 +30,8 @@ class RentorListScreen extends StatefulWidget {
   State<RentorListScreen> createState() => _RentorListScreenState();
 }
 
-class _RentorListScreenState extends State<RentorListScreen> {
+class _RentorListScreenState extends State<RentorListScreen>
+    with AuthReloadMixin<RentorListScreen> {
   final RentorsHelper _rentorsHelper = RentorsHelper();
   final RentorsRepository _rentorsRepository = RentorsRepository();
   final ScrollController _scrollController = ScrollController();
@@ -44,10 +46,17 @@ class _RentorListScreenState extends State<RentorListScreen> {
   String _searchQuery = '';
 
   @override
+  void onAuthReload() {
+    setState(() => _loading = true);
+    _rentorsRepository.reload();
+  }
+
+  @override
   void initState() {
     super.initState();
     _rentorsRepository.addListener(_onRentorsUpdated);
     _scrollController.addListener(_checkScrollability);
+    updateAuthListener(visible: widget.isVisible);
     if (widget.isVisible) {
       setState(() => _loading = true);
       _rentorsRepository.reload();
@@ -61,6 +70,10 @@ class _RentorListScreenState extends State<RentorListScreen> {
   void didUpdateWidget(covariant RentorListScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     bool isVisibleNow = !oldWidget.isVisible && widget.isVisible;
+
+    if (widget.isVisible != oldWidget.isVisible) {
+      updateAuthListener(visible: widget.isVisible);
+    }
 
     if (isVisibleNow && _deferLoading) {
       setState(() => _loading = true);

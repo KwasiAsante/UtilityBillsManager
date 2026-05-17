@@ -84,7 +84,7 @@ class LoggingHttpClient extends http.BaseClient {
       _logger.d(
         '← ${response.statusCode} ${request.url} (${stopwatch.elapsedMilliseconds}ms)\n$body', toServer: false
       );
-      if (response.statusCode == 403) {
+      if (response.statusCode == 401 || response.statusCode == 403) {
         ApiService.onUnauthorized?.call();
       }
       return http.StreamedResponse(

@@ -108,7 +108,8 @@ flowchart TD
     A([App Launch]) --> B[Flutter bindings init]
     B --> C[dotenv.load\nread .env asset]
     C --> D[AppConfig.init\nload SharedPreferences]
-    D --> E{Windows?}
+    D --> D2[ApiService.onUnauthorized\nwire 401/403 → login prompt]
+    D2 --> E{Windows?}
     E -- Yes --> F[WindowManager init\nTrayManager init]
     E -- No --> G
     F --> G[runApp — show loading spinner]
@@ -170,7 +171,7 @@ lib/
 │
 ├── screens/
 │   ├── auth/                     # login_screen · register_screen
-│   ├── base/                     # GoogleSignInScreenState mixin
+│   ├── base/                     # GoogleSignInScreenState · AuthReloadMixin
 │   ├── bills/                    # bill_list_screen · add_edit_bill_screen
 │   ├── rentors/                  # rentor_list_screen · add_edit_rentor_screen
 │   ├── payments/                 # payment_list_screen · add_edit_payment_screen

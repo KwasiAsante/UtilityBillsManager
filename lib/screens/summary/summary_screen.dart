@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/repositories/email_data_repository.dart';
+import '../base/auth_reload_mixin.dart';
 import '../base/google_sign_in_screen_state.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
@@ -39,7 +40,7 @@ class SummaryScreen extends StatefulWidget {
 }
 
 class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AuthReloadMixin<SummaryScreen> {
   // ── GoogleSignInScreenState contract ─────────────────────────────────────────
 
   @override
@@ -131,6 +132,11 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
     return bill.amount - _paidAmount(bill);
   }
 
+  // ── AuthReloadMixin ───────────────────────────────────────────────────────────
+
+  @override
+  void onAuthReload() => _loadData();
+
   // ── Data ─────────────────────────────────────────────────────────────────────
 
   @override
@@ -143,6 +149,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
     _rentorsRepo.addListener(_onDataChanged);
     _paymentsRepo.addListener(_onDataChanged);
     _emailDataRepo.addListener(_onDataChanged);
+    updateAuthListener(visible: widget.isVisible);
 
     if (isGoogleSignInEnabled) {
       if (widget.isVisible) {
@@ -166,6 +173,10 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
   void didUpdateWidget(covariant SummaryScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     bool isVisibleNow = !oldWidget.isVisible && widget.isVisible;
+
+    if (widget.isVisible != oldWidget.isVisible) {
+      updateAuthListener(visible: widget.isVisible);
+    }
 
     if (isGoogleSignInEnabled) {
       if (isVisibleNow) {

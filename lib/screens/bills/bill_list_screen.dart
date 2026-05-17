@@ -11,6 +11,7 @@ import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
 import '../../data/repositories/bills_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
+import '../../screens/base/auth_reload_mixin.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
 import '../../utils/constants.dart';
 import '../../utils/dialogs/due_date_filter_sheet.dart';
@@ -37,7 +38,8 @@ class BillListScreen extends StatefulWidget {
   State<BillListScreen> createState() => _BillListScreenState();
 }
 
-class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
+class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
+    with AuthReloadMixin<BillListScreen> {
   //region GoogleSignInScreenState contract
   @override
   String get googleListenerKey => 'BillListScreen';
@@ -74,6 +76,9 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   DateTime? _dateRangeEnd;
   String _searchQuery = '';
 
+  @override
+  void onAuthReload() => _loadBills();
+
   //region Lifecycle
   @override
   void initState() {
@@ -81,6 +86,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
 
     _scrollController.addListener(_checkScrollability);
     _billsRepository.addListener(_onBillsUpdated);
+    updateAuthListener(visible: widget.isVisible);
 
     if (isGoogleSignInEnabled) {
       if (widget.isVisible) {
@@ -105,6 +111,10 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen> {
   void didUpdateWidget(covariant BillListScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     bool isVisibleNow = !oldWidget.isVisible && widget.isVisible;
+
+    if (widget.isVisible != oldWidget.isVisible) {
+      updateAuthListener(visible: widget.isVisible);
+    }
 
     if (isGoogleSignInEnabled) {
       if (isVisibleNow) {

@@ -9,6 +9,7 @@ import '../../config/server_configuration.dart';
 import '../../data/models/email_data.dart';
 import '../../data/repositories/email_data_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
+import '../base/auth_reload_mixin.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
 import '../../utils/app_breakpoints.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
@@ -31,7 +32,8 @@ class EmailListScreen extends StatefulWidget {
   State<EmailListScreen> createState() => _EmailListScreenState();
 }
 
-class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
+class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen>
+    with AuthReloadMixin<EmailListScreen> {
   //region GoogleSignInScreenState contract
   @override
   String get googleListenerKey => 'EmailListScreen';
@@ -64,10 +66,14 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
   String _selectedSort = 'Default';
   String _searchQuery = '';
 
+  @override
+  void onAuthReload() => _loadEmails();
+
   //region Lifecycle
   @override
   void initState() {
     super.initState();
+    updateAuthListener(visible: widget.isVisible);
     if (isGoogleSignInEnabled) {
       if (widget.isVisible) {
         subscribeToSignedInEvents();
@@ -94,6 +100,10 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen> {
   void didUpdateWidget(covariant EmailListScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     bool isVisibleNow = !oldWidget.isVisible && widget.isVisible;
+
+    if (widget.isVisible != oldWidget.isVisible) {
+      updateAuthListener(visible: widget.isVisible);
+    }
 
     if (isGoogleSignInEnabled) {
       if (isVisibleNow) {

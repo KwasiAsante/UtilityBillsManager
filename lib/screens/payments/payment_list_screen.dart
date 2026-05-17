@@ -8,6 +8,7 @@ import '../../data/models/payment.dart';
 import '../../data/repositories/bills_repository.dart';
 import '../../data/repositories/payments_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
+import '../base/auth_reload_mixin.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
 import '../../utils/app_breakpoints.dart';
 import '../../utils/comparable_utils.dart';
@@ -34,8 +35,8 @@ class PaymentListScreen extends StatefulWidget {
   State<PaymentListScreen> createState() => _PaymentListScreenState();
 }
 
-class _PaymentListScreenState
-    extends GoogleSignInScreenState<PaymentListScreen> {
+class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
+    with AuthReloadMixin<PaymentListScreen> {
   // ---------------------------------------------------------------------------
   // GoogleSignInScreenState contract
   // ---------------------------------------------------------------------------
@@ -75,6 +76,9 @@ class _PaymentListScreenState
   DateTime? _dateRangeStart;
   DateTime? _dateRangeEnd;
 
+  @override
+  void onAuthReload() => _loadPayments();
+
   //region Lifecycle
   @override
   void initState() {
@@ -82,6 +86,7 @@ class _PaymentListScreenState
 
     _scrollController.addListener(_checkScrollability);
     _paymentsRepository.addListener(_onPaymentsUpdated);
+    updateAuthListener(visible: widget.isVisible);
 
     if (isGoogleSignInEnabled) {
       if (widget.isVisible) {
@@ -106,6 +111,10 @@ class _PaymentListScreenState
   void didUpdateWidget(covariant PaymentListScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     bool isVisibleNow = !oldWidget.isVisible && widget.isVisible;
+
+    if (widget.isVisible != oldWidget.isVisible) {
+      updateAuthListener(visible: widget.isVisible);
+    }
 
     if (isGoogleSignInEnabled) {
       if (isVisibleNow) {

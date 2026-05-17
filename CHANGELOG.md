@@ -18,6 +18,15 @@ All notable changes to this project are documented here.
 
 ### Added
 - **`flutter_dotenv 5.2.1`** — loads `.env` as a Flutter asset at runtime; `dotenv.load()` is the first async step in `main()`, with a silent fallback if the file is absent.
+- **`AuthReloadMixin`** (`lib/screens/base/auth_reload_mixin.dart`) — mixin applied to all five list screens (Bills, Rentors, Payments, Emails, Summary). Registers an `AuthService` listener while the tab is selected and removes it when the tab is deselected or disposed. When `isLoggedIn` becomes `true`, calls each screen's `onAuthReload()` so data that failed to load due to an expired session is fetched automatically after the user logs back in.
+- **Sign in button** — `MainTabScreen` now shows a `Sign in` button in the compact `AppBar` and the wide `NavigationRail` trailing slot when the user is not authenticated, providing an explicit entry point to `LoginScreen` without waiting for a server-triggered 401/403.
+
+### Fixed
+- **`ApiService.onUnauthorized` always set** — callback is now assigned in `main()` immediately after `AppConfig.init()` and before `runApp()`. Previously it was only set inside `_initialize()`, so if `_initialize()` threw before reaching `AuthService.loadFromPrefs()` the callback would remain null and 401/403 responses would never trigger the login prompt.
+- **401 now triggers login prompt** — `LoggingHttpClient` previously only called `onUnauthorized` on HTTP 403; it now also fires on 401 (the status most auth backends return for an expired or missing token).
+- **Duplicate login screen prevented** — `MainTabScreen._onAuthChanged` now guards navigation with a `_loginScreenVisible` flag. Background API calls that return 401/403 while the login screen is already showing no longer push a second `LoginScreen` on top.
+- **`clearUnauthorized()` timing** — previously called before navigating to `LoginScreen`, which reset `_pendingUnauthorized` immediately and allowed background 401/403 responses to re-trigger the prompt. It is now called in the `Navigator.push` `whenComplete` callback, keeping the flag set for the entire duration the login screen is visible.
+- **`pendingUnauthorized` race** — `MainTabScreen.initState` now checks `_authService.pendingUnauthorized` at mount time and dispatches `_onAuthChanged` via `addPostFrameCallback`. This catches the case where a 401/403 arrived during `_initialize()` before `MainTabScreen` existed and `notifyListeners()` fired with no listeners registered.
 
 ## [1.1.0] — 2026-04-17
 

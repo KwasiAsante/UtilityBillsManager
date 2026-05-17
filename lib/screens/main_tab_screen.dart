@@ -35,11 +35,17 @@ class MainTabScreen extends StatefulWidget {
 class _MainTabScreenState extends State<MainTabScreen> {
   int _selectedIndex = 2;
   final _authService = AuthService();
+  bool _loginScreenVisible = false;
 
   @override
   void initState() {
     super.initState();
     _authService.addListener(_onAuthChanged);
+    // Handle the case where a 401/403 arrived before this widget mounted
+    // (notifyListeners fired with no listeners registered).
+    if (_authService.pendingUnauthorized) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _onAuthChanged());
+    }
     if (kIsWeb && AppConfig.mode == AppMode.server) {
       _initGoogleSignInForWeb();
     }
@@ -52,16 +58,19 @@ class _MainTabScreenState extends State<MainTabScreen> {
   }
 
   void _onAuthChanged() {
-    if (_authService.pendingUnauthorized) {
-      _authService.clearUnauthorized();
+    if (_authService.pendingUnauthorized && !_loginScreenVisible) {
       if (mounted) {
+        _loginScreenVisible = true;
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => const LoginScreen(),
             fullscreenDialog: true,
           ),
-        );
+        ).whenComplete(() {
+          _loginScreenVisible = false;
+          _authService.clearUnauthorized();
+        });
       }
     }
     if (mounted) setState(() {});
