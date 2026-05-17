@@ -83,8 +83,24 @@ class _MainTabScreenState extends State<MainTabScreen> {
     });
   }
 
+  void _openLogin() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const LoginScreen(),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
   Widget _buildAvatarButton() {
-    if (!_authService.isLoggedIn) return const SizedBox.shrink();
+    if (!_authService.isLoggedIn) {
+      return TextButton.icon(
+        onPressed: _openLogin,
+        icon: const Icon(Icons.login, size: 18),
+        label: const Text('Sign in'),
+      );
+    }
     final initial = (_authService.email ?? '?')[0].toUpperCase();
     return PopupMenuButton<String>(
       tooltip: 'Account',
@@ -155,11 +171,10 @@ class _MainTabScreenState extends State<MainTabScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (_authService.isLoggedIn)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: _buildAvatarButton(),
-                          ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: _buildAvatarButton(),
+                        ),
                         const Divider(),
                         InkWell(
                           borderRadius: BorderRadius.circular(8),
