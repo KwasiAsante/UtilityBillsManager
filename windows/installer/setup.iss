@@ -14,7 +14,7 @@
 #define MyDataFolder     "AsanteDevs\Utility Bills Manager"
 
 [Setup]
-AppId={#MyAppID}
+AppId={{#MyAppID}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
