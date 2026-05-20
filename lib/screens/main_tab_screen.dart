@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'base_state.dart';
 import 'bills/bill_list_screen.dart';
 import 'rentors/rentor_list_screen.dart';
 import 'payments/payment_list_screen.dart';
@@ -32,7 +33,7 @@ class MainTabScreen extends StatefulWidget {
   State<MainTabScreen> createState() => _MainTabScreenState();
 }
 
-class _MainTabScreenState extends State<MainTabScreen> {
+class _MainTabScreenState extends BaseState<MainTabScreen> {
   int _selectedIndex = 2;
   final _authService = AuthService();
   bool _loginScreenVisible = false;
@@ -92,59 +93,6 @@ class _MainTabScreenState extends State<MainTabScreen> {
     });
   }
 
-  void _openLogin() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const LoginScreen(),
-        fullscreenDialog: true,
-      ),
-    );
-  }
-
-  Widget _buildAvatarButton() {
-    if (!_authService.isLoggedIn) {
-      return TextButton.icon(
-        onPressed: _openLogin,
-        icon: const Icon(Icons.login, size: 18),
-        label: const Text('Sign in'),
-      );
-    }
-    final initial = (_authService.email ?? '?')[0].toUpperCase();
-    return PopupMenuButton<String>(
-      tooltip: 'Account',
-      offset: const Offset(0, 48),
-      onSelected: (value) async {
-        if (value == 'logout') await _authService.logout();
-      },
-      itemBuilder: (_) => [
-        PopupMenuItem<String>(
-          enabled: false,
-          child: Text(
-            _authService.email ?? '',
-            style: const TextStyle(color: Colors.grey),
-          ),
-        ),
-        const PopupMenuItem<String>(
-          value: 'logout',
-          child: Text('Sign out', style: TextStyle(color: Colors.red)),
-        ),
-      ],
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: CircleAvatar(
-          radius: 16,
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          child: Text(
-            initial,
-            style: const TextStyle(
-                color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final screens = <Widget>[
@@ -172,6 +120,10 @@ class _MainTabScreenState extends State<MainTabScreen> {
                 NavigationRailDestination(icon: Icon(Icons.payment_outlined), selectedIcon: Icon(Icons.payment), label: Text('Payments')),
                 NavigationRailDestination(icon: Icon(Icons.email_outlined), selectedIcon: Icon(Icons.email), label: Text('Emails')),
               ],
+              leading: Padding(
+                padding: const EdgeInsets.only(top: 15, bottom: 30),
+                child: buildAvatarButton(),
+              ),
               trailing: Expanded(
                 child: Align(
                   alignment: Alignment.bottomCenter,
@@ -180,10 +132,6 @@ class _MainTabScreenState extends State<MainTabScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: _buildAvatarButton(),
-                        ),
                         const Divider(),
                         InkWell(
                           borderRadius: BorderRadius.circular(8),
@@ -218,10 +166,6 @@ class _MainTabScreenState extends State<MainTabScreen> {
     }
 
     return UpdateBanner(child: Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 48,
-        actions: [_buildAvatarButton()],
-      ),
       body: IndexedStack(index: _selectedIndex, children: screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,

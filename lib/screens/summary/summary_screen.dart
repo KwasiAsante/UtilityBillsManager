@@ -979,6 +979,11 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
                 }
               },
             ),
+          if (!AppBreakpoints.isWide(context))
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
+              child: buildAvatarButton(),
+            )
         ],
       ),
       body: ResponsiveConstraint(child: _buildBody()),

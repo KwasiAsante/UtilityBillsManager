@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:utility_bills_manager/screens/base_state.dart';
 
 import '../../config/app_config.dart';
 import '../../services/google/google_account_service_native.dart';
@@ -15,8 +16,7 @@ import '../../utils/app_logger.dart';
 ///
 /// Optionally override [onWebGoogleNotInitialized] to react when the Google
 /// SDK is not yet initialised on web (e.g. to hide a loading indicator early).
-abstract class GoogleSignInScreenState<T extends StatefulWidget>
-    extends State<T> {
+abstract class GoogleSignInScreenState<T extends StatefulWidget> extends BaseState<T> {
   // ---------------------------------------------------------------------------
   // Dependencies
   // ---------------------------------------------------------------------------

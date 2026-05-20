@@ -56,7 +56,7 @@ class AppConfig {
     }
   }
 
-  static bool get debugMode => dotenv.env['DEBUG_MODE']?.toLowerCase() == 'true';
+  static bool get debugMode => dotenv.env['DEBUG_MODE']?.toLowerCase() == 'false';
 
   //region App Mode
   /// Parses the `APP_MODE` dart-define string into an [AppMode] enum value,

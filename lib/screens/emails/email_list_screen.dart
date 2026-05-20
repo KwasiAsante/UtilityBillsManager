@@ -465,6 +465,11 @@ class _EmailListScreenState extends GoogleSignInScreenState<EmailListScreen>
                 }
               },
             ),
+          if (!AppBreakpoints.isWide(context))
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
+              child: buildAvatarButton(),
+            )
         ],
       ),
       body: ResponsiveConstraint(

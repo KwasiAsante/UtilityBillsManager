@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../base_state.dart';
 import '../rentors/add_edit_rentor_screen.dart';
 import '../../data/models/rentor.dart';
 import '../../data/repositories/rentors_repository.dart';
@@ -30,7 +31,7 @@ class RentorListScreen extends StatefulWidget {
   State<RentorListScreen> createState() => _RentorListScreenState();
 }
 
-class _RentorListScreenState extends State<RentorListScreen>
+class _RentorListScreenState extends BaseState<RentorListScreen>
     with AuthReloadMixin<RentorListScreen> {
   final RentorsHelper _rentorsHelper = RentorsHelper();
   final RentorsRepository _rentorsRepository = RentorsRepository();
@@ -40,7 +41,8 @@ class _RentorListScreenState extends State<RentorListScreen>
   Future<List<Rentor>>? _rentors;
   List<Rentor> _allRentors = [];
   bool _loading = false;
-  bool _deferLoading = false; // used to defer loading until screen becomes visible
+  bool _deferLoading =
+      false; // used to defer loading until screen becomes visible
   bool _isListScrollable = false;
   String _selectedSort = 'Percentage';
   String _searchQuery = '';
@@ -60,8 +62,7 @@ class _RentorListScreenState extends State<RentorListScreen>
     if (widget.isVisible) {
       setState(() => _loading = true);
       _rentorsRepository.reload();
-    }
-    else {
+    } else {
       _deferLoading = true;
     }
   }
@@ -233,6 +234,7 @@ class _RentorListScreenState extends State<RentorListScreen>
       }
     }
   }
+
   //endregion
 
   @override
@@ -365,6 +367,11 @@ class _RentorListScreenState extends State<RentorListScreen>
                   _deleteAllRentors();
                 }
               },
+            ),
+          if (!AppBreakpoints.isWide(context))
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
+              child: buildAvatarButton(),
             ),
         ],
       ),

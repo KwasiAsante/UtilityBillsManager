@@ -583,6 +583,11 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
                     ),
                   ],
             ),
+          if (!AppBreakpoints.isWide(context))
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
+              child: buildAvatarButton(),
+            )
         ],
       ),
       body: ResponsiveConstraint(

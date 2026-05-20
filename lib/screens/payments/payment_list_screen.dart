@@ -529,6 +529,11 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
                 }
               },
             ),
+          if (!AppBreakpoints.isWide(context))
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
+              child: buildAvatarButton(),
+            )
         ],
       ),
       body: ResponsiveConstraint(
