@@ -25,6 +25,13 @@ import '../../screens/bill_summary/message_preview_screen.dart';
 import '../../services/notification/notification_service.dart';
 import '../../utils/app_logger.dart';
 
+const initSettings = InitializationSettings(
+  android: AndroidInitializationSettings('@mipmap/launcher_icon'),
+  iOS: DarwinInitializationSettings(),
+  macOS: DarwinInitializationSettings(),
+  linux: LinuxInitializationSettings(defaultActionName: 'Open'),
+);
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,11 +58,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   final plugin = FlutterLocalNotificationsPlugin();
   await plugin.initialize(
-    settings: const InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      iOS: DarwinInitializationSettings(),
-      macOS: DarwinInitializationSettings(),
-    ),
+    settings: initSettings,
   );
 
   // Android 8+ requires the channel to exist before posting a notification.
@@ -192,13 +195,6 @@ class NativeNotificationService
       );
       return;
     }
-
-    const initSettings = InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      iOS: DarwinInitializationSettings(),
-      macOS: DarwinInitializationSettings(),
-      linux: LinuxInitializationSettings(defaultActionName: 'Open'),
-    );
 
     await _localNotifications.initialize(
       settings: initSettings,
