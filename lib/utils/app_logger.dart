@@ -46,7 +46,7 @@ class _FileLogOutput extends LogOutput {
     try {
       final appDir = await getApplicationDocumentsDirectory();
       _logsDir =
-          (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+          (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS))
               ? Directory('${appDir.path}/Utility Bills Manager/logs')
               : Directory('${appDir.path}/logs');
       await _logsDir!.create(recursive: true);

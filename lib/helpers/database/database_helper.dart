@@ -63,7 +63,7 @@ class DatabaseHelper {
     final desktopDir = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
         ? await getApplicationSupportDirectory()
     : null;
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
       desktopDir!.create(recursive: true);
     }
     final path = kIsWeb
