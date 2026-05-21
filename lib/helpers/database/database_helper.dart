@@ -60,7 +60,7 @@ class DatabaseHelper {
   /// Web persists under a logical name only (IndexedDB); mobile/desktop use
   /// [getDatabasesPath] + file name.
   Future<Database> _initDatabase() async {
-    final desktopDir = (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
+    final desktopDir = !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)
         ? await getApplicationSupportDirectory()
     : null;
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
