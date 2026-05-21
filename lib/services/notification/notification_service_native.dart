@@ -444,7 +444,7 @@ class NativeNotificationService
       return;
     }
 
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     final settings = await FirebaseMessaging.instance.requestPermission();
     AppLogger().d('[FCM] Permission: ${settings.authorizationStatus}');
