@@ -153,6 +153,10 @@ class AppConfig {
   //region Device Id
   static Future<String> _getId() async {
     DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+    if (kIsWeb) {
+      var webInfo = await deviceInfo.webBrowserInfo;
+      return webInfo.vendor ?? ''; // unique ID on web
+    }
     if (Platform.isIOS) {
       var iosDeviceInfo = await deviceInfo.iosInfo;
       return iosDeviceInfo.identifierForVendor ?? ''; // unique ID on iOS
