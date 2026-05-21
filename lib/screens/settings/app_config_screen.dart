@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:utility_bills_manager/factory/notification/notification_service_factory.dart';
 
 import '../../config/app_config.dart';
 import '../../data/models/app_configuration.dart';
+import '../../services/api/api_service.dart';
 import '../../widgets/responsive_constraint.dart';
 
 /// Settings form for [AppConfig] — exposes the API base URL and the bill
@@ -73,12 +75,20 @@ class _AppConfigScreenState extends State<AppConfigScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
     try {
+      var oldUrl = AppConfig.apiBaseUrl;
       await AppConfig.setApiBaseUrl(_apiUrlController.text.trim());
       await AppConfig.setMessageTemplate(_templateController.text.trim());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('App configuration saved')),
         );
+      }
+      if (oldUrl != AppConfig.apiBaseUrl) {
+        // Reconfigure API client with new base URL immediately.
+        ApiService.configure(baseUrl: AppConfig.apiBaseUrl);
+        final notificationService = createNotificationService();
+        notificationService.dispose();
+        await notificationService.initialize();
       }
     } catch (e) {
       if (mounted) {
