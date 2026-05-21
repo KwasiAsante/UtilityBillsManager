@@ -48,9 +48,8 @@
 
     <MediaTemplate EmbedCab="yes" />
 
-    <!-- Directory-selection UI (user can change the install folder) -->
-    <ui:WixUI Id="WixUI_InstallDir" />
-    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <!-- Feature-tree UI: shows checkboxes for each feature including shortcuts -->
+    <ui:WixUI Id="WixUI_FeatureTree" />
 
     <!-- Close the app if it is running before the upgrade proceeds -->
     <util:CloseApplication
@@ -63,6 +62,43 @@
     <StandardDirectory Id="ProgramFiles6432Folder">
       <Directory Id="INSTALLFOLDER" Name="Utility Bills Manager" />
     </StandardDirectory>
+
+    <!-- Shortcut target directories -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="AppMenuFolder" Name="Utility Bills Manager" />
+    </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder" />
+
+    <!-- Start Menu shortcut component -->
+    <Component Id="StartMenuShortcut" Directory="AppMenuFolder" Guid="*">
+      <Shortcut Id="StartMenuShortcutEntry"
+                Name="Utility Bills Manager"
+                Description="Manage your utility bills"
+                Target="[INSTALLFOLDER]utility_bills_manager.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveAppMenuFolder" Directory="AppMenuFolder" On="uninstall" />
+      <RegistryValue Root="HKCU"
+                     Key="SOFTWARE\AsanteDevs\UtilityBillsManager\Shortcuts"
+                     Name="StartMenu"
+                     Value="1"
+                     Type="integer"
+                     KeyPath="yes" />
+    </Component>
+
+    <!-- Desktop shortcut component -->
+    <Component Id="DesktopShortcut" Directory="DesktopFolder" Guid="*">
+      <Shortcut Id="DesktopShortcutEntry"
+                Name="Utility Bills Manager"
+                Description="Manage your utility bills"
+                Target="[INSTALLFOLDER]utility_bills_manager.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RegistryValue Root="HKCU"
+                     Key="SOFTWARE\AsanteDevs\UtilityBillsManager\Shortcuts"
+                     Name="Desktop"
+                     Value="1"
+                     Type="integer"
+                     KeyPath="yes" />
+    </Component>
 
     <!--
       REMOVE_USERDATA property (default 0 = keep data).
@@ -85,8 +121,33 @@
     </Property>
 
     <!--
+      Search for the install path written by a previous installation.
+      Written to HKLM on every install/upgrade (see StoreDataPath below)
+      so a reinstall can restore the same directory automatically.
+    -->
+    <Property Id="PREVIOUSINSTALLPATH">
+      <RegistrySearch Id="SearchInstallPath"
+                      Root="HKLM"
+                      Key="SOFTWARE\AsanteDevs\UtilityBillsManager"
+                      Name="InstallPath"
+                      Type="raw" />
+    </Property>
+
+    <!--
+      Pre-fill INSTALLFOLDER with the previously used path when found.
+      Runs in both the UI sequence (directory shown in the feature-tree
+      dialog is pre-filled) and the execute sequence (silent installs).
+    -->
+    <SetProperty Id="INSTALLFOLDER"
+                 Value="[PREVIOUSINSTALLPATH]"
+                 After="AppSearch"
+                 Sequence="both"
+                 Condition="PREVIOUSINSTALLPATH" />
+
+    <!--
       Persist the data path to the registry on install so that uninstall
       can find it even if %APPDATA% resolves differently.
+      Also persists the install path (HKLM) for future reinstall detection.
     -->
     <Component Id="StoreDataPath" Directory="INSTALLFOLDER" Guid="*">
       <RegistryValue Root="HKCU"
@@ -95,6 +156,11 @@
                      Value="[AppDataFolder]AsanteDevs\Utility Bills Manager"
                      Type="string"
                      KeyPath="yes" />
+      <RegistryValue Root="HKLM"
+                     Key="SOFTWARE\AsanteDevs\UtilityBillsManager"
+                     Name="InstallPath"
+                     Value="[INSTALLFOLDER]"
+                     Type="string" />
       <!--
         RemoveFolderEx: removes the data directory recursively on uninstall,
         but ONLY when REMOVE_USERDATA=1 is passed to msiexec.
@@ -111,9 +177,24 @@
       The generated AppFiles.wxs is passed as a second input to wix build.
     -->
 
-    <Feature Id="Complete" Title="Utility Bills Manager" Level="1">
+    <!--
+      Level="1"  → selected by default  (INSTALLLEVEL default is 3)
+      Level="4"  → NOT selected by default (mirrors the EXE: desktop is opt-in)
+    -->
+    <Feature Id="Complete" Title="Utility Bills Manager" Level="1"
+             ConfigurableDirectory="INSTALLFOLDER">
       <ComponentRef Id="StoreDataPath" />
       <ComponentGroupRef Id="AppFiles" />
+
+      <Feature Id="StartMenuShortcutFeature" Title="Start Menu shortcut"
+               Description="Add a shortcut to the Windows Start Menu." Level="1">
+        <ComponentRef Id="StartMenuShortcut" />
+      </Feature>
+
+      <Feature Id="DesktopShortcutFeature" Title="Desktop shortcut"
+               Description="Add a shortcut to the Windows Desktop." Level="4">
+        <ComponentRef Id="DesktopShortcut" />
+      </Feature>
     </Feature>
 
   </Package>
