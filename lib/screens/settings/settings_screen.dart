@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../widgets/responsive_constraint.dart';
 import 'app_config_screen.dart';
+import 'log_viewer_screen.dart';
 import 'server_config_screen.dart';
 
 /// Landing screen for app settings.
 ///
-/// Presents two navigation tiles — one for [AppConfigScreen] and one for
-/// [ServerConfigScreen] — so each configuration domain is edited independently.
+/// Presents navigation tiles for [AppConfigScreen], [ServerConfigScreen], and
+/// [LogViewerScreen] — so each configuration domain is edited independently.
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -42,6 +43,18 @@ class SettingsScreen extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => const ServerConfigScreen(),
                     ),
+                  ),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('Logs'),
+              subtitle: const Text('View and share on-device log files'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap:
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LogViewerScreen()),
                   ),
             ),
           ],

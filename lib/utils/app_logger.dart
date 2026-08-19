@@ -44,11 +44,7 @@ class _FileLogOutput extends LogOutput {
 
   Future<void> _initAsync() async {
     try {
-      final appDir = await getApplicationDocumentsDirectory();
-      _logsDir =
-          (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS))
-              ? Directory('${appDir.path}/Utility Bills Manager/logs')
-              : Directory('${appDir.path}/logs');
+      _logsDir = await AppLogger.logsDirectory();
       await _logsDir!.create(recursive: true);
     } catch (_) {
       // If we cannot create the directory, disable file logging silently.
@@ -194,6 +190,19 @@ class AppLogger {
   /// The server log output — exposed so [LogUploadService] can receive the same
   /// instance that is registered in the logger.
 
+  /// Resolves the directory log files are written to, creating no directory
+  /// itself — callers that need it to exist should call `.create()`.
+  ///
+  /// Desktop platforms nest logs under an app-named folder inside the OS
+  /// documents directory; mobile platforms use the documents root directly.
+  static Future<Directory> logsDirectory() async {
+    final appDir = await getApplicationDocumentsDirectory();
+    return (!kIsWeb &&
+            (Platform.isWindows || Platform.isLinux || Platform.isMacOS))
+        ? Directory('${appDir.path}/Utility Bills Manager/logs')
+        : Directory('${appDir.path}/logs');
+  }
+
   static PrettyPrinter get _printer => PrettyPrinter(
     methodCount: 0,
     errorMethodCount: 5,
@@ -241,7 +250,7 @@ class AppLogger {
 
       // Web DDC format: package:path/to/file.dart line:col   methodName
       final webMatch = RegExp(
-        r'package:[^\s]+/([^/]+)\.dart\s+\d+:\d+\s+(.+)$',
+        r'package:\S+/([^/]+)\.dart\s+\d+:\d+\s+(.+)$',
       ).firstMatch(frame);
       if (webMatch != null) {
         return '[${webMatch.group(1)!}.${webMatch.group(2)!}] ';
