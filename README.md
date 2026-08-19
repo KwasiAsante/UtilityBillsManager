@@ -32,7 +32,7 @@ Runs on **Android, iOS, macOS, Windows, Linux, and Web**.
 - **Export** — Export summaries as CSV or PDF, including per-bill rentor contributions.
 - **Real-Time Notifications** — Server-Sent Events (SSE) push `newBill` / `newPayment` events instantly. Firebase Cloud Messaging (FCM) handles push when the app is backgrounded. In-app notification bell with unread badge and slide-in panel.
 - **In-App Update Checker** — Polls `latest.json` from GitHub Pages on startup. When a newer version is found, a `MaterialBanner` appears on every screen. On Windows a dialog offers all three installer formats (EXE, MSI, MSIX).
-- **Settings** — API base URL with live reachability check; IMAP credentials and sync schedule configurable from within the app.
+- **Settings** — API base URL with live reachability check; IMAP credentials and sync schedule configurable from within the app; in-app log viewer to inspect and share on-device log files without a debugger.
 - **Windows Extras** — System tray icon, window lifecycle management, InnoSetup EXE and WiX MSI installers, MSIX auto-update via `.appinstaller`.
 
 ---
@@ -179,6 +179,7 @@ lib/
 │   ├── summary/                  # summary_screen
 │   ├── bill_summary/             # bill_selection_screen · message_preview_screen
 │   ├── settings/                 # settings_screen · app_config_screen · server_config_screen
+│   │                             # log_viewer_screen · log_detail_screen
 │   └── main_tab_screen.dart      # Root navigation shell (IndexedStack)
 │
 ├── services/
@@ -193,7 +194,7 @@ lib/
 │   ├── bill_readiness/           # Due-date reminder logic
 │   ├── bill_summary/             # Rentor message generation (pure functions)
 │   ├── windows/                  # WindowManagerService · TrayManagerService
-│   └── logs/                     # ServerLogOutput · LogUploadService
+│   └── logs/                     # ServerLogOutput · LogUploadService · LogFileService
 │
 ├── utils/
 │   ├── app_logger.dart           # Structured logging (local + optional server upload)

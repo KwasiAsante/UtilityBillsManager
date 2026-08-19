@@ -6,6 +6,11 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [1.2.0+11] — 2026-08-19
+
+### Added
+- **In-app log viewer** — new Settings → Logs screen (`LogViewerScreen`, `LogDetailScreen`, `LogFileService`) lists on-device log files (newest first), lets you open one to view its lines, and share a single file or all of them via the system share sheet. Useful for debugging when there's no debugger attached and the server log sink isn't reachable. `AppLogger.logsDirectory()` extracted as a shared helper so `_FileLogOutput` and `LogFileService` resolve the same platform-specific path instead of duplicating the logic.
+
 ### Changed
 - **Configuration — `.env` replaces `local_secrets.json`** — app configuration (app mode, debug flag, API URL, and email credentials) is now stored in a `.env` file loaded at startup via `flutter_dotenv`. `.env` is gitignored and bundled as a Flutter asset; `.env.example` is committed as a template. `AppConfig` and `ServerConfiguration` now read all values from `dotenv.env` instead of `String/int/bool.fromEnvironment`.
 - **`ServerConfiguration.init()`** — simplified startup: reloads DB config then calls `_seedFromEnv()`, which seeds the database from `.env` values when needed. Server mode always re-seeds (`.env` is authoritative); client mode only seeds on first run when no DB config exists. The `_LocalSecrets` AES-256-GCM decryption class and its asset-loading logic are removed entirely.
