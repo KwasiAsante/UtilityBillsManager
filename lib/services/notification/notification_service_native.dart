@@ -37,24 +37,30 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   AppLogger().d('[FCM] Background message: ${message.messageId}');
 
-  // Always show a local notification in the background isolate.
-  //
-  // Firebase auto-displays notification messages on stock Android, but many
-  // OEM devices (Samsung, Xiaomi, Huawei, etc.) suppress this via battery
-  // optimisation. Showing a local notification here ensures delivery on all
-  // devices. On stock Android this may produce a duplicate when the message
-  // also has a `notification` payload; the trade-off is acceptable since
-  // missing notifications is worse than an occasional extra one.
+  // Android/iOS auto-display the system notification whenever the payload
+  // has a `notification` block, even without this handler running. Since the
+  // server currently always includes that block, showing our own here too
+  // would duplicate it. Only fall back to a manually-built local notification
+  // for data-only messages (no `notification` block), e.g. on OEM devices
+  // that suppress the OS auto-display via battery optimisation.
+  if (message.notification != null) {
+    AppLogger().d(
+      '[FCM] Background message has a `notification` payload — skipping '
+      'local notification to avoid duplicating the OS auto-display.',
+    );
+    return;
+  }
+
+  AppLogger().d(
+    '[FCM] Background message is data-only — showing local notification fallback.',
+  );
+
   final title =
-      message.notification?.title ??
       message.data['title'] as String? ??
       message.data['type'] as String? ??
       'Utility Bills';
   final body =
-      message.notification?.body ??
-      message.data['body'] as String? ??
-      message.data['message'] as String? ??
-      '';
+      message.data['body'] as String? ?? message.data['message'] as String? ?? '';
 
   final plugin = FlutterLocalNotificationsPlugin();
   await plugin.initialize(
@@ -444,7 +450,11 @@ class NativeNotificationService
       return;
     }
 
-    // FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    // Re-enabled now that _firebaseMessagingBackgroundHandler guards against
+    // duplicating the OS auto-displayed notification (see its `notification
+    // != null` check above).
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    AppLogger().d('[FCM] Background message handler registered');
 
     final settings = await FirebaseMessaging.instance.requestPermission();
     AppLogger().d('[FCM] Permission: ${settings.authorizationStatus}');
