@@ -54,12 +54,22 @@ class BillsParser {
         type: billType,
         amount: amount,
         dueDate: DateTime.parse(dueDate),
-        status: amount <= 0 ? PaymentStatus.paid : PaymentStatus.unpaid,
+        status: inferStatus(amount),
         notes: subject,
       );
     }
 
     return null; // Couldn't extract a valid bill
+  }
+
+  /// Infers a [PaymentStatus] for a freshly parsed bill from its extracted
+  /// [amount]. A negative amount is unusual (e.g. a credit or equalized
+  /// payment plan adjustment) and shouldn't be silently assumed "paid", so
+  /// it's flagged as [PaymentStatus.unknown] for manual review instead.
+  static PaymentStatus inferStatus(double amount) {
+    if (amount < 0) return PaymentStatus.unknown;
+    if (amount == 0) return PaymentStatus.paid;
+    return PaymentStatus.unpaid;
   }
 
   /// Infers a [BillType] by checking the combined [sender] + [subject] + [body]
@@ -117,15 +127,26 @@ class BillsParser {
 
     final dollarMatch = dollarPattern.firstMatch(text);
     if (dollarMatch != null) {
-      return double.tryParse(dollarMatch.group(1)!.replaceAll(',', ''));
+      return _parseSignedAmount(text, dollarMatch);
     }
 
     final fallbackMatch = fallbackPattern.firstMatch(text);
     if (fallbackMatch != null) {
-      return double.tryParse(fallbackMatch.group(1)!.replaceAll(',', ''));
+      return _parseSignedAmount(text, fallbackMatch);
     }
 
     return null;
+  }
+
+  /// Parses the digits captured by [match] (found within [source]) and
+  /// negates the result if a `-` immediately precedes the match — the
+  /// amount regexes above only capture digits, so a leading sign (before an
+  /// optional `$`) is never part of the capture group itself.
+  static double? _parseSignedAmount(String source, Match match) {
+    final value = double.tryParse(match.group(1)!.replaceAll(',', ''));
+    if (value == null) return null;
+    final isNegative = match.start > 0 && source[match.start - 1] == '-';
+    return isNegative ? -value : value;
   }
 
   /// Context-aware dollar-amount extractor.
@@ -162,14 +183,14 @@ class BillsParser {
       if (prioritizedKeywords.any((keyword) => line.contains(keyword))) {
         final match = keywordAmountPattern.firstMatch(line);
         if (match != null) {
-          return double.tryParse(match.group(1)!.replaceAll(',', ''));
+          return _parseSignedAmount(line, match);
         } else {
           final amount = getAmountFromNextIndex(
             keywordAmountPattern,
             lines.indexOf(line),
             lines,
           );
-          if (amount != null && amount >= 0.00) {
+          if (amount != null) {
             return amount;
           }
         }
@@ -180,7 +201,7 @@ class BillsParser {
     final matches = dollarPattern.allMatches(text);
     if (matches.isNotEmpty) {
       final lastMatch = matches.last;
-      return double.tryParse(lastMatch.group(1)!.replaceAll(',', ''));
+      return _parseSignedAmount(text, lastMatch);
     }
 
     return null;
@@ -198,14 +219,14 @@ class BillsParser {
     var line = lines[updatedIndex];
     var match = pattern.firstMatch(line);
     if (match != null) {
-      return double.tryParse(match.group(1)!.replaceAll(',', ''));
+      return _parseSignedAmount(line, match);
     } else {
       updatedIndex++;
       if (updatedIndex >= lines.length) return null;
       line = lines[updatedIndex];
       match = pattern.firstMatch(line);
       if (match != null) {
-        return double.tryParse(match.group(1)!.replaceAll(',', ''));
+        return _parseSignedAmount(line, match);
       } else if (double.tryParse(line) != null) {
         return double.tryParse(line);
       } else {
