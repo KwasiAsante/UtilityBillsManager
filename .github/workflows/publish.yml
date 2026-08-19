@@ -441,6 +441,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate gh-pages/latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION_RAW=$(grep '^version:' pubspec.yaml | sed 's/version: //')
           VERSION=$(echo "$VERSION_RAW" | sed 's/+.*//')
@@ -449,13 +451,22 @@ jobs:
           TAG="v${VERSION}"
           REPO="${{ github.repository }}"
           BASE="https://github.com/${REPO}/releases/download/${TAG}"
-          MSIX_VERSION="${VERSION}.${BUILD}"
+
+          # The msix tool packages using {major}.{minor}.{patch}.0 — it does not
+          # embed the Flutter build number — so the actual asset filename can't be
+          # reconstructed from pubspec.yaml. Look up whatever .msix is actually on
+          # the release instead of guessing, so this never points at a 404.
+          WIN_MSIX_NAME=$(gh release view "$TAG" --repo "$REPO" --json assets \
+            --jq '.assets[] | select(.name | endswith(".msix")) | .name' | head -n1)
+          if [ -z "$WIN_MSIX_NAME" ]; then
+            echo "::warning::No .msix asset found on release $TAG"
+          fi
 
           jq -n \
             --arg  version      "$VERSION" \
             --argjson build      "$BUILD" \
             --arg  tag          "$TAG" \
-            --arg  win_msix     "${BASE}/utility_bills_manager_${MSIX_VERSION}.msix" \
+            --arg  win_msix     "${BASE}/${WIN_MSIX_NAME}" \
             --arg  win_exe      "${BASE}/utility_bills_manager-${VERSION}-setup.exe" \
             --arg  win_msi      "${BASE}/utility_bills_manager-${VERSION}-setup.msi" \
             --arg  android      "${BASE}/utility_bills_manager-${VERSION}-android.apk" \
