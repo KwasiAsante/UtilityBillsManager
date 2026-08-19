@@ -59,15 +59,26 @@ class PaymentsParser {
 
     final dollarMatch = dollarPattern.firstMatch(text);
     if (dollarMatch != null) {
-      return double.tryParse(dollarMatch.group(1)!.replaceAll(',', ''));
+      return _parseSignedAmount(text, dollarMatch);
     }
 
     final fallbackMatch = fallbackPattern.firstMatch(text);
     if (fallbackMatch != null) {
-      return double.tryParse(fallbackMatch.group(1)!.replaceAll(',', ''));
+      return _parseSignedAmount(text, fallbackMatch);
     }
 
     return null;
+  }
+
+  /// Parses the digits captured by [match] (found within [source]) and
+  /// negates the result if a `-` immediately precedes the match — the
+  /// amount regexes above only capture digits, so a leading sign (before an
+  /// optional `$`) is never part of the capture group itself.
+  static double? _parseSignedAmount(String source, Match match) {
+    final value = double.tryParse(match.group(1)!.replaceAll(',', ''));
+    if (value == null) return null;
+    final isNegative = match.start > 0 && source[match.start - 1] == '-';
+    return isNegative ? -value : value;
   }
 
   /// Context-aware amount extractor (mirrors [BillsParser.extractSmartAmount]).
@@ -96,14 +107,14 @@ class PaymentsParser {
       if (prioritizedKeywords.any((keyword) => line.contains(keyword))) {
         final match = keywordAmountPattern.firstMatch(line);
         if (match != null) {
-          return double.tryParse(match.group(1)!.replaceAll(',', ''));
+          return _parseSignedAmount(line, match);
         } else {
           final amount = getAmountFromNextIndex(
             keywordAmountPattern,
             lines.indexOf(line),
             lines,
           );
-          if (amount != null && amount >= 0.00) {
+          if (amount != null) {
             return amount;
           }
         }
@@ -114,7 +125,7 @@ class PaymentsParser {
     final matches = dollarPattern.allMatches(text);
     if (matches.isNotEmpty) {
       final lastMatch = matches.last;
-      return double.tryParse(lastMatch.group(1)!.replaceAll(',', ''));
+      return _parseSignedAmount(text, lastMatch);
     }
 
     return null;
@@ -126,13 +137,13 @@ class PaymentsParser {
     var line = lines[updatedIndex];
     var match = pattern.firstMatch(line);
     if (match != null) {
-      return double.tryParse(match.group(1)!.replaceAll(',', ''));
+      return _parseSignedAmount(line, match);
     } else {
       updatedIndex++;
       line = lines[updatedIndex];
       match = pattern.firstMatch(line);
       if (match != null) {
-        return double.tryParse(match.group(1)!.replaceAll(',', ''));
+        return _parseSignedAmount(line, match);
       } else if (double.tryParse(line) != null) {
         return double.tryParse(line);
       } else {
