@@ -3,7 +3,7 @@
   "build": 11,
   "tag": "v1.2.0",
   "downloads": {
-    "windows_msix": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.0/utility_bills_manager_1.2.0.0.msix",
+    "windows_msix": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.0/utility_bills_manager_1.2.0.11.msix",
     "windows_exe": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.0/utility_bills_manager-1.2.0-setup.exe",
     "windows_msi": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.0/utility_bills_manager-1.2.0-setup.msi",
     "android": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.0/utility_bills_manager-1.2.0-android.apk",
