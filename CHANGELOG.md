@@ -6,6 +6,13 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [1.2.0+12] — 2026-08-20
+
+### Fixed
+- **Negative bill/payment amounts silently lost their sign** — `BillsParser`/`PaymentsParser`'s amount-extraction regexes only ever captured digits, so a credit amount like `-$360.00` in an email body was parsed as `360.00` and stored as a positive bill. Both parsers now detect a `-` immediately preceding a matched amount and negate the parsed value accordingly (`_parseSignedAmount`), mirroring the equivalent fix in `utility_bills_server` for consistency between the two codebases.
+- **`BillsParser.inferStatus`** — a negative bill amount is abnormal (bills aren't expected to be credits), so it's now flagged as `PaymentStatus.unknown` for manual review instead of being guessed as `paid`.
+- **`BillsParser`/`PaymentsParser.getAmountFromNextIndex`** — removed a filter that discarded a negative amount found on the line following a keyword (e.g. "total due"), which previously caused the parser to fall through and potentially pick up the wrong number.
+
 ## [1.2.0+11] — 2026-08-19
 
 ### Added
