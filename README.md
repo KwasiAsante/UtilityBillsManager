@@ -23,10 +23,10 @@ Runs on **Android, iOS, macOS, Windows, Linux, and Web**.
 
 ## Features
 
-- **Bill Management** — Create, edit, and delete utility bills (electric, gas, water, internet, credit card). Track due dates, amounts, and payment status (paid / partial / unpaid).
+- **Bill Management** — Create, edit, and delete utility bills (electric, gas, water, internet, credit card). Track due dates, amounts, and payment status (paid / partial / unpaid / unknown).
 - **Payment Tracking** — Log payments, assign them to specific bills and rentors. Deleting a payment automatically reverses applied amounts.
 - **Rentor Management** — Manage rentors, assign percentage splits per bill type, exclude bill types, and track what each rentor owes. The **Calculate Amount Owed** button shows a per-bill-type breakdown accounting for percentages, exclusions, and prior payments.
-- **Email Sync (Gmail / IMAP)** — Sign in with Google (web) or connect via IMAP (native) to pull bill-related emails. Parsed emails are matched to bills and payments automatically. Sync can be triggered on-demand or run on a schedule.
+- **Email Sync (Gmail / IMAP)** — Sign in with Google (web) or connect via IMAP (native) to pull bill-related emails. Parsed emails are matched to bills and payments automatically. Sync can be triggered on-demand or run on a schedule. Negative/credit amounts (e.g. `-$45.00`) are parsed correctly and flagged with an **Unknown** status rather than assumed paid, since a credit on a bill is abnormal and warrants a manual look.
 - **Summary Screen** — Monthly overview grouped by bill type with "considered paid" threshold logic. A **Rentors Owed** card at the top shows what each rentor owes for the current month.
 - **Bill Summary Messages** — Select bills, preview a generated message (using a configurable template), and share directly to WhatsApp or any messaging app.
 - **Export** — Export summaries as CSV or PDF, including per-bill rentor contributions.
