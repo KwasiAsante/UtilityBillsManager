@@ -14,6 +14,7 @@ import '../../utils/app_breakpoints.dart';
 import '../../utils/comparable_utils.dart';
 import '../../utils/constants.dart';
 import '../../utils/dialogs/due_date_filter_sheet.dart';
+import '../../utils/dialogs/single_choice_dialog.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../widgets/notification_bell_icon.dart';
 import '../../widgets/responsive_constraint.dart';
@@ -68,7 +69,8 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
   Future<List<Payment>>? _payments;
   List<Payment> _allPayments = [];
   bool _loading = false;
-  bool _deferLoading = false; // used to defer loading until after Google sign-in if needed or when screen becomes visible
+  bool _deferLoading =
+      false; // used to defer loading until after Google sign-in if needed or when screen becomes visible
   bool _isListScrollable = false;
   String _selectedSort = 'Payment Date (Latest)';
   int? _selectedPaymentYear;
@@ -100,8 +102,7 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
           syncEmails: true,
           earliestEmailDate: ServerConfiguration.emailEarliestDate,
         );
-      }
-      else {
+      } else {
         _deferLoading = true;
       }
     }
@@ -208,24 +209,24 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
       context: context,
       builder:
           (context) => AlertDialog(
-        title: const Text('Delete Payment'),
-        content: Text(
-          'Are you sure you want to delete payment from ${payment.rentorName} for \$${payment.amountPaid} on ${DateFormat('MMM d, yyyy').format(payment.paymentDate)}?\nThis action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: Colors.red),
+            title: const Text('Delete Payment'),
+            content: Text(
+              'Are you sure you want to delete payment from ${payment.rentorName} for \$${payment.amountPaid} on ${DateFormat('MMM d, yyyy').format(payment.paymentDate)}?\nThis action cannot be undone.',
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
@@ -436,58 +437,78 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
           const NotificationBellIcon(),
           if (isGoogleSignInEnabled)
             googleAccountService.buildWebGoogleAction(authorizeGoogleAccount),
-          IconButton(
-            tooltip: _buildPaymentDateFilterTooltip(),
-            icon: Icon(
-              _hasActivePaymentDateFilter
-                  ? Icons.calendar_month
-                  : Icons.calendar_month_outlined,
+          if (AppBreakpoints.isWide(context)) ...[
+            IconButton(
+              tooltip: _buildPaymentDateFilterTooltip(),
+              icon: Icon(
+                _hasActivePaymentDateFilter
+                    ? Icons.calendar_month
+                    : Icons.calendar_month_outlined,
+              ),
+              onPressed: _openPaymentDateFilterSheet,
             ),
-            onPressed: _openPaymentDateFilterSheet,
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.sort),
-            tooltip: 'Sort: $_selectedSort',
-            onSelected: (value) {
-              setState(() => _selectedSort = value);
-              _updateDisplayedPayments();
-            },
-            itemBuilder:
-                (context) =>
-                    [
-                          'Payment Date (Earliest)',
-                          'Payment Date (Latest)',
-                          'Amount Paid (Lowest)',
-                          'Amount Paid (Highest)',
-                        ]
-                        .map(
-                          (value) => CheckedPopupMenuItem<String>(
-                            value: value,
-                            checked: _selectedSort == value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-          ),
-          if (AppBreakpoints.isWide(context))
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.sort),
+              tooltip: 'Sort: $_selectedSort',
+              onSelected: (value) {
+                setState(() => _selectedSort = value);
+                _updateDisplayedPayments();
+              },
+              itemBuilder:
+                  (context) =>
+                      [
+                            'Payment Date (Earliest)',
+                            'Payment Date (Latest)',
+                            'Amount Paid (Lowest)',
+                            'Amount Paid (Highest)',
+                          ]
+                          .map(
+                            (value) => CheckedPopupMenuItem<String>(
+                              value: value,
+                              checked: _selectedSort == value,
+                              child: Text(value),
+                            ),
+                          )
+                          .toList(),
+            ),
             IconButton(
               icon: const Icon(Icons.sync),
               tooltip: 'Sync payments',
               onPressed: _loading ? null : _syncPayments,
             ),
-          if (AppBreakpoints.isWide(context))
             IconButton(
               icon: const Icon(Icons.delete_sweep),
               tooltip: 'Delete all payments',
               color: Colors.red,
               onPressed: _deleteAllPayments,
             ),
-          if (!AppBreakpoints.isWide(context))
+          ] else
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert),
               tooltip: 'More actions',
               itemBuilder:
                   (context) => [
+                    PopupMenuItem<String>(
+                      value: 'due_date',
+                      child: ListTile(
+                        leading: Icon(
+                          _hasActivePaymentDateFilter
+                              ? Icons.calendar_month
+                              : Icons.calendar_month_outlined,
+                        ),
+                        title: const Text('Due date filter'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'sort',
+                      child: ListTile(
+                        leading: const Icon(Icons.sort),
+                        title: Text('Sort: $_selectedSort'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuDivider(),
                     const PopupMenuItem(
                       value: 'refresh',
                       child: ListTile(
@@ -517,15 +538,40 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
                     ),
                   ],
               onSelected: (String value) async {
-                if (value == 'refresh') {
-                  await _syncPayments();
-                } else if (value == 'settings') {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  );
-                } else if (value == 'delete_all') {
-                  _deleteAllPayments();
+                switch (value) {
+                  case 'due_date':
+                    await _openPaymentDateFilterSheet();
+                    break;
+                  case 'sort':
+                    final result = await SingleChoiceDialog.show<String>(
+                      context,
+                      title: 'Sort by',
+                      options: const [
+                        'Payment Date (Earliest)',
+                        'Payment Date (Latest)',
+                        'Amount Paid (Lowest)',
+                        'Amount Paid (Highest)',
+                      ],
+                      current: _selectedSort,
+                      labelBuilder: (value) => value,
+                    );
+                    if (result != null) {
+                      setState(() => _selectedSort = result);
+                      _updateDisplayedPayments();
+                    }
+                    break;
+                  case 'refresh':
+                    await _syncPayments();
+                    break;
+                  case 'settings':
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    );
+                    break;
+                  case 'delete_all':
+                    _deleteAllPayments();
+                    break;
                 }
               },
             ),
@@ -533,7 +579,7 @@ class _PaymentListScreenState extends GoogleSignInScreenState<PaymentListScreen>
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
               child: buildAvatarButton(),
-            )
+            ),
         ],
       ),
       body: ResponsiveConstraint(

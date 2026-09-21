@@ -420,7 +420,9 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
     if (addedBillIds.isNotEmpty || removedBillIds.isNotEmpty) {
       if (addedBillIds.isNotEmpty) {
         final addedBills =
-                  _selectedBills.where((b) => addedBillIds.contains(b.billId)).toList();
+            _selectedBills
+                .where((b) => addedBillIds.contains(b.billId))
+                .toList();
         await _billsHelper.updatePaymentStatusForBills(
           payment,
           bills: addedBills,
@@ -452,110 +454,117 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(isEditing ? 'Edit Payment' : 'Add Payment')),
-      body: ResponsiveConstraint(
-        maxWidth: 560,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _amountPaidController,
-                          decoration: const InputDecoration(
-                            labelText: 'Amount ',
+      body: SafeArea(
+        child: ResponsiveConstraint(
+          maxWidth: 560,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _amountPaidController,
+                            decoration: const InputDecoration(
+                              labelText: 'Amount ',
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator:
+                                (value) =>
+                                    value!.isEmpty ? 'Enter amount' : null,
                           ),
-                          keyboardType: TextInputType.number,
-                          validator:
-                              (value) => value!.isEmpty ? 'Enter amount' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _paymentDateController,
-                          decoration: const InputDecoration(
-                            labelText: 'Payment Date (YYYY-MM-DD)',
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _paymentDateController,
+                            decoration: const InputDecoration(
+                              labelText: 'Payment Date (YYYY-MM-DD)',
+                            ),
+                            keyboardType: TextInputType.datetime,
+                            validator:
+                                (value) =>
+                                    value!.isEmpty
+                                        ? 'Enter payment date'
+                                        : null,
                           ),
-                          keyboardType: TextInputType.datetime,
-                          validator:
-                              (value) =>
-                                  value!.isEmpty ? 'Enter payment date' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _rentorController,
-                          readOnly: true,
-                          onTap: _showRentorPickerDialog,
-                          decoration: InputDecoration(
-                            labelText: 'Assigned Rentor',
-                            hintText: 'Select a rentor',
-                            suffixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_selectedRentor != null) ...[
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _rentorController,
+                            readOnly: true,
+                            onTap: _showRentorPickerDialog,
+                            decoration: InputDecoration(
+                              labelText: 'Assigned Rentor',
+                              hintText: 'Select a rentor',
+                              suffixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_selectedRentor != null) ...[
+                                    IconButton(
+                                      tooltip: 'Edit rentor',
+                                      onPressed: () async {
+                                        final _ = await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder:
+                                                (context) =>
+                                                    AddEditRentorScreen(
+                                                      rentor: _selectedRentor,
+                                                    ),
+                                          ),
+                                        );
+                                        // RentorsRepository was updated by AddEditRentorScreen
+                                        if (_selectedRentor != null) {
+                                          final updatedRentor =
+                                              RentorsRepository().rentors
+                                                  .firstWhere(
+                                                    (r) =>
+                                                        r.rentorId ==
+                                                        _selectedRentor!
+                                                            .rentorId,
+                                                    orElse:
+                                                        () => _selectedRentor!,
+                                                  );
+                                          setState(() {
+                                            _selectedRentor = updatedRentor;
+                                            _rentorController.text =
+                                                _selectedRentor?.name ?? '';
+                                          });
+                                        }
+                                      },
+                                      icon: const Icon(Icons.edit_outlined),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'De-assign rentor',
+                                      onPressed: _clearRentorSelection,
+                                      icon: const Icon(Icons.cancel_outlined),
+                                    ),
+                                  ],
                                   IconButton(
-                                    tooltip: 'Edit rentor',
-                                    onPressed: () async {
-                                      final _ = await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) => AddEditRentorScreen(
-                                                rentor: _selectedRentor,
-                                              ),
-                                        ),
-                                      );
-                                      // RentorsRepository was updated by AddEditRentorScreen
-                                      if (_selectedRentor != null) {
-                                        final updatedRentor =
-                                            RentorsRepository().rentors
-                                                .firstWhere(
-                                                  (r) =>
-                                                      r.rentorId ==
-                                                      _selectedRentor!.rentorId,
-                                                  orElse:
-                                                      () => _selectedRentor!,
-                                                );
-                                        setState(() {
-                                          _selectedRentor = updatedRentor;
-                                          _rentorController.text =
-                                              _selectedRentor?.name ?? '';
-                                        });
-                                      }
-                                    },
-                                    icon: const Icon(Icons.edit_outlined),
-                                  ),
-                                  IconButton(
-                                    tooltip: 'De-assign rentor',
-                                    onPressed: _clearRentorSelection,
-                                    icon: const Icon(Icons.cancel_outlined),
+                                    tooltip: 'Search rentors',
+                                    onPressed: _showRentorPickerDialog,
+                                    icon: const Icon(
+                                      Icons.arrow_drop_down_circle_outlined,
+                                    ),
                                   ),
                                 ],
-                                IconButton(
-                                  tooltip: 'Search rentors',
-                                  onPressed: _showRentorPickerDialog,
-                                  icon: const Icon(
-                                    Icons.arrow_drop_down_circle_outlined,
-                                  ),
-                                ),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                        _buildBillFields(),
-                      ],
+                          _buildBillFields(),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: _savePayment,
-                  child: const Text('Save Payment'),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: _savePayment,
+                    child: const Text('Save Payment'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1013,6 +1022,42 @@ class _BillSelectionContentState extends State<_BillSelectionContent> {
     _updateDisplayedBills();
   }
 
+  void _clearDueDateFilters() {
+    setState(() {
+      _selectedDueYear = null;
+      _selectedDueMonth = null;
+      _dateRangeStart = null;
+      _dateRangeEnd = null;
+    });
+    _updateDisplayedBills();
+  }
+
+  Future<void> _refreshBillList() async {
+    String errorMessage = '';
+    if (allBills.isEmpty) {
+      Result<List<Bill>> result = await billsHelper.readAllBills();
+      if (!result.isSuccess) {
+        errorMessage = result.errorMessage ?? 'Failed to load bills.';
+      } else {
+        allBills = result.data!;
+      }
+    }
+
+    if (allBills.isEmpty && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            errorMessage.isEmpty ? 'No bills available.' : errorMessage,
+          ),
+        ),
+      );
+    }
+
+    setState(() {
+      searchQuery = '';
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -1056,73 +1101,107 @@ class _BillSelectionContentState extends State<_BillSelectionContent> {
                         },
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    IconButton(
-                      tooltip:
-                          allFilteredSelected ? 'Deselect all' : 'Select all',
-                      icon: Icon(
-                        allFilteredSelected
-                            ? Icons.check_circle
-                            : Icons.radio_button_unchecked,
-                      ),
-                      onPressed: () => _toggleSelectAll(filteredBills),
-                    ),
-                    IconButton(
-                      tooltip: _buildDueDateFilterTooltip(),
-                      icon: Icon(
-                        _hasActiveDueDateFilter
-                            ? Icons.calendar_month
-                            : Icons.calendar_month_outlined,
-                      ),
-                      onPressed: _openDueDateFilterSheet,
-                    ),
-                    if (_hasActiveDueDateFilter)
+                    const SizedBox(width: 8),
+                    if (AppBreakpoints.isWide(context)) ...[
                       IconButton(
-                        tooltip: 'Clear due date filters',
-                        icon: const Icon(Icons.filter_alt_off),
-                        onPressed: () {
-                          setState(() {
-                            _selectedDueYear = null;
-                            _selectedDueMonth = null;
-                            _dateRangeStart = null;
-                            _dateRangeEnd = null;
-                          });
-                          _updateDisplayedBills();
-                        },
+                        tooltip:
+                            allFilteredSelected ? 'Deselect all' : 'Select all',
+                        icon: Icon(
+                          allFilteredSelected
+                              ? Icons.check_circle
+                              : Icons.radio_button_unchecked,
+                        ),
+                        onPressed: () => _toggleSelectAll(filteredBills),
                       ),
-                    IconButton(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: () async {
-                        String errorMessage = '';
-                        if (allBills.isEmpty) {
-                          Result<List<Bill>> result =
-                              await billsHelper.readAllBills();
-                          if (!result.isSuccess) {
-                            errorMessage =
-                                result.errorMessage ?? 'Failed to load bills.';
-                          } else {
-                            allBills = result.data!;
+                      IconButton(
+                        tooltip: _buildDueDateFilterTooltip(),
+                        icon: Icon(
+                          _hasActiveDueDateFilter
+                              ? Icons.calendar_month
+                              : Icons.calendar_month_outlined,
+                        ),
+                        onPressed: _openDueDateFilterSheet,
+                      ),
+                      if (_hasActiveDueDateFilter)
+                        IconButton(
+                          tooltip: 'Clear due date filters',
+                          icon: const Icon(Icons.filter_alt_off),
+                          onPressed: _clearDueDateFilters,
+                        ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: _refreshBillList,
+                        tooltip: 'Refresh bill list',
+                      ),
+                    ] else
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert),
+                        tooltip: 'More options',
+                        onSelected: (value) {
+                          switch (value) {
+                            case 'select_all':
+                              _toggleSelectAll(filteredBills);
+                              break;
+                            case 'due_date':
+                              _openDueDateFilterSheet();
+                              break;
+                            case 'clear_filter':
+                              _clearDueDateFilters();
+                              break;
+                            case 'refresh':
+                              _refreshBillList();
+                              break;
                           }
-                        }
-
-                        if (allBills.isEmpty && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                errorMessage.isEmpty
-                                    ? 'No bills available.'
-                                    : errorMessage,
+                        },
+                        itemBuilder:
+                            (context) => [
+                              PopupMenuItem<String>(
+                                value: 'select_all',
+                                child: ListTile(
+                                  leading: Icon(
+                                    allFilteredSelected
+                                        ? Icons.check_circle
+                                        : Icons.radio_button_unchecked,
+                                  ),
+                                  title: Text(
+                                    allFilteredSelected
+                                        ? 'Deselect all'
+                                        : 'Select all',
+                                  ),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
                               ),
-                            ),
-                          );
-                        }
-
-                        setState(() {
-                          searchQuery = '';
-                        });
-                      },
-                      tooltip: 'Refresh bill list',
-                    ),
+                              PopupMenuItem<String>(
+                                value: 'due_date',
+                                child: ListTile(
+                                  leading: Icon(
+                                    _hasActiveDueDateFilter
+                                        ? Icons.calendar_month
+                                        : Icons.calendar_month_outlined,
+                                  ),
+                                  title: const Text('Due date filter'),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              ),
+                              if (_hasActiveDueDateFilter)
+                                const PopupMenuItem<String>(
+                                  value: 'clear_filter',
+                                  child: ListTile(
+                                    leading: Icon(Icons.filter_alt_off),
+                                    title: Text('Clear due date filters'),
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                ),
+                              const PopupMenuItem<String>(
+                                value: 'refresh',
+                                child: ListTile(
+                                  leading: Icon(Icons.refresh),
+                                  title: Text('Refresh bill list'),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              ),
+                            ],
+                      ),
                   ],
                 ),
                 if (widget.excludedBillTypes != null &&

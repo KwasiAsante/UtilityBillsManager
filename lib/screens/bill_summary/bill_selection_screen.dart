@@ -48,11 +48,14 @@ class _BillSelectionScreenState extends State<BillSelectionScreen> {
   }
 
   void _generateMessage() {
-    final selectedBills = widget.eligibleBills
-        .where((b) => _selectedIds.contains(b.billId))
-        .toList();
-    final message = BillSummaryService()
-        .generateMessage(widget.rentor, selectedBills);
+    final selectedBills =
+        widget.eligibleBills
+            .where((b) => _selectedIds.contains(b.billId))
+            .toList();
+    final message = BillSummaryService().generateMessage(
+      widget.rentor,
+      selectedBills,
+    );
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -65,38 +68,43 @@ class _BillSelectionScreenState extends State<BillSelectionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Select Bills')),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: widget.eligibleBills.length,
-              itemBuilder: (context, index) {
-                final bill = widget.eligibleBills[index];
-                final isSelected = _selectedIds.contains(bill.billId);
-                final owedAmount =
-                    Rentor.calculateOwedAmount(widget.rentor, bill, roundToWholeDollar: false);
-                return CheckboxListTile(
-                  value: isSelected,
-                  onChanged: (value) => _toggleBill(bill.billId, value),
-                  title: Text('${bill.type.name} — ${bill.companyName}'),
-                  subtitle: Text(
-                    'Due: ${_dateFormat.format(bill.dueDate)} · '
-                    'Total: \$${bill.amount.toStringAsFixed(2)} · '
-                    'Your share: \$${owedAmount.toStringAsFixed(2)}',
-                  ),
-                );
-              },
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: ListView.builder(
+                itemCount: widget.eligibleBills.length,
+                itemBuilder: (context, index) {
+                  final bill = widget.eligibleBills[index];
+                  final isSelected = _selectedIds.contains(bill.billId);
+                  final owedAmount = Rentor.calculateOwedAmount(
+                    widget.rentor,
+                    bill,
+                    roundToWholeDollar: false,
+                  );
+                  return CheckboxListTile(
+                    value: isSelected,
+                    onChanged: (value) => _toggleBill(bill.billId, value),
+                    title: Text('${bill.type.name} — ${bill.companyName}'),
+                    subtitle: Text(
+                      'Due: ${_dateFormat.format(bill.dueDate)} · '
+                      'Total: \$${bill.amount.toStringAsFixed(2)} · '
+                      'Your share: \$${owedAmount.toStringAsFixed(2)}',
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: FilledButton(
-              onPressed: _selectedIds.isEmpty ? null : _generateMessage,
-              child: const Text('Generate Message'),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: FilledButton(
+                onPressed: _selectedIds.isEmpty ? null : _generateMessage,
+                child: const Text('Generate Message'),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

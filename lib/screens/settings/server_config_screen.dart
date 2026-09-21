@@ -170,213 +170,217 @@ class _ServerConfigScreenState extends State<ServerConfigScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Server Configuration')),
-      body: ResponsiveConstraint(
-        maxWidth: 560,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ── Email credentials ──────────────────────────────────────────
-                Text(
-                  'Email Account',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _emailAddressController,
-                          decoration: const InputDecoration(
-                            labelText: 'Email Address',
-                          ),
-                          keyboardType: TextInputType.emailAddress,
-                          autocorrect: false,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Email address is required';
-                            }
-                            final trimmed = value.trim();
-                            final atIndex = trimmed.indexOf('@');
-                            if (atIndex <= 0 || atIndex == trimmed.length - 1) {
-                              return 'Enter a valid email address';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _emailPasswordController,
-                          decoration: InputDecoration(
-                            labelText: 'Email Password',
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _passwordVisible
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
-                              ),
-                              onPressed:
-                                  () => setState(
-                                    () => _passwordVisible = !_passwordVisible,
-                                  ),
+      body: SafeArea(
+        child: ResponsiveConstraint(
+          maxWidth: 560,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // ── Email credentials ──────────────────────────────────────────
+                  Text(
+                    'Email Account',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _emailAddressController,
+                            decoration: const InputDecoration(
+                              labelText: 'Email Address',
                             ),
+                            keyboardType: TextInputType.emailAddress,
+                            autocorrect: false,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Email address is required';
+                              }
+                              final trimmed = value.trim();
+                              final atIndex = trimmed.indexOf('@');
+                              if (atIndex <= 0 ||
+                                  atIndex == trimmed.length - 1) {
+                                return 'Enter a valid email address';
+                              }
+                              return null;
+                            },
                           ),
-                          obscureText: !_passwordVisible,
-                          autocorrect: false,
-                          enableSuggestions: false,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // ── IMAP settings ──────────────────────────────────────────────
-                Text(
-                  'IMAP Settings',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _imapServerController,
-                          decoration: const InputDecoration(
-                            labelText: 'IMAP Server',
-                            hintText: 'imap.gmail.com',
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _emailPasswordController,
+                            decoration: InputDecoration(
+                              labelText: 'Email Password',
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _passwordVisible
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                ),
+                                onPressed:
+                                    () => setState(
+                                      () =>
+                                          _passwordVisible = !_passwordVisible,
+                                    ),
+                              ),
+                            ),
+                            obscureText: !_passwordVisible,
+                            autocorrect: false,
+                            enableSuggestions: false,
                           ),
-                          autocorrect: false,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'IMAP server is required';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _imapPortController,
-                          decoration: const InputDecoration(
-                            labelText: 'IMAP Port',
-                            hintText: '993',
-                          ),
-                          keyboardType: TextInputType.number,
-                          validator: _validatePort,
-                        ),
-                        const SizedBox(height: 8),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Use Secure Connection (TLS)'),
-                          value: _imapSecure,
-                          onChanged: (v) => setState(() => _imapSecure = v),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // ── Manual Sync ────────────────────────────────────────────────
-                Text(
-                  'Manual Sync',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: TextFormField(
-                      controller: _earliestDateController,
-                      decoration: InputDecoration(
-                        labelText: 'Default Earliest Email Date',
-                        helperText:
-                            'The default start date used when you trigger a manual sync. '
-                            'You can override this each time in the sync dialog.',
-                        helperMaxLines: 3,
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.calendar_today_outlined),
-                          onPressed: _pickDate,
-                        ),
+                        ],
                       ),
-                      readOnly: true,
-                      onTap: _pickDate,
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
-                // ── Background Sync ────────────────────────────────────────────
-                Text(
-                  'Background Sync',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _syncDelayController,
-                          decoration: const InputDecoration(
-                            labelText: 'Sync Delay (seconds)',
-                            hintText: '30',
-                            helperText:
-                                'How long to wait after the app starts before the first background sync runs.',
-                            helperMaxLines: 2,
-                          ),
-                          keyboardType: TextInputType.number,
-                          validator:
-                              (v) => _validateInt(
-                                v,
-                                'Sync Delay',
-                                allowZero: true,
-                              ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _syncIntervalController,
-                          decoration: const InputDecoration(
-                            labelText: 'Sync Interval (seconds)',
-                            hintText: '900',
-                            helperText:
-                                'How often the app checks for new emails in the background. '
-                                '900 = every 15 minutes.',
-                            helperMaxLines: 2,
-                          ),
-                          keyboardType: TextInputType.number,
-                          validator: (v) => _validateInt(v, 'Sync Interval'),
-                        ),
-                      ],
-                    ),
+                  // ── IMAP settings ──────────────────────────────────────────────
+                  Text(
+                    'IMAP Settings',
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
-                ),
-                const SizedBox(height: 24),
-
-                FilledButton(
-                  onPressed: _saving ? null : _saveSettings,
-                  child:
-                      _saving
-                          ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Theme.of(context).colorScheme.onPrimary,
+                  const SizedBox(height: 8),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _imapServerController,
+                            decoration: const InputDecoration(
+                              labelText: 'IMAP Server',
+                              hintText: 'imap.gmail.com',
                             ),
-                          )
-                          : const Text('Save'),
-                ),
-                const SizedBox(height: 16),
-              ],
+                            autocorrect: false,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'IMAP server is required';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _imapPortController,
+                            decoration: const InputDecoration(
+                              labelText: 'IMAP Port',
+                              hintText: '993',
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: _validatePort,
+                          ),
+                          const SizedBox(height: 8),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Use Secure Connection (TLS)'),
+                            value: _imapSecure,
+                            onChanged: (v) => setState(() => _imapSecure = v),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Manual Sync ────────────────────────────────────────────────
+                  Text(
+                    'Manual Sync',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: TextFormField(
+                        controller: _earliestDateController,
+                        decoration: InputDecoration(
+                          labelText: 'Default Earliest Email Date',
+                          helperText:
+                              'The default start date used when you trigger a manual sync. '
+                              'You can override this each time in the sync dialog.',
+                          helperMaxLines: 3,
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.calendar_today_outlined),
+                            onPressed: _pickDate,
+                          ),
+                        ),
+                        readOnly: true,
+                        onTap: _pickDate,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Background Sync ────────────────────────────────────────────
+                  Text(
+                    'Background Sync',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _syncDelayController,
+                            decoration: const InputDecoration(
+                              labelText: 'Sync Delay (seconds)',
+                              hintText: '30',
+                              helperText:
+                                  'How long to wait after the app starts before the first background sync runs.',
+                              helperMaxLines: 2,
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator:
+                                (v) => _validateInt(
+                                  v,
+                                  'Sync Delay',
+                                  allowZero: true,
+                                ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _syncIntervalController,
+                            decoration: const InputDecoration(
+                              labelText: 'Sync Interval (seconds)',
+                              hintText: '900',
+                              helperText:
+                                  'How often the app checks for new emails in the background. '
+                                  '900 = every 15 minutes.',
+                              helperMaxLines: 2,
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator: (v) => _validateInt(v, 'Sync Interval'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  FilledButton(
+                    onPressed: _saving ? null : _saveSettings,
+                    child:
+                        _saving
+                            ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Theme.of(context).colorScheme.onPrimary,
+                              ),
+                            )
+                            : const Text('Save'),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
             ),
           ),
         ),

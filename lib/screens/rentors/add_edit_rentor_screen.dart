@@ -395,10 +395,11 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => BillSelectionScreen(
-          rentor: widget.rentor!,
-          eligibleBills: _eligibleBills!,
-        ),
+        builder:
+            (_) => BillSelectionScreen(
+              rentor: widget.rentor!,
+              eligibleBills: _eligibleBills!,
+            ),
       ),
     );
   }
@@ -446,112 +447,124 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(isEditing ? 'Edit Rentor' : 'Add Rentor')),
-      body: ResponsiveConstraint(
-        maxWidth: 560,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(labelText: 'Name'),
-                          validator:
-                              (value) => value!.isEmpty ? 'Enter name' : null,
-                        ),
-                        TextFormField(
-                          controller: _emailController,
-                          decoration: const InputDecoration(labelText: 'Email'),
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-                        TextFormField(
-                          controller: _phoneController,
-                          decoration: const InputDecoration(
-                            labelText: 'Phone Number',
+      body: SafeArea(
+        child: ResponsiveConstraint(
+          maxWidth: 560,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          TextFormField(
+                            controller: _nameController,
+                            decoration: const InputDecoration(
+                              labelText: 'Name',
+                            ),
+                            validator:
+                                (value) => value!.isEmpty ? 'Enter name' : null,
                           ),
-                          keyboardType: TextInputType.phone,
-                        ),
-                        TextFormField(
-                          controller: _percentageController,
-                          decoration: const InputDecoration(
-                            labelText: 'Percentage %',
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _emailController,
+                            decoration: const InputDecoration(
+                              labelText: 'Email',
+                            ),
+                            keyboardType: TextInputType.emailAddress,
                           ),
-                          keyboardType: TextInputType.number,
-                          validator:
-                              (value) =>
-                                  value!.isEmpty ? 'Enter percentage' : null,
-                        ),
-                        _buildBillTypeFields(),
-                        _buildExclusionListSection(),
-                        GestureDetector(
-                          onTap: _pickDate,
-                          child: AbsorbPointer(
-                            child: TextFormField(
-                              controller: _lastPaymentDateController,
-                              decoration: const InputDecoration(
-                                labelText: 'Last Payment Date',
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _phoneController,
+                            decoration: const InputDecoration(
+                              labelText: 'Phone Number',
+                            ),
+                            keyboardType: TextInputType.phone,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _percentageController,
+                            decoration: const InputDecoration(
+                              labelText: 'Percentage %',
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator:
+                                (value) =>
+                                    value!.isEmpty ? 'Enter percentage' : null,
+                          ),
+                          _buildBillTypeFields(),
+                          _buildExclusionListSection(),
+                          GestureDetector(
+                            onTap: _pickDate,
+                            child: AbsorbPointer(
+                              child: TextFormField(
+                                controller: _lastPaymentDateController,
+                                decoration: const InputDecoration(
+                                  labelText: 'Last Payment Date',
+                                ),
+                                keyboardType: TextInputType.datetime,
                               ),
-                              keyboardType: TextInputType.datetime,
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: _showCalculateAmountOwedDialog,
-                              icon: const Icon(Icons.calculate),
-                              label: const Text('Calculate Amount Owed'),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextField(
-                                controller: _amountOwedController,
-                                readOnly: true,
-                                decoration: InputDecoration(
-                                  labelText: 'Amount Owed',
-                                  hintText: '—',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                          const SizedBox(height: 20),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: _showCalculateAmountOwedDialog,
+                                icon: const Icon(Icons.calculate),
+                                label: const Text('Calculate Amount Owed'),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: _amountOwedController,
+                                  readOnly: true,
+                                  decoration: InputDecoration(
+                                    labelText: 'Amount Owed',
+                                    hintText: '—',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 25),
-                if (isEditing && _eligibleBills != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12.0),
-                    child: ElevatedButton.icon(
-                        onPressed: _eligibleBills!.isEmpty
-                          ? () => ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text(
-                                      '${widget.rentor!.name} is settled for this month'
-                                  )
-                              )
-                          )
-                          : _navigateToBillSelection,
+                  const SizedBox(height: 25),
+                  if (isEditing && _eligibleBills != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: ElevatedButton.icon(
+                        onPressed:
+                            _eligibleBills!.isEmpty
+                                ? () => ScaffoldMessenger.of(
+                                  context,
+                                ).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '${widget.rentor!.name} is settled for this month',
+                                    ),
+                                  ),
+                                )
+                                : _navigateToBillSelection,
                         icon: const Icon(Icons.message),
-                        label: const Text('Send Bill Summary')
+                        label: const Text('Send Bill Summary'),
+                      ),
                     ),
-                ),
-                FilledButton(
-                  onPressed: _saveRentor,
-                  child: const Text('Save Rentor'),
-                ),
-              ],
+                  FilledButton(
+                    onPressed: _saveRentor,
+                    child: const Text('Save Rentor'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -15,6 +15,7 @@ import '../../screens/base/auth_reload_mixin.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
 import '../../utils/constants.dart';
 import '../../utils/dialogs/due_date_filter_sheet.dart';
+import '../../utils/dialogs/single_choice_dialog.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../utils/app_breakpoints.dart';
 import '../../widgets/notification_bell_icon.dart';
@@ -66,7 +67,8 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
   Future<List<Bill>>? _bills;
   List<Bill> _allBills = [];
   bool _loading = false;
-  bool _deferLoading = false; // used to defer loading until after Google sign-in if needed or when screen becomes visible
+  bool _deferLoading =
+      false; // used to defer loading until after Google sign-in if needed or when screen becomes visible
   bool _isListScrollable = false;
   String _selectedFilter = 'All';
   String _selectedSort = 'Due Date (Latest)';
@@ -100,8 +102,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
           syncEmails: !kIsWeb && AppConfig.mode == AppMode.server,
           earliestEmailDate: ServerConfiguration.emailEarliestDate,
         );
-      }
-      else {
+      } else {
         _deferLoading = true;
       }
     }
@@ -206,24 +207,24 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
       context: context,
       builder:
           (context) => AlertDialog(
-        title: const Text('Delete Bill'),
-        content: Text(
-          'Are you sure you want to delete bill ${bill.companyName}? This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: Colors.red),
+            title: const Text('Delete Bill'),
+            content: Text(
+              'Are you sure you want to delete bill ${bill.companyName}? This action cannot be undone.',
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
     );
 
     if (confirmed == true) {
@@ -467,93 +468,159 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
           const NotificationBellIcon(),
           if (isGoogleSignInEnabled)
             googleAccountService.buildWebGoogleAction(authorizeGoogleAccount),
-          IconButton(
-            tooltip: _buildDueDateFilterTooltip(),
-            icon: Icon(
-              _hasActiveDueDateFilter
-                  ? Icons.calendar_month
-                  : Icons.calendar_month_outlined,
+          if (AppBreakpoints.isWide(context)) ...[
+            IconButton(
+              tooltip: _buildDueDateFilterTooltip(),
+              icon: Icon(
+                _hasActiveDueDateFilter
+                    ? Icons.calendar_month
+                    : Icons.calendar_month_outlined,
+              ),
+              onPressed: _openDueDateFilterSheet,
             ),
-            onPressed: _openDueDateFilterSheet,
-          ),
-          PopupMenuButton<String>(
-            tooltip: 'Filter: $_selectedFilter',
-            icon: const Icon(Icons.filter_list),
-            onSelected: (String newValue) {
-              setState(() {
-                _selectedFilter = newValue;
-              });
-              _updateDisplayedBills();
-            },
-            itemBuilder:
-                (context) =>
-                    ['All', 'Paid', 'Unpaid']
-                        .map(
-                          (value) => CheckedPopupMenuItem<String>(
-                            value: value,
-                            checked: _selectedFilter == value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-          ),
-          PopupMenuButton<String>(
-            tooltip: 'Sort: $_selectedSort',
-            icon: const Icon(Icons.sort),
-            onSelected: (String newValue) {
-              setState(() {
-                _selectedSort = newValue;
-              });
-              _updateDisplayedBills();
-            },
-            itemBuilder:
-                (context) =>
-                    [
-                          'Due Date (Earliest)',
-                          'Due Date (Latest)',
-                          'Amount (Lowest)',
-                          'Amount (Highest)',
-                        ]
-                        .map(
-                          (value) => CheckedPopupMenuItem<String>(
-                            value: value,
-                            checked: _selectedSort == value,
-                            child: Text(value),
-                          ),
-                        )
-                        .toList(),
-          ),
-          if (AppBreakpoints.isWide(context))
+            PopupMenuButton<String>(
+              tooltip: 'Filter: $_selectedFilter',
+              icon: const Icon(Icons.filter_list),
+              onSelected: (String newValue) {
+                setState(() {
+                  _selectedFilter = newValue;
+                });
+                _updateDisplayedBills();
+              },
+              itemBuilder:
+                  (context) =>
+                      ['All', 'Paid', 'Unpaid']
+                          .map(
+                            (value) => CheckedPopupMenuItem<String>(
+                              value: value,
+                              checked: _selectedFilter == value,
+                              child: Text(value),
+                            ),
+                          )
+                          .toList(),
+            ),
+            PopupMenuButton<String>(
+              tooltip: 'Sort: $_selectedSort',
+              icon: const Icon(Icons.sort),
+              onSelected: (String newValue) {
+                setState(() {
+                  _selectedSort = newValue;
+                });
+                _updateDisplayedBills();
+              },
+              itemBuilder:
+                  (context) =>
+                      [
+                            'Due Date (Earliest)',
+                            'Due Date (Latest)',
+                            'Amount (Lowest)',
+                            'Amount (Highest)',
+                          ]
+                          .map(
+                            (value) => CheckedPopupMenuItem<String>(
+                              value: value,
+                              checked: _selectedSort == value,
+                              child: Text(value),
+                            ),
+                          )
+                          .toList(),
+            ),
             IconButton(
               icon: const Icon(Icons.sync),
               tooltip: 'Sync bills',
               onPressed: _loading ? null : _syncBills,
             ),
-          if (AppBreakpoints.isWide(context))
             IconButton(
               icon: const Icon(Icons.delete_sweep),
               tooltip: 'Delete all bills',
               color: Colors.red,
               onPressed: _deleteAllBills,
             ),
-          if (!AppBreakpoints.isWide(context))
+          ] else
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert),
               tooltip: 'More actions',
-              onSelected: (String value) {
-                if (value == 'refresh') {
-                  if (!_loading) _syncBills();
-                } else if (value == 'settings') {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                  );
-                } else if (value == 'delete_all') {
-                  _deleteAllBills();
+              onSelected: (String value) async {
+                switch (value) {
+                  case 'due_date':
+                    await _openDueDateFilterSheet();
+                    break;
+                  case 'filter':
+                    final result = await SingleChoiceDialog.show<String>(
+                      context,
+                      title: 'Filter by status',
+                      options: const ['All', 'Paid', 'Unpaid'],
+                      current: _selectedFilter,
+                      labelBuilder: (value) => value,
+                    );
+                    if (result != null) {
+                      setState(() => _selectedFilter = result);
+                      _updateDisplayedBills();
+                    }
+                    break;
+                  case 'sort':
+                    final result = await SingleChoiceDialog.show<String>(
+                      context,
+                      title: 'Sort by',
+                      options: const [
+                        'Due Date (Earliest)',
+                        'Due Date (Latest)',
+                        'Amount (Lowest)',
+                        'Amount (Highest)',
+                      ],
+                      current: _selectedSort,
+                      labelBuilder: (value) => value,
+                    );
+                    if (result != null) {
+                      setState(() => _selectedSort = result);
+                      _updateDisplayedBills();
+                    }
+                    break;
+                  case 'refresh':
+                    if (!_loading) _syncBills();
+                    break;
+                  case 'settings':
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    );
+                    break;
+                  case 'delete_all':
+                    _deleteAllBills();
+                    break;
                 }
               },
               itemBuilder:
                   (context) => [
+                    PopupMenuItem<String>(
+                      value: 'due_date',
+                      child: ListTile(
+                        leading: Icon(
+                          _hasActiveDueDateFilter
+                              ? Icons.calendar_month
+                              : Icons.calendar_month_outlined,
+                        ),
+                        title: const Text('Due date filter'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'filter',
+                      child: ListTile(
+                        leading: const Icon(Icons.filter_list),
+                        title: Text('Filter: $_selectedFilter'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    PopupMenuItem<String>(
+                      value: 'sort',
+                      child: ListTile(
+                        leading: const Icon(Icons.sort),
+                        title: Text('Sort: $_selectedSort'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuDivider(),
                     const PopupMenuItem<String>(
                       value: 'refresh',
                       child: ListTile(
@@ -587,7 +654,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 8),
               child: buildAvatarButton(),
-            )
+            ),
         ],
       ),
       body: ResponsiveConstraint(

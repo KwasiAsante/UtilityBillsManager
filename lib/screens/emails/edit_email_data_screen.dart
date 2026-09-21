@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../data/models/bill.dart';
 import '../../data/models/email_data.dart';
@@ -103,244 +104,257 @@ class _EditEmailDataScreenState extends State<EditEmailDataScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Email')),
-      body: ResponsiveConstraint(
-        maxWidth: 560,
-        child:
-            _loading
-                ? const Center(child: CircularProgressIndicator())
-                : Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Subject (read-only)
-                              TextFormField(
-                                initialValue: widget.emailData.emailSubject,
-                                decoration: const InputDecoration(
-                                  labelText: 'Subject',
+      body: SafeArea(
+        child: ResponsiveConstraint(
+          maxWidth: 560,
+          child:
+              _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Subject (read-only)
+                                TextFormField(
+                                  initialValue: widget.emailData.emailSubject,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Subject',
+                                  ),
+                                  readOnly: true,
+                                  maxLines: 2,
                                 ),
-                                readOnly: true,
-                                maxLines: 2,
-                              ),
-                              const SizedBox(height: 16),
+                                const SizedBox(height: 16),
 
-                              // Email body (collapsible)
-                              InkWell(
-                                onTap:
-                                    () => setState(
-                                      () => _isBodyExpanded = !_isBodyExpanded,
+                                // Email body (collapsible)
+                                InkWell(
+                                  onTap:
+                                      () => setState(
+                                        () =>
+                                            _isBodyExpanded = !_isBodyExpanded,
+                                      ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 4,
                                     ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        'Email Body',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
-                                      Icon(
-                                        _isBodyExpanded
-                                            ? Icons.expand_less
-                                            : Icons.expand_more,
-                                        size: 20,
-                                        color: Colors.grey,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.grey.shade300,
-                                  ),
-                                ),
-                                child:
-                                    _isBodyExpanded
-                                        ? SelectableText(
-                                          widget.emailData.emailBody,
-                                          style: const TextStyle(fontSize: 13),
-                                        )
-                                        : Text(
-                                          widget.emailData.emailBody.length >
-                                                  200
-                                              ? '${widget.emailData.emailBody.substring(0, 200)}...'
-                                              : widget.emailData.emailBody,
-                                          style: const TextStyle(
-                                            fontSize: 13,
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        const Text(
+                                          'Email Body',
+                                          style: TextStyle(
+                                            fontSize: 12,
                                             color: Colors.grey,
                                           ),
-                                          maxLines: 4,
-                                          overflow: TextOverflow.ellipsis,
                                         ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Processed toggle
-                              SwitchListTile(
-                                title: const Text('Processed'),
-                                subtitle: const Text(
-                                  'Mark this email as processed',
+                                        Icon(
+                                          _isBodyExpanded
+                                              ? Icons.expand_less
+                                              : Icons.expand_more,
+                                          size: 20,
+                                          color: Colors.grey,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                                value: _processed,
-                                onChanged:
-                                    (value) =>
-                                        setState(() => _processed = value),
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                              const Divider(),
-                              const SizedBox(height: 8),
-
-                              // Linked Bill dropdown + edit button
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Expanded(
-                                    child: DropdownButtonFormField<String?>(
-                                      initialValue:
-                                          _billsRepository.bills.any(
-                                                (b) =>
-                                                    b.billId == _selectedBillId,
-                                              )
-                                              ? _selectedBillId
-                                              : null,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Linked Bill',
-                                      ),
-                                      items: [
-                                        const DropdownMenuItem<String?>(
-                                          value: null,
-                                          child: Text('None'),
-                                        ),
-                                        ..._billsRepository.bills.map((
-                                          Bill bill,
-                                        ) {
-                                          return DropdownMenuItem<String?>(
-                                            value: bill.billId,
-                                            child: Text(
-                                              '${bill.companyName} – ${bill.dueDate} (\$${bill.amount.toStringAsFixed(2)})',
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          );
-                                        }),
-                                      ],
-                                      onChanged:
-                                          (value) => setState(
-                                            () => _selectedBillId = value,
-                                          ),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Colors.grey.shade300,
                                     ),
                                   ),
-                                  if (_selectedBill != null) ...[
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      tooltip: 'Edit linked bill',
-                                      icon: const Icon(Icons.edit_outlined),
-                                      onPressed: () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder:
-                                                (context) => AddEditBillScreen(
-                                                  bill: _selectedBill,
-                                                ),
+                                  child:
+                                      _isBodyExpanded
+                                          ? SelectableText(
+                                            widget.emailData.emailBody,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                            ),
+                                          )
+                                          : Text(
+                                            widget.emailData.emailBody.length >
+                                                    200
+                                                ? '${widget.emailData.emailBody.substring(0, 200)}...'
+                                                : widget.emailData.emailBody,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey,
+                                            ),
+                                            maxLines: 4,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                        );
-                                        await _billsRepository.reload();
-                                        setState(() {});
-                                      },
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              const SizedBox(height: 16),
+                                ),
+                                const SizedBox(height: 16),
 
-                              // Linked Payment dropdown + edit button
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Expanded(
-                                    child: DropdownButtonFormField<String?>(
-                                      initialValue:
-                                          _paymentsRepository.payments.any(
-                                                (p) =>
-                                                    p.paymentId ==
-                                                    _selectedPaymentId,
-                                              )
-                                              ? _selectedPaymentId
-                                              : null,
-                                      decoration: const InputDecoration(
-                                        labelText: 'Linked Payment',
-                                      ),
-                                      items: [
-                                        const DropdownMenuItem<String?>(
-                                          value: null,
-                                          child: Text('None'),
+                                // Processed toggle
+                                SwitchListTile(
+                                  title: const Text('Processed'),
+                                  subtitle: const Text(
+                                    'Mark this email as processed',
+                                  ),
+                                  value: _processed,
+                                  onChanged:
+                                      (value) =>
+                                          setState(() => _processed = value),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                const Divider(),
+                                const SizedBox(height: 8),
+
+                                // Linked Bill dropdown + edit button
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Expanded(
+                                      child: DropdownButtonFormField<String?>(
+                                        initialValue:
+                                            _billsRepository.bills.any(
+                                                  (b) =>
+                                                      b.billId ==
+                                                      _selectedBillId,
+                                                )
+                                                ? _selectedBillId
+                                                : null,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Linked Bill',
                                         ),
-                                        ..._paymentsRepository.payments.map((
-                                          Payment payment,
-                                        ) {
-                                          return DropdownMenuItem<String?>(
-                                            value: payment.paymentId,
-                                            child: Text(
-                                              '${payment.paymentDate} – \$${payment.amountPaid.toStringAsFixed(2)} (${payment.rentorName})',
-                                              overflow: TextOverflow.ellipsis,
+                                        items: [
+                                          const DropdownMenuItem<String?>(
+                                            value: null,
+                                            child: Text('None'),
+                                          ),
+                                          ..._billsRepository.bills.map((
+                                            Bill bill,
+                                          ) {
+                                            return DropdownMenuItem<String?>(
+                                              value: bill.billId,
+                                              child: Text(
+                                                '${bill.companyName} – ${DateFormat('yyyy-MM-dd').format(bill.dueDate)} (\$${bill.amount.toStringAsFixed(2)})',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            );
+                                          }),
+                                        ],
+                                        onChanged:
+                                            (value) => setState(
+                                              () => _selectedBillId = value,
+                                            ),
+                                      ),
+                                    ),
+                                    if (_selectedBill != null) ...[
+                                      const SizedBox(width: 8),
+                                      IconButton(
+                                        tooltip: 'Edit linked bill',
+                                        icon: const Icon(Icons.edit_outlined),
+                                        onPressed: () async {
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder:
+                                                  (context) =>
+                                                      AddEditBillScreen(
+                                                        bill: _selectedBill,
+                                                      ),
                                             ),
                                           );
-                                        }),
-                                      ],
-                                      onChanged:
-                                          (value) => setState(
-                                            () => _selectedPaymentId = value,
-                                          ),
-                                    ),
-                                  ),
-                                  if (_selectedPayment != null) ...[
-                                    const SizedBox(width: 8),
-                                    IconButton(
-                                      tooltip: 'Edit linked payment',
-                                      icon: const Icon(Icons.edit_outlined),
-                                      onPressed: () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder:
-                                                (context) =>
-                                                    AddEditPaymentScreen(
-                                                      payment: _selectedPayment,
-                                                    ),
-                                          ),
-                                        );
-                                        await _paymentsRepository.reload();
-                                        setState(() {});
-                                      },
-                                    ),
+                                          await _billsRepository.reload();
+                                          setState(() {});
+                                        },
+                                      ),
+                                    ],
                                   ],
-                                ],
-                              ),
-                            ],
+                                ),
+                                const SizedBox(height: 16),
+
+                                // Linked Payment dropdown + edit button
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Expanded(
+                                      child: DropdownButtonFormField<String?>(
+                                        initialValue:
+                                            _paymentsRepository.payments.any(
+                                                  (p) =>
+                                                      p.paymentId ==
+                                                      _selectedPaymentId,
+                                                )
+                                                ? _selectedPaymentId
+                                                : null,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Linked Payment',
+                                        ),
+                                        items: [
+                                          const DropdownMenuItem<String?>(
+                                            value: null,
+                                            child: Text('None'),
+                                          ),
+                                          ..._paymentsRepository.payments.map((
+                                            Payment payment,
+                                          ) {
+                                            return DropdownMenuItem<String?>(
+                                              value: payment.paymentId,
+                                              child: Text(
+                                                '${DateFormat('yyyy-MM-dd').format(payment.paymentDate)} – \$${payment.amountPaid.toStringAsFixed(2)} (${payment.rentorName})',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            );
+                                          }),
+                                        ],
+                                        onChanged:
+                                            (value) => setState(
+                                              () => _selectedPaymentId = value,
+                                            ),
+                                      ),
+                                    ),
+                                    if (_selectedPayment != null) ...[
+                                      const SizedBox(width: 8),
+                                      IconButton(
+                                        tooltip: 'Edit linked payment',
+                                        icon: const Icon(Icons.edit_outlined),
+                                        onPressed: () async {
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder:
+                                                  (context) =>
+                                                      AddEditPaymentScreen(
+                                                        payment:
+                                                            _selectedPayment,
+                                                      ),
+                                            ),
+                                          );
+                                          await _paymentsRepository.reload();
+                                          setState(() {});
+                                        },
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton(onPressed: _save, child: const Text('Save')),
-                    ],
+                        const SizedBox(height: 16),
+                        FilledButton(
+                          onPressed: _save,
+                          child: const Text('Save'),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+        ),
       ),
     );
   }

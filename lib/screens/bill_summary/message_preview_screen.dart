@@ -33,8 +33,7 @@ class _MessagePreviewScreenState extends State<MessagePreviewScreen> {
 
   Future<void> _share() async {
     final text = _controller.text;
-    final result =
-        await SharePlus.instance.share(ShareParams(text: text));
+    final result = await SharePlus.instance.share(ShareParams(text: text));
     if (result.status == ShareResultStatus.unavailable && mounted) {
       await Clipboard.setData(ClipboardData(text: text));
       if (mounted) {
@@ -49,30 +48,32 @@ class _MessagePreviewScreenState extends State<MessagePreviewScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Bill Summary Message')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: 'Edit your message here…',
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  maxLines: null,
+                  expands: true,
+                  textAlignVertical: TextAlignVertical.top,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'Edit your message here…',
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _share,
-              icon: const Icon(Icons.share),
-              label: const Text('Share'),
-            ),
-          ],
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: _share,
+                icon: const Icon(Icons.share),
+                label: const Text('Share'),
+              ),
+            ],
+          ),
         ),
       ),
     );
