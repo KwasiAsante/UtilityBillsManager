@@ -37,6 +37,7 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
   int _selectedIndex = 2;
   final _authService = AuthService();
   bool _loginScreenVisible = false;
+  bool _railExtended = true;
 
   @override
   void initState() {
@@ -98,7 +99,7 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
     final screens = <Widget>[
       BillListScreen(isVisible: _selectedIndex == 0),
       RentorListScreen(isVisible: _selectedIndex == 1),
-      SummaryScreen(isVisible: _selectedIndex == 2,),
+      SummaryScreen(isVisible: _selectedIndex == 2),
       PaymentListScreen(isVisible: _selectedIndex == 3),
       EmailListScreen(isVisible: _selectedIndex == 4),
     ];
@@ -106,98 +107,149 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
     final wide = AppBreakpoints.isWide(context);
 
     if (wide) {
-      return UpdateBanner(child: Scaffold(
-        body: Row(
-          children: [
-            NavigationRail(
-              extended: true,
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: _onItemTapped,
-              destinations: const [
-                NavigationRailDestination(icon: Icon(Icons.receipt_outlined), selectedIcon: Icon(Icons.receipt), label: Text('Bills')),
-                NavigationRailDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: Text('Rentors')),
-                NavigationRailDestination(icon: Icon(Icons.summarize_outlined), selectedIcon: Icon(Icons.summarize), label: Text('Summary')),
-                NavigationRailDestination(icon: Icon(Icons.payment_outlined), selectedIcon: Icon(Icons.payment), label: Text('Payments')),
-                NavigationRailDestination(icon: Icon(Icons.email_outlined), selectedIcon: Icon(Icons.email), label: Text('Emails')),
-              ],
-              leading: Padding(
-                padding: const EdgeInsets.only(top: 15, bottom: 30),
-                child: buildAvatarButton(),
-              ),
-              trailing: Expanded(
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Divider(),
-                        InkWell(
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                          ),
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            child: Row(
-                              children: [
-                                Icon(Icons.settings_outlined),
-                                SizedBox(width: 24),
-                                Text('Settings'),
-                              ],
-                            ),
-                          ),
+      return UpdateBanner(
+        child: Scaffold(
+          body: Row(
+            children: [
+              NavigationRail(
+                extended: _railExtended,
+                scrollable: true,
+                trailingAtBottom: true,
+                selectedIndex: _selectedIndex,
+                onDestinationSelected: _onItemTapped,
+                destinations: const [
+                  NavigationRailDestination(
+                    icon: Icon(Icons.receipt_outlined),
+                    selectedIcon: Icon(Icons.receipt),
+                    label: Text('Bills'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.people_outline),
+                    selectedIcon: Icon(Icons.people),
+                    label: Text('Rentors'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.summarize_outlined),
+                    selectedIcon: Icon(Icons.summarize),
+                    label: Text('Summary'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.payment_outlined),
+                    selectedIcon: Icon(Icons.payment),
+                    label: Text('Payments'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.email_outlined),
+                    selectedIcon: Icon(Icons.email),
+                    label: Text('Emails'),
+                  ),
+                ],
+                leading: Padding(
+                  padding: const EdgeInsets.only(top: 8, bottom: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip:
+                            _railExtended ? 'Collapse menu' : 'Expand menu',
+                        icon: Icon(
+                          _railExtended ? Icons.menu_open : Icons.menu,
                         ),
-                      ],
-                    ),
+                        onPressed:
+                            () =>
+                                setState(() => _railExtended = !_railExtended),
+                      ),
+                      const SizedBox(height: 8),
+                      buildAvatarButton(),
+                    ],
+                  ),
+                ),
+                trailing: Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Divider(),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap:
+                            () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SettingsScreen(),
+                              ),
+                            ),
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: _railExtended ? 16 : 0,
+                            vertical: 12,
+                          ),
+                          child:
+                              _railExtended
+                                  ? const Row(
+                                    children: [
+                                      Icon(Icons.settings_outlined),
+                                      SizedBox(width: 24),
+                                      Text('Settings'),
+                                    ],
+                                  )
+                                  : const Center(
+                                    child: Tooltip(
+                                      message: 'Settings',
+                                      child: Icon(Icons.settings_outlined),
+                                    ),
+                                  ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
+              const VerticalDivider(thickness: 1, width: 1),
+              Expanded(
+                child: IndexedStack(index: _selectedIndex, children: screens),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return UpdateBanner(
+      child: Scaffold(
+        body: IndexedStack(index: _selectedIndex, children: screens),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: _onItemTapped,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.receipt_outlined),
+              selectedIcon: Icon(Icons.receipt),
+              label: 'Bills',
             ),
-            const VerticalDivider(thickness: 1, width: 1),
-            Expanded(
-              child: IndexedStack(index: _selectedIndex, children: screens),
+            NavigationDestination(
+              icon: Icon(Icons.people_outline),
+              selectedIcon: Icon(Icons.people),
+              label: 'Rentors',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.summarize_outlined),
+              selectedIcon: Icon(Icons.summarize),
+              label: 'Summary',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.payment_outlined),
+              selectedIcon: Icon(Icons.payment),
+              label: 'Payments',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.email_outlined),
+              selectedIcon: Icon(Icons.email),
+              label: 'Emails',
             ),
           ],
         ),
-      ));
-    }
-
-    return UpdateBanner(child: Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: screens),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _onItemTapped,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.receipt_outlined),
-            selectedIcon: Icon(Icons.receipt),
-            label: 'Bills',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
-            label: 'Rentors',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.summarize_outlined),
-            selectedIcon: Icon(Icons.summarize),
-            label: 'Summary',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.payment_outlined),
-            selectedIcon: Icon(Icons.payment),
-            label: 'Payments',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.email_outlined),
-            selectedIcon: Icon(Icons.email),
-            label: 'Emails',
-          ),
-        ],
       ),
-    ));
+    );
   }
 }

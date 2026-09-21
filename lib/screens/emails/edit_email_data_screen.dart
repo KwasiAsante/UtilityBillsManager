@@ -225,6 +225,7 @@ class _EditEmailDataScreenState extends State<EditEmailDataScreen> {
                                                 )
                                                 ? _selectedBillId
                                                 : null,
+                                        isExpanded: true,
                                         decoration: const InputDecoration(
                                           labelText: 'Linked Bill',
                                         ),
@@ -291,6 +292,7 @@ class _EditEmailDataScreenState extends State<EditEmailDataScreen> {
                                                 )
                                                 ? _selectedPaymentId
                                                 : null,
+                                        isExpanded: true,
                                         decoration: const InputDecoration(
                                           labelText: 'Linked Payment',
                                         ),
