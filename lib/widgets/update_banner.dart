@@ -38,6 +38,10 @@ class _UpdateBannerState extends State<UpdateBanner> {
   }
 
   Future<void> _check() async {
+    // The browser handles its own reloads/caching; there's no separate app
+    // binary to download on web, so skip the check entirely.
+    if (kIsWeb) return;
+
     final info = await UpdateService.instance.checkForUpdate();
     if (info == null || !info.isUpdateAvailable) return;
     if (!mounted) return;
@@ -99,47 +103,48 @@ class _UpdateBannerState extends State<UpdateBanner> {
   void _showWindowsDownloadDialog(UpdateInfo info) {
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        icon: const Icon(Icons.system_update_alt, size: 36),
-        title: Text('Update to ${info.latestVersion}'),
-        content: const Text(
-          'Choose your preferred installer format.\n\n'
-          '• EXE — recommended for most users\n'
-          '• MSI — for enterprise / IT deployment\n'
-          '• MSIX — for the auto-update (appinstaller) flow',
-        ),
-        actions: [
-          if (info.downloads.windowsExe != null)
-            FilledButton.icon(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _launch(info.downloads.windowsExe!);
-              },
-              icon: const Icon(Icons.download, size: 18),
-              label: const Text('EXE installer'),
+      builder:
+          (ctx) => AlertDialog(
+            icon: const Icon(Icons.system_update_alt, size: 36),
+            title: Text('Update to ${info.latestVersion}'),
+            content: const Text(
+              'Choose your preferred installer format.\n\n'
+              '• EXE — recommended for most users\n'
+              '• MSI — for enterprise / IT deployment\n'
+              '• MSIX — for the auto-update (appinstaller) flow',
             ),
-          if (info.downloads.windowsMsi != null)
-            OutlinedButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _launch(info.downloads.windowsMsi!);
-              },
-              child: const Text('MSI installer'),
-            ),
-          if (info.downloads.windowsMsix != null)
-            OutlinedButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _launch(info.downloads.windowsMsix!);
-              },
-              child: const Text('MSIX package'),
-            ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            actions: [
+              if (info.downloads.windowsExe != null)
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _launch(info.downloads.windowsExe!);
+                  },
+                  icon: const Icon(Icons.download, size: 18),
+                  label: const Text('EXE installer'),
+                ),
+              if (info.downloads.windowsMsi != null)
+                OutlinedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _launch(info.downloads.windowsMsi!);
+                  },
+                  child: const Text('MSI installer'),
+                ),
+              if (info.downloads.windowsMsix != null)
+                OutlinedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _launch(info.downloads.windowsMsix!);
+                  },
+                  child: const Text('MSIX package'),
+                ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -147,9 +152,9 @@ class _UpdateBannerState extends State<UpdateBanner> {
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open: $url')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not open: $url')));
       }
     }
   }
