@@ -184,7 +184,26 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
                           padding: EdgeInsets.symmetric(
                             horizontal: _railExtended ? 20 : 0,
                           ),
-                          child: buildAvatarButton(),
+                          child:
+                              _railExtended && _authService.isLoggedIn
+                                  ? Row(
+                                    children: [
+                                      buildAvatarButton(),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          _authService.email ?? '',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style:
+                                              Theme.of(
+                                                context,
+                                              ).textTheme.bodySmall,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                  : buildAvatarButton(),
                         ),
                       ],
                     ),
