@@ -158,41 +158,37 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
                     padding: const EdgeInsets.only(top: 8, bottom: 16),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment:
-                          _railExtended
-                              ? CrossAxisAlignment.start
-                              : CrossAxisAlignment.center,
                       children: [
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: _railExtended ? 20 : 0,
-                          ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap:
-                                () => setState(
-                                  () => _railExtended = !_railExtended,
-                                ),
-                            child: Tooltip(
-                              message:
-                                  _railExtended
-                                      ? 'Collapse menu'
-                                      : 'Expand menu',
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Image.asset(
-                                      'assets/icon/utility_bills_manager_icon.png',
-                                      width: 32,
-                                      height: 32,
+                        InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap:
+                              () => setState(
+                                () => _railExtended = !_railExtended,
+                              ),
+                          child: Tooltip(
+                            message:
+                                _railExtended ? 'Collapse menu' : 'Expand menu',
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  // Same width as a NavigationRailDestination's
+                                  // icon column so the logo lines up with the
+                                  // destination icons below it.
+                                  SizedBox(
+                                    width: _railMinWidth,
+                                    child: Center(
+                                      child: Image.asset(
+                                        'assets/icon/utility_bills_manager_icon.png',
+                                        width: 32,
+                                        height: 32,
+                                      ),
                                     ),
-                                    if (_railExtended) ...[
-                                      const SizedBox(width: 12),
-                                      const Expanded(
+                                  ),
+                                  if (_railExtended)
+                                    const Expanded(
+                                      child: Padding(
+                                        padding: EdgeInsets.only(right: 12),
                                         child: Text(
                                           'Utility Bills Manager',
                                           maxLines: 1,
@@ -202,39 +198,38 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
                                           ),
                                         ),
                                       ),
-                                    ],
-                                  ],
-                                ),
+                                    ),
+                                ],
                               ),
                             ),
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: _railExtended ? 20 : 0,
-                          ),
-                          child:
-                              _railExtended && _authService.isLoggedIn
-                                  ? Row(
-                                    children: [
-                                      buildAvatarButton(),
-                                      const SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          _authService.email ?? '',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style:
-                                              Theme.of(
-                                                context,
-                                              ).textTheme.bodySmall,
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                  : buildAvatarButton(),
-                        ),
+                        _railExtended && _authService.isLoggedIn
+                            ? Row(
+                              children: [
+                                SizedBox(
+                                  width: _railMinWidth,
+                                  child: Center(child: buildAvatarButton()),
+                                ),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(right: 12),
+                                    child: Text(
+                                      _authService.email ?? '',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style:
+                                          Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                            : SizedBox(
+                              width: _railMinWidth,
+                              child: Center(child: buildAvatarButton()),
+                            ),
                       ],
                     ),
                   ),
@@ -256,31 +251,24 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
                                   builder: (_) => const SettingsScreen(),
                                 ),
                               ),
-                          child: SizedBox(
-                            width:
-                                _railExtended
-                                    ? _railExtendedWidth
-                                    : _railMinWidth,
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: _railExtended ? 20 : 0,
-                                vertical: 12,
-                              ),
-                              child:
-                                  _railExtended
-                                      ? const Row(
-                                        children: [
-                                          Icon(Icons.settings_outlined),
-                                          SizedBox(width: 24),
-                                          Text('Settings'),
-                                        ],
-                                      )
-                                      : const Center(
-                                        child: Tooltip(
-                                          message: 'Settings',
-                                          child: Icon(Icons.settings_outlined),
-                                        ),
-                                      ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: _railMinWidth,
+                                  child: const Center(
+                                    child: Tooltip(
+                                      message: 'Settings',
+                                      child: Icon(Icons.settings_outlined),
+                                    ),
+                                  ),
+                                ),
+                                if (_railExtended) ...[
+                                  const SizedBox(width: 4),
+                                  const Text('Settings'),
+                                ],
+                              ],
                             ),
                           ),
                         ),
