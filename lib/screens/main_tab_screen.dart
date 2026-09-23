@@ -34,9 +34,16 @@ class MainTabScreen extends StatefulWidget {
 }
 
 class _MainTabScreenState extends BaseState<MainTabScreen> {
+  // NavigationRail gives leading/trailing unconstrained width, so these are
+  // passed explicitly to the rail and reused to size leading/trailing to
+  // match instead of using an unbounded SizedBox(width: double.infinity).
+  static const double _railMinWidth = 80.0;
+  static const double _railExtendedWidth = 256.0;
+
   int _selectedIndex = 2;
   final _authService = AuthService();
   bool _loginScreenVisible = false;
+  bool _railExtended = true;
 
   @override
   void initState() {
@@ -98,7 +105,7 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
     final screens = <Widget>[
       BillListScreen(isVisible: _selectedIndex == 0),
       RentorListScreen(isVisible: _selectedIndex == 1),
-      SummaryScreen(isVisible: _selectedIndex == 2,),
+      SummaryScreen(isVisible: _selectedIndex == 2),
       PaymentListScreen(isVisible: _selectedIndex == 3),
       EmailListScreen(isVisible: _selectedIndex == 4),
     ];
@@ -106,27 +113,129 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
     final wide = AppBreakpoints.isWide(context);
 
     if (wide) {
-      return UpdateBanner(child: Scaffold(
-        body: Row(
-          children: [
-            NavigationRail(
-              extended: true,
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: _onItemTapped,
-              destinations: const [
-                NavigationRailDestination(icon: Icon(Icons.receipt_outlined), selectedIcon: Icon(Icons.receipt), label: Text('Bills')),
-                NavigationRailDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: Text('Rentors')),
-                NavigationRailDestination(icon: Icon(Icons.summarize_outlined), selectedIcon: Icon(Icons.summarize), label: Text('Summary')),
-                NavigationRailDestination(icon: Icon(Icons.payment_outlined), selectedIcon: Icon(Icons.payment), label: Text('Payments')),
-                NavigationRailDestination(icon: Icon(Icons.email_outlined), selectedIcon: Icon(Icons.email), label: Text('Emails')),
-              ],
-              leading: Padding(
-                padding: const EdgeInsets.only(top: 15, bottom: 30),
-                child: buildAvatarButton(),
-              ),
-              trailing: Expanded(
-                child: Align(
-                  alignment: Alignment.bottomCenter,
+      return UpdateBanner(
+        child: Scaffold(
+          body: Row(
+            children: [
+              NavigationRail(
+                extended: _railExtended,
+                minWidth: _railMinWidth,
+                minExtendedWidth: _railExtendedWidth,
+                scrollable: true,
+                trailingAtBottom: true,
+                selectedIndex: _selectedIndex,
+                onDestinationSelected: _onItemTapped,
+                destinations: const [
+                  NavigationRailDestination(
+                    icon: Icon(Icons.receipt_outlined),
+                    selectedIcon: Icon(Icons.receipt),
+                    label: Text('Bills'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.people_outline),
+                    selectedIcon: Icon(Icons.people),
+                    label: Text('Rentors'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.summarize_outlined),
+                    selectedIcon: Icon(Icons.summarize),
+                    label: Text('Summary'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.payment_outlined),
+                    selectedIcon: Icon(Icons.payment),
+                    label: Text('Payments'),
+                  ),
+                  NavigationRailDestination(
+                    icon: Icon(Icons.email_outlined),
+                    selectedIcon: Icon(Icons.email),
+                    label: Text('Emails'),
+                  ),
+                ],
+                leading: SizedBox(
+                  width: _railExtended ? _railExtendedWidth : _railMinWidth,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap:
+                              () => setState(
+                                () => _railExtended = !_railExtended,
+                              ),
+                          child: Tooltip(
+                            message:
+                                _railExtended ? 'Collapse menu' : 'Expand menu',
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  // Same width as a NavigationRailDestination's
+                                  // icon column so the logo lines up with the
+                                  // destination icons below it.
+                                  SizedBox(
+                                    width: _railMinWidth,
+                                    child: Center(
+                                      child: Image.asset(
+                                        'assets/icon/utility_bills_manager_icon.png',
+                                        width: 32,
+                                        height: 32,
+                                      ),
+                                    ),
+                                  ),
+                                  if (_railExtended)
+                                    const Expanded(
+                                      child: Padding(
+                                        padding: EdgeInsets.only(right: 12),
+                                        child: Text(
+                                          'Utility Bills Manager',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _railExtended && _authService.isLoggedIn
+                            ? Row(
+                              children: [
+                                SizedBox(
+                                  width: _railMinWidth,
+                                  child: Center(child: buildAvatarButton()),
+                                ),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(right: 12),
+                                    child: Text(
+                                      _authService.email ?? '',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style:
+                                          Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                            : SizedBox(
+                              width: _railMinWidth,
+                              child: Center(child: buildAvatarButton()),
+                            ),
+                      ],
+                    ),
+                  ),
+                ),
+                trailing: SizedBox(
+                  width: _railExtended ? _railExtendedWidth : _railMinWidth,
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: Column(
@@ -135,17 +244,30 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
                         const Divider(),
                         InkWell(
                           borderRadius: BorderRadius.circular(8),
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                          ),
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          onTap:
+                              () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SettingsScreen(),
+                                ),
+                              ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             child: Row(
                               children: [
-                                Icon(Icons.settings_outlined),
-                                SizedBox(width: 24),
-                                Text('Settings'),
+                                SizedBox(
+                                  width: _railMinWidth,
+                                  child: const Center(
+                                    child: Tooltip(
+                                      message: 'Settings',
+                                      child: Icon(Icons.settings_outlined),
+                                    ),
+                                  ),
+                                ),
+                                if (_railExtended) ...[
+                                  const SizedBox(width: 4),
+                                  const Text('Settings'),
+                                ],
                               ],
                             ),
                           ),
@@ -155,49 +277,51 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
                   ),
                 ),
               ),
+              const VerticalDivider(thickness: 1, width: 1),
+              Expanded(
+                child: IndexedStack(index: _selectedIndex, children: screens),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return UpdateBanner(
+      child: Scaffold(
+        body: IndexedStack(index: _selectedIndex, children: screens),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: _onItemTapped,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.receipt_outlined),
+              selectedIcon: Icon(Icons.receipt),
+              label: 'Bills',
             ),
-            const VerticalDivider(thickness: 1, width: 1),
-            Expanded(
-              child: IndexedStack(index: _selectedIndex, children: screens),
+            NavigationDestination(
+              icon: Icon(Icons.people_outline),
+              selectedIcon: Icon(Icons.people),
+              label: 'Rentors',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.summarize_outlined),
+              selectedIcon: Icon(Icons.summarize),
+              label: 'Summary',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.payment_outlined),
+              selectedIcon: Icon(Icons.payment),
+              label: 'Payments',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.email_outlined),
+              selectedIcon: Icon(Icons.email),
+              label: 'Emails',
             ),
           ],
         ),
-      ));
-    }
-
-    return UpdateBanner(child: Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: screens),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _onItemTapped,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.receipt_outlined),
-            selectedIcon: Icon(Icons.receipt),
-            label: 'Bills',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
-            label: 'Rentors',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.summarize_outlined),
-            selectedIcon: Icon(Icons.summarize),
-            label: 'Summary',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.payment_outlined),
-            selectedIcon: Icon(Icons.payment),
-            label: 'Payments',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.email_outlined),
-            selectedIcon: Icon(Icons.email),
-            label: 'Emails',
-          ),
-        ],
       ),
-    ));
+    );
   }
 }

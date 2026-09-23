@@ -33,7 +33,9 @@ class _AppConfigScreenState extends State<AppConfigScreen> {
   void initState() {
     super.initState();
     _apiUrlController = TextEditingController(text: AppConfig.apiBaseUrl);
-    _templateController = TextEditingController(text: AppConfig.messageTemplate);
+    _templateController = TextEditingController(
+      text: AppConfig.messageTemplate,
+    );
     _templateController.addListener(_updatePreview);
     _updatePreview();
   }
@@ -50,7 +52,10 @@ class _AppConfigScreenState extends State<AppConfigScreen> {
         .replaceAll('{{greeting}}', 'Good morning')
         .replaceAll('{{firstName}}', 'Alex')
         .replaceAll('{{fullName}}', 'Alex Johnson')
-        .replaceAll('{{billSummary}}', 'the electric bill is \$45.00 due April 15th.');
+        .replaceAll(
+          '{{billSummary}}',
+          'the electric bill is \$45.00 due April 15th.',
+        );
     setState(() => _previewText = preview);
   }
 
@@ -92,8 +97,9 @@ class _AppConfigScreenState extends State<AppConfigScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to save: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to save: $e')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -105,125 +111,140 @@ class _AppConfigScreenState extends State<AppConfigScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('App Configuration')),
-      body: ResponsiveConstraint(
-        maxWidth: 560,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text('General', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 8),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: TextFormField(
-                      controller: _apiUrlController,
-                      decoration: const InputDecoration(
-                        labelText: 'API Base URL',
-                        hintText: 'http://127.0.0.1:8080',
+      body: SafeArea(
+        child: ResponsiveConstraint(
+          maxWidth: 560,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('General', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: TextFormField(
+                        controller: _apiUrlController,
+                        decoration: const InputDecoration(
+                          labelText: 'API Base URL',
+                          hintText: 'http://127.0.0.1:8080',
+                        ),
+                        keyboardType: TextInputType.url,
+                        autocorrect: false,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'API Base URL is required';
+                          }
+                          final uri = Uri.tryParse(value.trim());
+                          if (uri == null ||
+                              !uri.hasScheme ||
+                              !uri.hasAuthority) {
+                            return 'Enter a valid URL (e.g. http://127.0.0.1:8080)';
+                          }
+                          if (uri.scheme != 'http' && uri.scheme != 'https') {
+                            return 'URL must use http or https';
+                          }
+                          return null;
+                        },
                       ),
-                      keyboardType: TextInputType.url,
-                      autocorrect: false,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'API Base URL is required';
-                        }
-                        final uri = Uri.tryParse(value.trim());
-                        if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
-                          return 'Enter a valid URL (e.g. http://127.0.0.1:8080)';
-                        }
-                        if (uri.scheme != 'http' && uri.scheme != 'https') {
-                          return 'URL must use http or https';
-                        }
-                        return null;
-                      },
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Message Template', style: theme.textTheme.titleMedium),
-                    TextButton(
-                      onPressed: _resetTemplate,
-                      child: const Text('Reset to default'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextFormField(
-                          controller: _templateController,
-                          decoration: const InputDecoration(
-                            labelText: 'Template',
-                            hintText: '{{greeting}} {{firstName}}, {{billSummary}}',
-                            alignLabelWithHint: true,
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Message Template',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      TextButton(
+                        onPressed: _resetTemplate,
+                        child: const Text('Reset to default'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextFormField(
+                            controller: _templateController,
+                            decoration: const InputDecoration(
+                              labelText: 'Template',
+                              hintText:
+                                  '{{greeting}} {{firstName}}, {{billSummary}}',
+                              alignLabelWithHint: true,
+                            ),
+                            maxLines: 3,
+                            autocorrect: false,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Template cannot be empty';
+                              }
+                              return null;
+                            },
                           ),
-                          maxLines: 3,
-                          autocorrect: false,
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Template cannot be empty';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        Text('Insert variable:', style: theme.textTheme.labelMedium),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: _templateVariables
-                              .map((v) => ActionChip(
-                                    label: Text(v),
-                                    onPressed: () => _insertVariable(v),
-                                  ))
-                              .toList(),
-                        ),
-                        const SizedBox(height: 16),
-                        Text('Preview:', style: theme.textTheme.labelMedium),
-                        const SizedBox(height: 4),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(8),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Insert variable:',
+                            style: theme.textTheme.labelMedium,
                           ),
-                          child: Text(
-                            _previewText,
-                            style: theme.textTheme.bodyMedium,
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children:
+                                _templateVariables
+                                    .map(
+                                      (v) => ActionChip(
+                                        label: Text(v),
+                                        onPressed: () => _insertVariable(v),
+                                      ),
+                                    )
+                                    .toList(),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          Text('Preview:', style: theme.textTheme.labelMedium),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _previewText,
+                              style: theme.textTheme.bodyMedium,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: _saving ? null : _saveSettings,
-                  child: _saving
-                      ? SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: theme.colorScheme.onPrimary,
-                          ),
-                        )
-                      : const Text('Save'),
-                ),
-              ],
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: _saving ? null : _saveSettings,
+                    child:
+                        _saving
+                            ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: theme.colorScheme.onPrimary,
+                              ),
+                            )
+                            : const Text('Save'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

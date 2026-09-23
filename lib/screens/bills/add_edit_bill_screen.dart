@@ -104,132 +104,137 @@ class _AddEditBillScreenState extends State<AddEditBillScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(isEditing ? 'Edit Bill' : 'Add Bill')),
-      body: ResponsiveConstraint(
-        maxWidth: 560,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        if (!isEditing)
-                          DropdownButtonFormField<BillType>(
-                            initialValue: _selectedType,
+      body: SafeArea(
+        child: ResponsiveConstraint(
+          maxWidth: 560,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          if (!isEditing)
+                            DropdownButtonFormField<BillType>(
+                              initialValue: _selectedType,
+                              decoration: const InputDecoration(
+                                labelText: 'Bill Type',
+                              ),
+                              items:
+                                  BillType.values.map((type) {
+                                    return DropdownMenuItem(
+                                      value: type,
+                                      child: Text(
+                                        type.name[0].toUpperCase() +
+                                            type.name.substring(1),
+                                      ),
+                                    );
+                                  }).toList(),
+                              onChanged: (type) {
+                                if (type != null) {
+                                  setState(() {
+                                    _selectedType = type;
+                                  });
+                                }
+                              },
+                            )
+                          else
+                            TextFormField(
+                              initialValue:
+                                  _selectedType.name[0].toUpperCase() +
+                                  _selectedType.name.substring(1),
+                              decoration: const InputDecoration(
+                                labelText: 'Bill Type',
+                              ),
+                              enabled: false,
+                            ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _companyController,
                             decoration: const InputDecoration(
-                              labelText: 'Bill Type',
+                              labelText: 'Company',
+                            ),
+                            validator:
+                                (value) =>
+                                    value!.isEmpty
+                                        ? 'Enter company name'
+                                        : null,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _amountController,
+                            decoration: const InputDecoration(
+                              labelText: 'Amount',
+                            ),
+                            keyboardType: TextInputType.number,
+                            validator:
+                                (value) =>
+                                    value!.isEmpty ? 'Enter amount' : null,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _dueDateController,
+                            decoration: const InputDecoration(
+                              labelText: 'Due Date (YYYY-MM-DD)',
+                            ),
+                            keyboardType: TextInputType.datetime,
+                            validator:
+                                (value) =>
+                                    value!.isEmpty ? 'Enter due date' : null,
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<PaymentStatus>(
+                            initialValue: _selectedStatus,
+                            decoration: const InputDecoration(
+                              labelText: 'Payment Status',
                             ),
                             items:
-                                BillType.values.map((type) {
+                                PaymentStatus.values.map((status) {
                                   return DropdownMenuItem(
-                                    value: type,
+                                    value: status,
                                     child: Text(
-                                      type.name[0].toUpperCase() +
-                                          type.name.substring(1),
+                                      status.name[0].toUpperCase() +
+                                          status.name.substring(1),
                                     ),
                                   );
                                 }).toList(),
-                            onChanged: (type) {
-                              if (type != null) {
+                            onChanged: (status) {
+                              if (status != null) {
                                 setState(() {
-                                  _selectedType = type;
+                                  _selectedStatus = status;
                                 });
                               }
                             },
-                          )
-                        else
+                          ),
+                          const SizedBox(height: 12),
                           TextFormField(
-                            initialValue:
-                                _selectedType.name[0].toUpperCase() +
-                                _selectedType.name.substring(1),
-                            decoration: const InputDecoration(
-                              labelText: 'Bill Type',
-                            ),
+                            controller: _amountPaidController,
                             enabled: false,
+                            decoration: const InputDecoration(
+                              labelText: 'Amount Paid \$',
+                            ),
                           ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _companyController,
-                          decoration: const InputDecoration(
-                            labelText: 'Company',
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _notesController,
+                            decoration: const InputDecoration(
+                              labelText: 'Notes (Optional)',
+                            ),
                           ),
-                          validator:
-                              (value) =>
-                                  value!.isEmpty ? 'Enter company name' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _amountController,
-                          decoration: const InputDecoration(
-                            labelText: 'Amount',
-                          ),
-                          keyboardType: TextInputType.number,
-                          validator:
-                              (value) => value!.isEmpty ? 'Enter amount' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _dueDateController,
-                          decoration: const InputDecoration(
-                            labelText: 'Due Date (YYYY-MM-DD)',
-                          ),
-                          keyboardType: TextInputType.datetime,
-                          validator:
-                              (value) =>
-                                  value!.isEmpty ? 'Enter due date' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<PaymentStatus>(
-                          initialValue: _selectedStatus,
-                          decoration: const InputDecoration(
-                            labelText: 'Payment Status',
-                          ),
-                          items:
-                              PaymentStatus.values.map((status) {
-                                return DropdownMenuItem(
-                                  value: status,
-                                  child: Text(
-                                    status.name[0].toUpperCase() +
-                                        status.name.substring(1),
-                                  ),
-                                );
-                              }).toList(),
-                          onChanged: (status) {
-                            if (status != null) {
-                              setState(() {
-                                _selectedStatus = status;
-                              });
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _amountPaidController,
-                          enabled: false,
-                          decoration: const InputDecoration(
-                            labelText: 'Amount Paid \$',
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _notesController,
-                          decoration: const InputDecoration(
-                            labelText: 'Notes (Optional)',
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: _saveBill,
-                  child: const Text('Save Bill'),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: _saveBill,
+                    child: const Text('Save Bill'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
