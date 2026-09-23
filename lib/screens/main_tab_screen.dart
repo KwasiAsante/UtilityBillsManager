@@ -114,7 +114,6 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
               NavigationRail(
                 extended: _railExtended,
                 scrollable: true,
-                trailingAtBottom: true,
                 selectedIndex: _selectedIndex,
                 onDestinationSelected: _onItemTapped,
                 destinations: const [
