@@ -205,31 +205,57 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        _railExtended && _authService.isLoggedIn
-                            ? Row(
+                        if (!_authService.isLoggedIn)
+                          InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: openLogin,
+                            child: Row(
                               children: [
                                 SizedBox(
                                   width: _railMinWidth,
-                                  child: Center(child: buildAvatarButton()),
-                                ),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(right: 12),
-                                    child: Text(
-                                      _authService.email ?? '',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style:
-                                          Theme.of(context).textTheme.bodySmall,
+                                  child: const Center(
+                                    child: Tooltip(
+                                      message: 'Sign in',
+                                      child: Icon(Icons.login, size: 18),
                                     ),
                                   ),
                                 ),
+                                if (_railExtended)
+                                  const Text(
+                                    'Sign in',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                               ],
-                            )
-                            : SizedBox(
-                              width: _railMinWidth,
-                              child: Center(child: buildAvatarButton()),
                             ),
+                          )
+                        else if (_railExtended)
+                          Row(
+                            children: [
+                              SizedBox(
+                                width: _railMinWidth,
+                                child: Center(child: buildAvatarButton()),
+                              ),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 12),
+                                  child: Text(
+                                    _authService.email ?? '',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        else
+                          SizedBox(
+                            width: _railMinWidth,
+                            child: Center(child: buildAvatarButton()),
+                          ),
                       ],
                     ),
                   ),
