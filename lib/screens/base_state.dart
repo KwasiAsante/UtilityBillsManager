@@ -10,7 +10,7 @@ class BaseState<T extends StatefulWidget> extends State<T> {
   Widget buildAvatarButton() {
     if (!_authService.isLoggedIn) {
       return TextButton.icon(
-        onPressed: _openLogin,
+        onPressed: openLogin,
         icon: const Icon(Icons.login, size: 18),
         label: const Text('Sign in'),
       );
@@ -22,19 +22,20 @@ class BaseState<T extends StatefulWidget> extends State<T> {
       onSelected: (value) async {
         if (value == 'logout') await _authService.logout();
       },
-      itemBuilder: (_) => [
-        PopupMenuItem<String>(
-          enabled: false,
-          child: Text(
-            _authService.email ?? '',
-            style: const TextStyle(color: Colors.grey),
-          ),
-        ),
-        const PopupMenuItem<String>(
-          value: 'logout',
-          child: Text('Sign out', style: TextStyle(color: Colors.red)),
-        ),
-      ],
+      itemBuilder:
+          (_) => [
+            PopupMenuItem<String>(
+              enabled: false,
+              child: Text(
+                _authService.email ?? '',
+                style: const TextStyle(color: Colors.grey),
+              ),
+            ),
+            const PopupMenuItem<String>(
+              value: 'logout',
+              child: Text('Sign out', style: TextStyle(color: Colors.red)),
+            ),
+          ],
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: CircleAvatar(
@@ -43,14 +44,18 @@ class BaseState<T extends StatefulWidget> extends State<T> {
           child: Text(
             initial,
             style: const TextStyle(
-                color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),
     );
   }
 
-  void _openLogin() {
+  @protected
+  void openLogin() {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -59,7 +64,6 @@ class BaseState<T extends StatefulWidget> extends State<T> {
       ),
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
