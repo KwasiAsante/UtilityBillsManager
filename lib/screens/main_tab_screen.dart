@@ -167,16 +167,46 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
                           padding: EdgeInsets.symmetric(
                             horizontal: _railExtended ? 20 : 0,
                           ),
-                          child: IconButton(
-                            tooltip:
-                                _railExtended ? 'Collapse menu' : 'Expand menu',
-                            icon: Icon(
-                              _railExtended ? Icons.menu_open : Icons.menu,
-                            ),
-                            onPressed:
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap:
                                 () => setState(
                                   () => _railExtended = !_railExtended,
                                 ),
+                            child: Tooltip(
+                              message:
+                                  _railExtended
+                                      ? 'Collapse menu'
+                                      : 'Expand menu',
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Image.asset(
+                                      'assets/icon/utility_bills_manager_icon.png',
+                                      width: 32,
+                                      height: 32,
+                                    ),
+                                    if (_railExtended) ...[
+                                      const SizedBox(width: 12),
+                                      const Expanded(
+                                        child: Text(
+                                          'Utility Bills Manager',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 8),
