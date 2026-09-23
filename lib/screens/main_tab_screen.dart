@@ -114,6 +114,7 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
               NavigationRail(
                 extended: _railExtended,
                 scrollable: true,
+                trailingAtBottom: true,
                 selectedIndex: _selectedIndex,
                 onDestinationSelected: _onItemTapped,
                 destinations: const [
@@ -143,64 +144,88 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
                     label: Text('Emails'),
                   ),
                 ],
-                leading: Padding(
-                  padding: const EdgeInsets.only(top: 8, bottom: 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip:
-                            _railExtended ? 'Collapse menu' : 'Expand menu',
-                        icon: Icon(
-                          _railExtended ? Icons.menu_open : Icons.menu,
+                leading: SizedBox(
+                  width: double.infinity,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment:
+                          _railExtended
+                              ? CrossAxisAlignment.start
+                              : CrossAxisAlignment.center,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: _railExtended ? 20 : 0,
+                          ),
+                          child: IconButton(
+                            tooltip:
+                                _railExtended ? 'Collapse menu' : 'Expand menu',
+                            icon: Icon(
+                              _railExtended ? Icons.menu_open : Icons.menu,
+                            ),
+                            onPressed:
+                                () => setState(
+                                  () => _railExtended = !_railExtended,
+                                ),
+                          ),
                         ),
-                        onPressed:
-                            () =>
-                                setState(() => _railExtended = !_railExtended),
-                      ),
-                      const SizedBox(height: 8),
-                      buildAvatarButton(),
-                    ],
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: _railExtended ? 20 : 0,
+                          ),
+                          child: buildAvatarButton(),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                trailing: Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Divider(),
-                      InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap:
-                            () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const SettingsScreen(),
+                trailing: SizedBox(
+                  width: double.infinity,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Divider(),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap:
+                              () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const SettingsScreen(),
+                                ),
                               ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: _railExtended ? 20 : 0,
+                                vertical: 12,
+                              ),
+                              child:
+                                  _railExtended
+                                      ? const Row(
+                                        children: [
+                                          Icon(Icons.settings_outlined),
+                                          SizedBox(width: 24),
+                                          Text('Settings'),
+                                        ],
+                                      )
+                                      : const Center(
+                                        child: Tooltip(
+                                          message: 'Settings',
+                                          child: Icon(Icons.settings_outlined),
+                                        ),
+                                      ),
                             ),
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: _railExtended ? 16 : 0,
-                            vertical: 12,
                           ),
-                          child:
-                              _railExtended
-                                  ? const Row(
-                                    children: [
-                                      Icon(Icons.settings_outlined),
-                                      SizedBox(width: 24),
-                                      Text('Settings'),
-                                    ],
-                                  )
-                                  : const Center(
-                                    child: Tooltip(
-                                      message: 'Settings',
-                                      child: Icon(Icons.settings_outlined),
-                                    ),
-                                  ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
