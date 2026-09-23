@@ -34,6 +34,12 @@ class MainTabScreen extends StatefulWidget {
 }
 
 class _MainTabScreenState extends BaseState<MainTabScreen> {
+  // NavigationRail gives leading/trailing unconstrained width, so these are
+  // passed explicitly to the rail and reused to size leading/trailing to
+  // match instead of using an unbounded SizedBox(width: double.infinity).
+  static const double _railMinWidth = 80.0;
+  static const double _railExtendedWidth = 256.0;
+
   int _selectedIndex = 2;
   final _authService = AuthService();
   bool _loginScreenVisible = false;
@@ -113,6 +119,8 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
             children: [
               NavigationRail(
                 extended: _railExtended,
+                minWidth: _railMinWidth,
+                minExtendedWidth: _railExtendedWidth,
                 scrollable: true,
                 trailingAtBottom: true,
                 selectedIndex: _selectedIndex,
@@ -145,7 +153,7 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
                   ),
                 ],
                 leading: SizedBox(
-                  width: double.infinity,
+                  width: _railExtended ? _railExtendedWidth : _railMinWidth,
                   child: Padding(
                     padding: const EdgeInsets.only(top: 8, bottom: 16),
                     child: Column(
@@ -183,7 +191,7 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
                   ),
                 ),
                 trailing: SizedBox(
-                  width: double.infinity,
+                  width: _railExtended ? _railExtendedWidth : _railMinWidth,
                   child: Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: Column(
@@ -200,7 +208,10 @@ class _MainTabScreenState extends BaseState<MainTabScreen> {
                                 ),
                               ),
                           child: SizedBox(
-                            width: double.infinity,
+                            width:
+                                _railExtended
+                                    ? _railExtendedWidth
+                                    : _railMinWidth,
                             child: Padding(
                               padding: EdgeInsets.symmetric(
                                 horizontal: _railExtended ? 20 : 0,
