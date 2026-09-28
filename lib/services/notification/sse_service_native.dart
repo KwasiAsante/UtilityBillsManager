@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:sse_channel/sse_channel.dart';
 import 'package:utility_bills_manager/utils/app_logger.dart';
 
@@ -17,6 +18,11 @@ class SseService extends SseServiceBase {
   SseService._();
 
   SseChannel? _activeChannel;
+
+  /// Test-only seam for injecting a channel directly, bypassing the real
+  /// network connection [open] establishes.
+  @visibleForTesting
+  set debugActiveChannel(SseChannel? channel) => _activeChannel = channel;
 
   // ---------------------------------------------------------------------------
   // open / close
@@ -90,7 +96,17 @@ class SseService extends SseServiceBase {
 
   @override
   void close() {
-    _activeChannel?.sink.close();
+    try {
+      _activeChannel?.sink.close();
+    } catch (e) {
+      // The transport may have already torn itself down independently of
+      // this call — e.g. the OS dropped the connection while the app was
+      // backgrounded (opening the share sheet triggers exactly this). The
+      // sink is then already closed, so SseSinkImpl.close()'s add('close')
+      // throws "Bad state: Cannot add event after closing". There's nothing
+      // further to close in that case.
+      AppLogger().d('[SSE] Sink already closed: $e');
+    }
     _activeChannel?.close();
     _activeChannel = null;
   }

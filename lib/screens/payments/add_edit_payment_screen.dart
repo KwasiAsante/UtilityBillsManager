@@ -180,7 +180,11 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
         builder:
             (context) => Padding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
+                // Clear both the keyboard (viewInsets) and the system nav
+                // bar / gesture area (padding) — viewInsets alone leaves the
+                // Cancel/Assign row hidden behind Android's nav bar.
+                bottom: MediaQuery.of(context).viewInsets.bottom +
+                    MediaQuery.of(context).padding.bottom,
               ),
               child: content,
             ),
@@ -273,7 +277,11 @@ class _AddEditPaymentScreenState extends State<AddEditPaymentScreen> {
         builder:
             (context) => Padding(
               padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
+                // Clear both the keyboard (viewInsets) and the system nav
+                // bar / gesture area (padding) — viewInsets alone leaves the
+                // Cancel/Assign row hidden behind Android's nav bar.
+                bottom: MediaQuery.of(context).viewInsets.bottom +
+                    MediaQuery.of(context).padding.bottom,
               ),
               child: content,
             ),
