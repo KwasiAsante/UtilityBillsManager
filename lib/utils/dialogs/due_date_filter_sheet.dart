@@ -223,15 +223,22 @@ class _DueDateFilterSheetContentState
             ? _tempYear
             : null;
 
+    // On the bottom-sheet branch, clear both the keyboard (viewInsets) and
+    // the system nav bar / gesture area (padding) — using viewInsets alone
+    // leaves the Apply/Clear All row hidden behind Android's nav bar.
+    final bottomInset =
+        widget.isDialog
+            ? 16.0
+            : MediaQuery.of(context).viewInsets.bottom +
+                MediaQuery.of(context).padding.bottom +
+                16;
+
     return Padding(
       padding: EdgeInsets.only(
         left: 16,
         right: 16,
         top: 16,
-        bottom:
-            widget.isDialog
-                ? 16
-                : MediaQuery.of(context).viewInsets.bottom + 16,
+        bottom: bottomInset,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

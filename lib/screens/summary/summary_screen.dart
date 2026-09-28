@@ -11,6 +11,7 @@ import '../../data/repositories/bills_repository.dart';
 import '../../data/repositories/payments_repository.dart';
 import '../../data/repositories/rentors_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
+import '../../utils/dialogs/export_month_picker_dialog.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../utils/export_utils.dart';
 import '../../utils/app_breakpoints.dart';
@@ -343,8 +344,23 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
   // ── Export ───────────────────────────────────────────────────────────────────
 
   void _exportToCSV() async {
+    final months = _groupByMonth(_filteredBills).keys.toList();
+    if (months.isEmpty) return;
+    final selection = await ExportMonthPickerDialog.show(
+      context,
+      availableMonths: months,
+      showCombineOption: true,
+    );
+    if (selection == null || !mounted) return;
+
     try {
-      await ExportUtils.exportBillsToCSV(_filteredBills, _rentors, _payments);
+      await ExportUtils.exportBillsToCSV(
+        _filteredBills,
+        _rentors,
+        _payments,
+        selectedMonths: selection.selectedMonths,
+        combineAsWorkbook: selection.combineAsWorkbook,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -358,8 +374,21 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
   }
 
   void _exportToPDF() async {
+    final months = _groupByMonth(_filteredBills).keys.toList();
+    if (months.isEmpty) return;
+    final selection = await ExportMonthPickerDialog.show(
+      context,
+      availableMonths: months,
+    );
+    if (selection == null || !mounted) return;
+
     try {
-      await ExportUtils.exportBillsToPDF(_filteredBills, _rentors, _payments);
+      await ExportUtils.exportBillsToPDF(
+        _filteredBills,
+        _rentors,
+        _payments,
+        selectedMonths: selection.selectedMonths,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
