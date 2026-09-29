@@ -29,7 +29,7 @@ Runs on **Android, iOS, macOS, Windows, Linux, and Web**.
 - **Email Sync (Gmail / IMAP)** — Sign in with Google (web) or connect via IMAP (native) to pull bill-related emails. Parsed emails are matched to bills and payments automatically. Sync can be triggered on-demand or run on a schedule. Negative/credit amounts (e.g. `-$45.00`) are parsed correctly and flagged with an **Unknown** status rather than assumed paid, since a credit on a bill is abnormal and warrants a manual look.
 - **Summary Screen** — Monthly overview grouped by bill type with "considered paid" threshold logic. A **Rentors Owed** card at the top shows what each rentor owes for the current month.
 - **Bill Summary Messages** — Select bills, preview a generated message (using a configurable template), and share directly to WhatsApp or any messaging app.
-- **Export** — Export summaries as CSV or PDF, including per-bill rentor contributions.
+- **Export** — Pick one or more months to export as CSV or PDF, including per-bill rentor contributions. CSV can combine every selected month into a single styled Excel workbook (a Summary sheet with per-year totals plus one sheet per month) or fall back to a plain CSV per month; PDF always produces one file with a summary page followed by a page per month.
 - **Real-Time Notifications** — Server-Sent Events (SSE) push `newBill` / `newPayment` events instantly. Firebase Cloud Messaging (FCM) handles push when the app is backgrounded. In-app notification bell with unread badge and slide-in panel.
 - **In-App Update Checker** — Polls `latest.json` from GitHub Pages on startup. When a newer version is found, a `MaterialBanner` appears on every screen. On Windows a dialog offers all three installer formats (EXE, MSI, MSIX).
 - **Settings** — API base URL with live reachability check; IMAP credentials and sync schedule configurable from within the app; in-app log viewer to inspect and share on-device log files without a debugger.
@@ -198,14 +198,14 @@ lib/
 │
 ├── utils/
 │   ├── app_logger.dart           # Structured logging (local + optional server upload)
-│   ├── export_utils.dart         # CSV / PDF export
+│   ├── export_utils.dart         # CSV / PDF export (multi-month, styled Excel workbook)
 │   ├── preferences.dart          # SharedPreferences wrapper
 │   ├── bills/bills_parser.dart
 │   ├── email/email_parser.dart
 │   ├── payments/payments_parser.dart
 │   ├── files/                    # file_utils · native_pdf_text_extractor
 │   ├── windows/                  # DataMigration · AppWindowsListener
-│   └── dialogs/                  # SyncOptionsDialog · DueDateFilterSheet
+│   └── dialogs/                  # SyncOptionsDialog · DueDateFilterSheet · ExportMonthPickerDialog
 │
 ├── widgets/
 │   ├── notification_bell_icon.dart
@@ -598,6 +598,7 @@ git push --tags
 | `firebase_core` / `firebase_auth` / `firebase_messaging` | Firebase init, auth, FCM push |
 | `flutter_local_notifications` | Due-date reminders |
 | `pdf` / `pdfrx` | PDF generation and parsing |
+| `quds_office_engine` | Styled Excel (.xlsx) workbook generation for combined CSV export |
 | `share_plus` | File sharing / export |
 | `flutter_dotenv` | Loads `.env` asset at runtime for build-time configuration |
 | `logger` | Structured logging via `AppLogger` |
