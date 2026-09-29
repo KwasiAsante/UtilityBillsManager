@@ -6,6 +6,18 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [1.2.1+14] — 2026-09-29
+
+### Added
+- **Multi-month export** — the Summary screen's CSV and PDF export buttons now open a month-picker dialog before exporting. CSV export can combine every selected month into a single styled Excel (`.xlsx`) workbook — a "Summary" sheet with per-month rows and a bolded "YYYY Total" row after each year, plus one bordered/color-coded sheet per month with the same content as the previous per-month CSVs — or export each month as its own plain CSV. PDF export now always produces one file: a summary page (with the same per-year totals) followed by one page per selected month. On web, the picker caps selection at 10 months when not combining into a workbook, since Chromium's `navigator.share()` rejects a call sharing more files than that.
+- **`quds_office_engine`** dependency — pure-Dart `.xlsx` workbook writer used for the combined export above; no dependency conflicts with the existing `enough_mail`/`archive` chain that `excel` and its actively-maintained forks all hit.
+- **`ExportMonthPickerDialog`** (`lib/utils/dialogs/export_month_picker_dialog.dart`) — adaptive dialog/bottom-sheet, following the same wide-screen-dialog vs. narrow-screen-bottom-sheet pattern as `DueDateFilterSheet`.
+
+### Fixed
+- **Multi-file mobile/web sharing** — `ExportUtils.exportBillsToCSV`'s mobile/web path now attaches every selected month's file to a single `SharePlus` call instead of looping one `share()` call per file. A loop of calls either fails outright on web (`navigator.share()` consumes the page's user-activation the instant it's invoked, so only the first of several calls in one click handler can ever show a dialog) or silently corrupts every file but the last on Android (`share_plus`'s native staging step copies every shared file into one shared cache folder keyed only by filename, and `XFile.fromData`'s `name` is dropped by `cross_file` on every native platform unless `ShareParams.fileNameOverrides` is set — so same-named files were overwriting each other, leaving every exported file with the earliest selected month's content and a garbled machine-generated name).
+- **Bottom sheet action buttons hidden behind Android's system nav bar** — `ExportMonthPickerDialog`, `DueDateFilterSheet`, and the rentor/bill picker bottom sheets in `AddEditPaymentScreen` computed their bottom padding from `MediaQuery.viewInsets.bottom` (the on-screen keyboard) only. Added `MediaQuery.padding.bottom` (the system nav bar / gesture inset) so the Cancel/Apply/Assign row is never obscured on devices with an on-screen nav bar.
+- **`SseService.close()` throwing during app resume** — closing the SSE sink unconditionally called `add('close')` on it even when the underlying transport had already torn itself down independently (e.g. the OS dropping the connection while the app was backgrounded for the share sheet), throwing `Bad state: Cannot add event after closing` as an unhandled exception on every app resume. The close call is now wrapped so an already-closed sink is a silent no-op.
+
 ## [1.2.0+12] — 2026-08-20
 
 ### Fixed
