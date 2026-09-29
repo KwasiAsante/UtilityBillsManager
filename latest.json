@@ -1,13 +1,13 @@
 {
-  "version": "1.2.0",
-  "build": 12,
-  "tag": "v1.2.0",
+  "version": "1.2.1",
+  "build": 14,
+  "tag": "v1.2.1",
   "downloads": {
-    "windows_msix": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.0/utility_bills_manager_1.2.0.0.msix",
-    "windows_exe": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.0/utility_bills_manager-1.2.0-setup.exe",
-    "windows_msi": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.0/utility_bills_manager-1.2.0-setup.msi",
-    "android": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.0/utility_bills_manager-1.2.0-android.apk",
-    "macos": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.0/utility_bills_manager-1.2.0-macos.dmg",
-    "linux": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.0/utility_bills_manager-1.2.0-linux-x64.tar.gz"
+    "windows_msix": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.1/utility_bills_manager_1.2.1.0.msix",
+    "windows_exe": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.1/utility_bills_manager-1.2.1-setup.exe",
+    "windows_msi": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.1/utility_bills_manager-1.2.1-setup.msi",
+    "android": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.1/utility_bills_manager-1.2.1-android.apk",
+    "macos": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.1/utility_bills_manager-1.2.1-macos.dmg",
+    "linux": "https://github.com/KwasiAsante/UtilityBillsManager/releases/download/v1.2.1/utility_bills_manager-1.2.1-linux-x64.tar.gz"
   }
 }
