@@ -175,6 +175,7 @@ class WindowsNotificationService
       final title = switch (event.type) {
         SseEventType.newBill => 'New Bill',
         SseEventType.newPayment => 'New Payment',
+        SseEventType.billSummaryReminder => 'Send Bill Summary',
       };
 
       AppLogger().d('[SSE] ${event.type}: $title');
@@ -218,6 +219,7 @@ class WindowsNotificationService
   Future<void> _reloadRepositoryAsync(SseEventType type) async {
     switch (type) {
       case SseEventType.newBill:
+      case SseEventType.billSummaryReminder:
         await BillsRepository().reload();
       case SseEventType.newPayment:
         await PaymentsRepository().reload();
@@ -324,6 +326,7 @@ class WindowsNotificationService
   void reloadRepository(SseEventType type) {
     switch (type) {
       case SseEventType.newBill:
+      case SseEventType.billSummaryReminder:
         BillsRepository().reload();
       case SseEventType.newPayment:
         PaymentsRepository().reload();
