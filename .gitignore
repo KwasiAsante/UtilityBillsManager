@@ -4,6 +4,7 @@
 # Miscellaneous
 *.class
 *.lock
+!pubspec.lock
 *.log
 *.pyc
 *.swp
@@ -132,7 +133,5 @@ app.*.symbols
 # Local env config (build-time dart-defines — never bundled in release)
 .env
 
-# If you're building an application, you may want to check-in your pubspec.lock
-pubspec.lock
 .DS_Store
 /~/Library
