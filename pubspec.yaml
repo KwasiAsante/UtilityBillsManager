@@ -35,7 +35,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cross_file: ^0.3.5+2
   cupertino_icons: ^1.0.9
-  enough_mail: ^2.1.7
+  enough_mail: ^3.0.0
   firebase_auth: ^6.5.1
   firebase_core: ^4.9.0
   firebase_messaging: ^16.2.2
@@ -47,7 +47,7 @@ dependencies:
   intl: ^0.20.2
   path: ^1.9.1 # For handling file path
   path_provider: ^2.1.5
-  pdf: ^3.12.0
+  pdf: ^3.13.1
   pdfrx: ^2.4.1
   share_plus: ^13.1.0
   file_selector: ^1.1.0
