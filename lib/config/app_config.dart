@@ -36,6 +36,22 @@ class AppConfig {
   /// this cache after startup so the DB is never hit on the hot path.
   static AppConfiguration? _appConfig;
 
+  /// Loads the bundled [fileName] asset into `dotenv`.
+  ///
+  /// The asset is optional. When it is missing, empty or fails to load,
+  /// `dotenv` is initialised with no entries so `dotenv.env[...]` reads
+  /// return null and fall back to defaults instead of throwing
+  /// `NotInitializedError`.
+  static Future<void> loadEnv({String fileName = '.env'}) async {
+    try {
+      await dotenv.load(fileName: fileName);
+    } catch (_) {
+      // testLoad is the only public API that marks dotenv initialised
+      // without reading an asset.
+      dotenv.testLoad();
+    }
+  }
+
   /// Loads optional local secrets from a bundled asset and pre-warms
   /// the SharedPreferences instance.
   ///
