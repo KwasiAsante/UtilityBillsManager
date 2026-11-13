@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sse_channel/sse_channel.dart';
 import 'package:stream_channel/stream_channel.dart';
+import 'package:utility_bills_manager/data/models/sse_event.dart';
 import 'package:utility_bills_manager/services/notification/sse_service_native.dart';
 
 void main() {
@@ -31,6 +32,19 @@ void main() {
       SseService.instance.debugActiveChannel = channel;
 
       expect(() => SseService.instance.close(), returnsNormally);
+    });
+  });
+
+  group('SseService.parseEventType', () {
+    test('recognises the monthly billSummaryReminder event', () {
+      expect(
+        SseService.instance.parseEventType('billSummaryReminder'),
+        SseEventType.billSummaryReminder,
+      );
+    });
+
+    test('still ignores unknown event types', () {
+      expect(SseService.instance.parseEventType('somethingElse'), isNull);
     });
   });
 }

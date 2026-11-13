@@ -100,11 +100,7 @@ abstract class SseServiceBase {
   // ---------------------------------------------------------------------------
 
   /// Parses a raw type string into a known [SseEventType], or returns null.
-  SseEventType? parseEventType(String? type) => switch (type) {
-    'newBill' => SseEventType.newBill,
-    'newPayment' => SseEventType.newPayment,
-    _ => null,
-  };
+  SseEventType? parseEventType(String? type) => parseSseEventType(type);
 
   void onConnected() {
     state = SseState.connected;

@@ -161,9 +161,11 @@ class _NotificationTile extends StatelessWidget {
         leading: CircleAvatar(
           backgroundColor: colorScheme.primaryContainer,
           child: Icon(
-            notification.type == SseEventType.newBill
-                ? Icons.receipt_outlined
-                : Icons.payment_outlined,
+            switch (notification.type) {
+              SseEventType.newBill => Icons.receipt_outlined,
+              SseEventType.newPayment => Icons.payment_outlined,
+              SseEventType.billSummaryReminder => Icons.summarize_outlined,
+            },
             size: 20,
             color: colorScheme.onPrimaryContainer,
           ),

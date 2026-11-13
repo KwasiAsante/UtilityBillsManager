@@ -296,6 +296,7 @@ class NativeNotificationService
       final title = switch (event.type) {
         SseEventType.newBill => 'New Bill',
         SseEventType.newPayment => 'New Payment',
+        SseEventType.billSummaryReminder => 'Send Bill Summary',
       };
 
       AppLogger().d('[SSE] ${event.type}: $title');
@@ -337,6 +338,7 @@ class NativeNotificationService
   Future<void> _reloadRepositoryAsync(SseEventType type) async {
     switch (type) {
       case SseEventType.newBill:
+      case SseEventType.billSummaryReminder:
         await BillsRepository().reload();
       case SseEventType.newPayment:
         await PaymentsRepository().reload();
@@ -505,11 +507,7 @@ class NativeNotificationService
     reloadRepository(eventType);
   }
 
-  SseEventType? _eventTypeFromString(String? type) => switch (type) {
-    'newBill' => SseEventType.newBill,
-    'newPayment' => SseEventType.newPayment,
-    _ => null,
-  };
+  SseEventType? _eventTypeFromString(String? type) => parseSseEventType(type);
 
   //endregion
 
@@ -535,6 +533,7 @@ class NativeNotificationService
   void reloadRepository(SseEventType type) {
     switch (type) {
       case SseEventType.newBill:
+      case SseEventType.billSummaryReminder:
         BillsRepository().reload();
       case SseEventType.newPayment:
         PaymentsRepository().reload();

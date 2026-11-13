@@ -1,7 +1,20 @@
 import 'dart:convert';
 
 /// The type of server-sent event pushed to connected clients.
-enum SseEventType { newBill, newPayment }
+///
+/// [billSummaryReminder] is sent once per month, when that month's electric,
+/// gas, and internet bills have all arrived, as a prompt to send the rentors
+/// a bill summary. Its `data` is `{'month': 'yyyy-MM'}`.
+enum SseEventType { newBill, newPayment, billSummaryReminder }
+
+/// Parses a server-sent event type string (the enum value's name, e.g.
+/// `'newBill'`) into a known [SseEventType], or returns null for unknown
+/// types.
+///
+/// Shared by the SSE decoders and the FCM handlers so every channel
+/// recognises the same set of types.
+SseEventType? parseSseEventType(String? type) =>
+    type == null ? null : SseEventType.values.asNameMap()[type];
 
 /// A server-sent event (SSE) payload pushed to connected clients over the
 /// `/connect` stream.
