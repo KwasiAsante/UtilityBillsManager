@@ -30,7 +30,7 @@ class DatabaseHelper {
 
   /// Current schema version.  Bump this and add a corresponding
   /// `if (oldVersion < N)` block in [_onUpgrade] for every schema change.
-  static const _databaseVersion = 18;
+  static const _databaseVersion = 19;
 
   static final DatabaseHelper _instance = DatabaseHelper._internal();
 
@@ -114,7 +114,8 @@ class DatabaseHelper {
         defaultPercentage REAL NOT NULL,
         billPercentages TEXT,
         excludedBillTypes TEXT,
-        lastPaymentDate TEXT
+        lastPaymentDate TEXT,
+        startDate TEXT
       )
     ''');
 
@@ -656,6 +657,10 @@ class DatabaseHelper {
     if (oldVersion < 18) {
       await _ensureColumn(db, 'app_configuration', 'messageTemplate', 'TEXT');
     }
+
+    if (oldVersion < 19) {
+      await _ensureColumn(db, 'rentors', 'startDate', 'TEXT');
+    }
   }
   //endregion
 
@@ -915,6 +920,7 @@ class DatabaseHelper {
       'r.billPercentages AS r_billPercentages',
       'r.excludedBillTypes AS r_excludedBillTypes',
       'r.lastPaymentDate AS r_lastPaymentDate',
+      'r.startDate AS r_startDate',
     ];
 
     return '''

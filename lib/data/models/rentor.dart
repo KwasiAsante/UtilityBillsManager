@@ -16,6 +16,8 @@ import '../../utils/comparable_utils.dart';
 /// - A per-[BillType] override map ([billPercentages]) for fine-grained splits.
 /// - An [excludedBillTypes] list for bill types the rentor never pays.
 /// - A [lastPaymentDate] that is updated whenever a new [Payment] is recorded.
+/// - An optional [startDate]; bills due before it are not the rentor's
+///   responsibility (null means the rentor is always active).
 ///
 /// Amount calculations are available via [owedAmount] and the static helper
 /// [calculateOwedAmount]. For payment-aware breakdowns use [calculateOwedBreakdown]
@@ -30,6 +32,7 @@ class Rentor {
   final Map<BillType, double> billPercentages; // e.g., {'Electric': 0.1, 'Gas': 0.2}
   final List<BillType> excludedBillTypes;
   DateTime? lastPaymentDate;
+  final DateTime? startDate;
 
   Rentor({
     this.id,
@@ -41,6 +44,7 @@ class Rentor {
     required this.billPercentages,
     List<BillType>? excludedBillTypes,
     this.lastPaymentDate,
+    this.startDate,
   })  : rentorId = rentorId ?? Uuid().v4(),
         excludedBillTypes = excludedBillTypes ?? const [];
 
@@ -99,6 +103,9 @@ class Rentor {
       lastPaymentDate: json['lastPaymentDate'] != null
           ? DateTime.tryParse(json['lastPaymentDate'])
           : null,
+      startDate: json['startDate'] != null
+          ? DateTime.tryParse(json['startDate'])
+          : null,
     );
   }
 
@@ -138,6 +145,9 @@ class Rentor {
       lastPaymentDate: map['r_lastPaymentDate'] != null
           ? DateTime.tryParse(map['r_lastPaymentDate'])
           : null,
+      startDate: map['r_startDate'] != null
+          ? DateTime.tryParse(map['r_startDate'])
+          : null,
     );
   }
 
@@ -159,6 +169,9 @@ class Rentor {
       'billPercentages': encodedMap,
       'excludedBillTypes': excludedBillTypes.map((t) => t.name.toLowerCase()).toList(),
       'lastPaymentDate': lastPaymentDate?.toIso8601String().split('T').first,
+      // Always present: null means "always active". The server keeps its stored
+      // value when the key is missing, so omitting it would be wrong.
+      'startDate': startDate?.toIso8601String().split('T').first,
     };
   }
 
@@ -172,16 +185,36 @@ class Rentor {
     return payload;
   }
 
+  /// Whether this rentor is responsible for bills dated [date].
+  ///
+  /// True when [startDate] is null or its calendar day is on or before the
+  /// calendar day of [date] (time-of-day is ignored).
+  bool isActiveOn(DateTime date) {
+    final start = startDate;
+    if (start == null) return true;
+    final startDay = DateTime(start.year, start.month, start.day);
+    final day = DateTime(date.year, date.month, date.day);
+    return !startDay.isAfter(day);
+  }
+
+  /// The percentage of a [type] bill this rentor pays: `0` when the type is in
+  /// [excludedBillTypes], else the [billPercentages] override, else
+  /// [defaultPercentage].
+  double percentageFor(BillType type) {
+    if (excludedBillTypes.contains(type)) return 0;
+    return billPercentages[type] ?? defaultPercentage;
+  }
+
   /// Calculates the amount owed by [rentor] for a single [bill].
   ///
-  /// Uses the bill-type-specific percentage from [rentor.billPercentages] if
-  /// one exists; otherwise falls back to `0.0` (not the default percentage —
-  /// that would override the user's explicit zero assignment).  The result is
-  /// rounded to the nearest whole dollar.
+  /// Returns `0` when the rentor was not yet active on the bill's due date
+  /// (see [isActiveOn]). Otherwise applies [percentageFor] the bill's type
+  /// (exclusion -> 0, bill-specific override, else [defaultPercentage]). The
+  /// result is rounded to the nearest whole dollar only when
+  /// [roundToWholeDollar] is true.
   static double calculateOwedAmount(Rentor rentor, Bill bill, {bool roundToWholeDollar = false}) {
-    if (rentor.excludedBillTypes.contains(bill.type)) return 0.0;
-    double? customPercentage = rentor.billPercentages[bill.type];
-    double percentage = customPercentage ?? rentor.defaultPercentage;
+    if (!rentor.isActiveOn(bill.dueDate)) return 0.0;
+    final percentage = rentor.percentageFor(bill.type);
     double amount = bill.amount * (percentage / 100);
     return roundToWholeDollar ? amount.round().toDouble() : amount;
   }
@@ -232,7 +265,8 @@ extension RentorExtensions on Rentor {
   /// subtracting [alreadyPaidPerBill] (a map from bill ID to the amount already
   /// paid by this rentor toward that bill).
   ///
-  /// Bill types in [excludedBillTypes] are skipped. Pass [percentageForType] to
+  /// Bills due before [startDate] (see [isActiveOn]) and bill types in
+  /// [excludedBillTypes] are skipped. Pass [percentageForType] to
   /// override the percentage lookup (e.g. to use live form-controller values);
   /// otherwise [billPercentages] is used with [defaultPercentage] as fallback.
   ///
@@ -244,10 +278,11 @@ extension RentorExtensions on Rentor {
   }) {
     final breakdown = <BillType, double>{};
     for (final bill in bills) {
+      if (!isActiveOn(bill.dueDate)) continue;
       if (excludedBillTypes.contains(bill.type)) continue;
       final pct = percentageForType != null
           ? percentageForType(bill.type)
-          : (billPercentages[bill.type] ?? defaultPercentage);
+          : percentageFor(bill.type);
       final totalOwed = bill.amount * (pct / 100);
       final alreadyPaid = alreadyPaidPerBill[bill.billId] ?? 0.0;
       final stillOwes = (totalOwed - alreadyPaid).clamp(0.0, double.infinity);
