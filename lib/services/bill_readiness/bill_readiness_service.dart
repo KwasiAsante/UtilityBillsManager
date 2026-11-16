@@ -63,7 +63,8 @@ class BillReadinessService {
 
     final relevantRentors = allRentors.where((r) =>
         r.billPercentages.containsKey(newBill.type) &&
-        !r.excludedBillTypes.contains(newBill.type));
+        !r.excludedBillTypes.contains(newBill.type) &&
+        r.isActiveOn(newBill.dueDate));
 
     for (final rentor in relevantRentors) {
       // Record receipt once.

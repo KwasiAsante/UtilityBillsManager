@@ -25,6 +25,9 @@ class BillSummaryService {
   /// 3. [bill.dueDate] falls in the current calendar month — OR, for
   ///    [BillType.water] only, in the following month (water bills arrive
   ///    mid-month but are due early next month).
+  /// 4. [bill.dueDate] is not before the rentor's [Rentor.startDate]
+  ///    (see [Rentor.isActiveOn]); bills due before the rentor moved in are
+  ///    dropped, not shown as zero.
   List<Bill> getEligibleBills(
     Rentor rentor,
     List<Bill> allBills, {
@@ -37,6 +40,7 @@ class BillSummaryService {
     return allBills.where((bill) {
       if (bill.status == PaymentStatus.paid) return false;
       if (rentor.excludedBillTypes.contains(bill.type)) return false;
+      if (!rentor.isActiveOn(bill.dueDate)) return false;
 
       final dueThisMonth =
           bill.dueDate.year == ref.year && bill.dueDate.month == ref.month;

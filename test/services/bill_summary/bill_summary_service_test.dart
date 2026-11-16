@@ -30,12 +30,14 @@ void main() {
     String name = 'Alex Johnson',
     double defaultPercentage = 50.0,
     List<BillType> excluded = const [],
+    DateTime? startDate,
   }) =>
       Rentor(
         name: name,
         defaultPercentage: defaultPercentage,
         billPercentages: const {},
         excludedBillTypes: excluded,
+        startDate: startDate,
       );
 
   group('getEligibleBills', () {
@@ -136,6 +138,36 @@ void main() {
       final result = service.getEligibleBills(rentor, [bill],
           now: DateTime(2026, 4, 1));
       expect(result, isEmpty);
+    });
+
+    test('excludes bills due before the rentor startDate', () {
+      final rentor = makeRentor(startDate: DateTime(2026, 11, 13));
+      final beforeStart = makeBill(
+        type: BillType.electric,
+        amount: 100.0,
+        dueDate: DateTime(2026, 11, 5),
+      );
+      final afterStart = makeBill(
+        type: BillType.electric,
+        amount: 120.0,
+        dueDate: DateTime(2026, 11, 20),
+      );
+      final result = service.getEligibleBills(
+          rentor, [beforeStart, afterStart],
+          now: DateTime(2026, 11, 16));
+      expect(result, [afterStart]);
+    });
+
+    test('includes a bill due on the rentor startDate', () {
+      final rentor = makeRentor(startDate: DateTime(2026, 11, 13));
+      final onStart = makeBill(
+        type: BillType.electric,
+        amount: 100.0,
+        dueDate: DateTime(2026, 11, 13),
+      );
+      final result = service.getEligibleBills(rentor, [onStart],
+          now: DateTime(2026, 11, 16));
+      expect(result, [onStart]);
     });
 
     test('handles December → January year boundary for water bill', () {

@@ -94,6 +94,7 @@ Rentor _rentor({
   required String rentorId,
   required Map<BillType, double> billPercentages,
   List<BillType> excludedBillTypes = const [],
+  DateTime? startDate,
 }) =>
     Rentor(
       rentorId: rentorId,
@@ -101,6 +102,7 @@ Rentor _rentor({
       defaultPercentage: 30.0,
       billPercentages: billPercentages,
       excludedBillTypes: excludedBillTypes,
+      startDate: startDate,
     );
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -144,6 +146,60 @@ void main() {
       );
 
       expect(result, isEmpty);
+    });
+  });
+
+  group('checkReadiness — rentor startDate', () {
+    // Bill due 2026-04-15 (default of _bill).
+    test(
+        'rentor whose startDate is after the new bill due date gets no compose '
+        'notification and no tracker row', () async {
+      final rentor = _rentor(
+        rentorId: 'r1',
+        billPercentages: {BillType.electric: 35},
+        startDate: DateTime(2026, 4, 20),
+      );
+      final bill = _bill(billId: 'b1', type: BillType.electric);
+
+      final result = await service.checkReadiness(
+        bill, [rentor], [bill], now: now,
+      );
+
+      expect(result, isEmpty);
+      final tracked = await fakeHelper.hasBillBeenTracked('r1', 'b1');
+      expect(tracked.data, isFalse);
+    });
+
+    test('same rentor without a future startDate does get a notification',
+        () async {
+      final rentor = _rentor(
+        rentorId: 'r1',
+        billPercentages: {BillType.electric: 35},
+      );
+      final bill = _bill(billId: 'b1', type: BillType.electric);
+
+      final result = await service.checkReadiness(
+        bill, [rentor], [bill], now: now,
+      );
+
+      expect(result, hasLength(1));
+      expect(result.single.rentor.rentorId, 'r1');
+    });
+
+    test('rentor whose startDate is on or before the bill due date is relevant',
+        () async {
+      final rentor = _rentor(
+        rentorId: 'r1',
+        billPercentages: {BillType.electric: 35},
+        startDate: DateTime(2026, 4, 15),
+      );
+      final bill = _bill(billId: 'b1', type: BillType.electric);
+
+      final result = await service.checkReadiness(
+        bill, [rentor], [bill], now: now,
+      );
+
+      expect(result, hasLength(1));
     });
   });
 
