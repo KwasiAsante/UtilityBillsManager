@@ -156,29 +156,38 @@ class RentorsHelper {
 
   /// Refreshes the rentor's `lastPaymentDate` after [payment] is recorded.
   ///
-  /// Resolves the rentor from [rentorId] if [rentor] is not provided directly,
-  /// then calls [Rentor.updateLastPaymentDate] and persists the change.
+  /// The rentor is identified by [rentorId], or by `rentor.rentorId` when only
+  /// [rentor] is given; the passed-in object is used for its id only. The
+  /// rentor is always re-read from the data source before it is updated,
+  /// because callers typically hold a cached copy (e.g. `payment.rentor` from
+  /// the payments cache) that can predate a rentor edit, and saving the whole
+  /// stale rentor would overwrite that edit (and make the server re-check bill
+  /// statuses against the old values).
+  ///
+  /// Skips the write, logging the reason, if the read fails or finds nothing.
   Future<void> updateRentorPaymentInfo(Payment payment, {Rentor? rentor, String? rentorId}) async {
-    if (rentor == null && rentorId == null) {
+    final id = rentorId ?? rentor?.rentorId;
+    if (id == null) {
       return;
     }
 
-    if (rentor == null) {
-      final readResult = await readRentor(rentorId!);
-      if (readResult.isSuccess) {
-        rentor = readResult.data!;
-      } else {
-        return;
-      }
+    final readResult = await readRentor(id);
+    final fresh = readResult.data;
+    if (!readResult.isSuccess || fresh == null) {
+      AppLogger().e(
+        "Could not read rentor $id to update payment info: "
+        "${readResult.errorMessage ?? 'rentor not found'}",
+      );
+      return;
     }
 
-    rentor.updateLastPaymentDate(payments: [payment]);
-    final results = await updateRentor(rentor);
+    fresh.updateLastPaymentDate(payments: [payment]);
+    final results = await updateRentor(fresh);
     if (!results.isSuccess) {
       AppLogger().e("Error updating rentor payment info: ${results.errorMessage}");
     }
     else {
-      AppLogger().d("Successfully updated rentor payment info for rentor ${rentor.id}");
+      AppLogger().d("Successfully updated rentor payment info for rentor ${fresh.id}");
     }
   }
   //endregion
