@@ -16,7 +16,9 @@
 
 - Property Manager percentage = `100 − Σ rentor.percentageFor(type)` over rentors where `isActiveOn(bill.dueDate)`; **never rounded** (display formats to 2 decimals only).
 - A type is covered only if at least one active rentor does not exclude it; otherwise no threshold.
-- Share ≤ 0 → threshold 0 (full payment); the `+ 1.00` dollar tolerance still applies.
+- Share ≤ 0 → threshold 0 (full payment); the rounding tolerance still applies.
+- Rounding tolerance = max($1.00, $0.50 × number of active rentors that cover the bill type) — decided in the server's final review (two rentors → exactly $1.00 as before). Comes with the ported `PropertyManagerShare`.
+- `Rentor.toJson` always sends the `startDate` key (null = always active): the server keeps the stored value when the key is missing and defaults a new rentor to today, so the app must send explicit null to mean "always".
 - `isActiveOn`: `startDate == null` or `dateOnly(startDate) <= dateOnly(date)`.
 - `percentageFor(type)`: excluded → 0; else `billPercentages[type]`; else `defaultPercentage`.
 - `startDate` JSON key `startDate`, date-only `yyyy-MM-dd`; DB column `rentors.startDate TEXT`, nullable; DB version 18 → **19**.
@@ -103,7 +105,7 @@ git commit -m "feat: add rentor startDate and start-date-aware owed amounts"
 - Produces: the **exact** API from the server plan's Task 2 — `static` members on `class PropertyManagerShare`:
   `double? shareFor(BillType, DateTime asOf, List<Rentor>)`, `Map<BillType, double> sharesAsOf(DateTime, List<Rentor>)`, `double paidAmount(Bill)`, `bool isConsideredPaid(Bill, List<Rentor>)`, `PaymentStatus recomputeStatus(Bill, List<Rentor>)`, `bool shareInputsChanged(Rentor before, Rentor after)`, `List<Bill> billsAffectedByChange(Rentor? before, Rentor after, List<Bill>)`.
 
-Algorithms, fixtures and expected values are those in `utility_bills_server/docs/superpowers/plans/2026-11-16-property-manager-share-server.md` Task 2. Port the server's implementation and test file as-is, adjusting only imports (`package:utility_bills_manager/...`; `PaymentStatus` lives in `data/models/payment.dart`) and `test` → `flutter_test`.
+The source of truth is the **merged server code**, not the server plan text: the server's review loop changed `recomputeStatus` (keeps status for unknown/uncovered bills), `paidAmount` (amountPaid-first) and the rounding tolerance. Port `utility_bills_server/lib/utils/bills/property_manager_share.dart` and `test/utils/bills/property_manager_share_test.dart` from the server's `main` as-is, adjusting only imports (`package:utility_bills_manager/...`; `PaymentStatus` lives in `data/models/payment.dart`) and `test` → `flutter_test`.
 
 - [ ] **Step 1: Copy the server test file to `test/utils/bills/property_manager_share_test.dart`, adjust imports**
 - [ ] **Step 2: Run `flutter test test/utils/bills/property_manager_share_test.dart`** — Expected: FAIL, utility missing.
@@ -172,7 +174,8 @@ git commit -m "feat: ignore bills due before a rentor's start date in summaries 
 - [ ] **Step 3: `RentorsHelper`** — in the `AppMode.server` branch only: `createRentor` → on success `recheckStatusesForRentorChange(null, rentor)`; `updateRentor` → read `before` via `dbHelper.readRentor(rentor.rentorId)` before the update, on success re-check if `before == null || PropertyManagerShare.shareInputsChanged(before, rentor)`. Re-check failures are logged, not returned as errors.
 - [ ] **Step 4: `SummaryScreen`** — delete static `_unpaidThreshold`; `_isConsideredPaid(bill)` becomes `PropertyManagerShare.isConsideredPaid(bill, _rentors) || bill.status == PaymentStatus.paid`.
 - [ ] **Step 5: `ExportUtils._thresholdNote`** — exact copy:
-  `'Note: Bills whose unpaid amount is within the Property Manager\'s share (or within \$1.00 of it) are considered paid. Amounts in this export reflect actual values.'`
+  `'Note: Bills whose unpaid amount is within the Property Manager\'s share (plus a small rounding allowance) are considered paid. Amounts in this export reflect actual values.'`
+- [ ] **Step 5b: `BillsHelper._updateLastPaymentStatus` skip branch** — when `owedAmount <= 0`, return the incoming `amountPaid` unchanged instead of `0.0` (same fix as the server's final review: returning 0.0 swallows the rest of the payment and records it as applied to a bill the rentor owes nothing on).
 - [ ] **Step 6: `AddEditRentorScreen._saveRentor`** — after `create`/`update`, `await _billsRepository.reload();` before popping.
 - [ ] **Step 7: Verify**
 
