@@ -1,3 +1,4 @@
+import '../bills/bills_helper.dart';
 import '../database/database_helper.dart';
 import '../../config/app_config.dart';
 import '../../data/models/payment.dart';
@@ -5,6 +6,7 @@ import '../../data/models/rentor.dart';
 import '../../data/models/result.dart';
 import '../../services/api/api_service.dart';
 import '../../utils/app_logger.dart';
+import '../../utils/bills/property_manager_share.dart';
 
 /// Singleton service layer for rentor-related persistence.
 ///
@@ -25,6 +27,21 @@ class RentorsHelper {
   /// [AppConfig.mode] == [AppMode.server].
   DatabaseHelper get dbHelper => DatabaseHelper();
 
+  /// Re-derives affected bill statuses after a rentor save (server mode only;
+  /// in client mode the server performs the re-check).
+  ///
+  /// Failures are logged and swallowed so they never turn a successful rentor
+  /// create/update into an error.
+  Future<void> _recheckBills(Rentor? before, Rentor after) async {
+    try {
+      await BillsHelper().recheckStatusesForRentorChange(before, after);
+    } catch (e) {
+      AppLogger().e(
+        "Error re-checking bill statuses for Rentor ${after.rentorId}: $e",
+      );
+    }
+  }
+
   //region CRUD Operations
   //region Rentor
   /// Persists [rentor] to the data source.
@@ -32,6 +49,7 @@ class RentorsHelper {
     if (AppConfig.mode == AppMode.server) {
       final id = await dbHelper.createRentor(rentor);
       if (id >= 0) {
+        await _recheckBills(null, rentor);
         return Result.success();
       } else {
         return Result.error(
@@ -82,8 +100,21 @@ class RentorsHelper {
   /// Updates [rentor] in the data source.
   Future<Result<Rentor>> updateRentor(Rentor rentor) async {
     if (AppConfig.mode == AppMode.server) {
+      // Read the prior state before the write so the re-check can diff it.
+      Rentor? before;
+      try {
+        before = await dbHelper.readRentor(rentor.rentorId);
+      } catch (e) {
+        AppLogger().e(
+          "Error reading Rentor ${rentor.rentorId} before update: $e",
+        );
+      }
       final id = await dbHelper.updateRentor(rentor);
       if (id >= 0) {
+        if (before == null ||
+            PropertyManagerShare.shareInputsChanged(before, rentor)) {
+          await _recheckBills(before, rentor);
+        }
         return Result.success();
       } else {
         return Result.error(

@@ -9,6 +9,7 @@ import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
 import '../../data/models/result.dart';
 import '../../services/api/api_service.dart';
+import '../../utils/bills/property_manager_share.dart';
 
 /// Singleton service layer for bill-related persistence and status logic.
 ///
@@ -236,6 +237,7 @@ class BillsHelper {
         return;
       }
 
+      final rentors = await _loadRentors();
       double remainingAmount = payment.amountPaid;
       for (var bill in bills) {
         final appliedAmount = await dbHelper.getPaymentBillAppliedAmount(
@@ -253,6 +255,7 @@ class BillsHelper {
           remainingAmount,
           bill: bill,
           rentor: rentor,
+          rentors: rentors,
         );
         remainingAmount = amount;
 
@@ -287,7 +290,8 @@ class BillsHelper {
   ///
   /// For every bill, the previously recorded `appliedAmount` is subtracted from
   /// `bill.amountPaid` and the status is recalculated:
-  /// - `paid`    → if the remaining owed amount is within the threshold
+  /// - `paid`    → if the remaining owed amount is within the Property Manager
+  ///   share threshold (see [PropertyManagerShare.isConsideredPaid])
   /// - `partial` → if some amount has still been paid
   /// - `unpaid`  → if nothing has been paid
   Future<void> reversePaymentStatusForBills(
@@ -314,6 +318,7 @@ class BillsHelper {
         bills = billResult.data;
       }
 
+      final rentors = await _loadRentors();
       for (final bill in bills!) {
         final appliedAmount = await dbHelper.getPaymentBillAppliedAmount(
           payment.paymentId,
@@ -326,9 +331,11 @@ class BillsHelper {
         bill.amountPaid = newAmountPaid;
 
         final amountOwed = bill.amount - newAmountPaid;
-        final amountLeft =
-            (bill.amount * (bill.type == BillType.internet ? 0.5 : 0.3));
-        if (_isConsideredPaid(bill)) {
+        final amountLeft = bill.amount *
+            ((PropertyManagerShare.shareFor(bill.type, bill.dueDate, rentors) ??
+                    0) /
+                100);
+        if (_isConsideredPaid(bill, rentors)) {
           AppLogger().d(
             "Bill ${bill.billId} is now fully paid after reversing payment. New amount paid: $newAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}",
           );
@@ -378,59 +385,104 @@ class BillsHelper {
     }
   }
 
-  /// Returns the maximum unpaid-fraction that still counts as "considered paid"
-  /// for a given bill type, or null if no threshold applies.
-  double? _unpaidThreshold(BillType type) {
-    switch (type) {
-      case BillType.electric:
-      case BillType.gas:
-      case BillType.water:
-        return 0.30; // ≤30% unpaid → considered paid
-      case BillType.internet:
-        return 0.50; // ≤50% unpaid → considered paid
-      default:
-        return null;
-    }
-  }
-
-  /// Returns `true` when [bill] has been paid enough to be treated as fully
-  /// paid, based on the bill-type threshold from [_unpaidThreshold].
+  /// Loads all rentors used to compute the Property Manager share.
   ///
-  /// A bill is considered paid when the remaining unpaid amount is within the
-  /// threshold percentage (or within \$1.00 of that threshold amount).
-  bool _isConsideredPaid(Bill bill) {
-    final threshold = _unpaidThreshold(bill.type);
-    if (threshold == null) return false;
-    final actualUnpaid = bill.amount - _paidAmount(bill);
-    if (actualUnpaid <= 0) return true;
-    // Within the percentage threshold, OR within $1.00 of the threshold amount.
-    final thresholdAmount = bill.amount * threshold;
-    return actualUnpaid <= thresholdAmount + 1.0;
+  /// Returns an empty list (and logs an error) if the rentors cannot be read,
+  /// in which case no bill type is covered and bills are never considered paid.
+  Future<List<Rentor>> _loadRentors() async {
+    final result = await RentorsHelper().readAllRentors();
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
+    }
+    AppLogger().e(
+      "Error reading rentors for Property Manager share: ${result.errorMessage}",
+    );
+    return [];
   }
 
-  /// Returns the total amount already paid toward [bill] based on its current
-  /// [PaymentStatus]: the recorded [Bill.amountPaid] for `paid`/`partial`
-  /// bills, or `0.0` for `unpaid`/`unknown`.
-  double _paidAmount(Bill bill) {
-    if (bill.status == PaymentStatus.paid) {
-      return bill.amountPaid ?? bill.amount;
-    } else if (bill.status == PaymentStatus.partial) {
-      return bill.amountPaid ?? 0.0;
+  /// Re-derives the status of bills affected by a rentor create/update.
+  ///
+  /// [before] is the rentor prior to the change (`null` for a new rentor) and
+  /// [after] the saved rentor; call this **after** the rentor write so the new
+  /// rentor list is read. Only bills selected by
+  /// [PropertyManagerShare.billsAffectedByChange] are considered, and only
+  /// [Bill.status] is changed (never [Bill.amountPaid]).
+  ///
+  /// If the rentor list cannot be loaded (or is empty) nothing is changed.
+  /// Returns the number of bills whose status changed.
+  Future<int> recheckStatusesForRentorChange(
+    Rentor? before,
+    Rentor after,
+  ) async {
+    final rentors = await _loadRentors();
+    if (rentors.isEmpty) {
+      AppLogger().w(
+        "Skipping bill status re-check for rentor ${after.rentorId}: "
+        "no rentors loaded",
+      );
+      return 0;
     }
-    return 0.0;
+
+    final billsResult = await readAllBills();
+    if (!billsResult.isSuccess || billsResult.data == null) {
+      AppLogger().e(
+        "Error reading bills for status re-check: ${billsResult.errorMessage}",
+      );
+      return 0;
+    }
+
+    var changed = 0;
+    for (final bill in PropertyManagerShare.billsAffectedByChange(
+      before,
+      after,
+      billsResult.data!,
+    )) {
+      final newStatus = PropertyManagerShare.recomputeStatus(bill, rentors);
+      if (newStatus == bill.status) continue;
+      final oldStatus = bill.status;
+      bill.status = newStatus;
+      final updated = await updateBill(bill);
+      if (updated.isSuccess) {
+        changed++;
+        AppLogger().d(
+          "Bill ${bill.billId} status ${oldStatus.name} -> ${newStatus.name} "
+          "after rentor ${after.rentorId} change",
+        );
+      } else {
+        bill.status = oldStatus;
+        AppLogger().e(
+          "Failed to update status of bill ${bill.billId}: "
+          "${updated.errorMessage}",
+        );
+      }
+    }
+    AppLogger().d(
+      "Rentor ${after.rentorId} change re-check updated $changed bill(s)",
+    );
+    return changed;
   }
+
+  bool _isConsideredPaid(Bill bill, List<Rentor> rentors) =>
+      PropertyManagerShare.isConsideredPaid(bill, rentors);
 
   /// Applies [amountPaid] toward [bill], respects the rentor's owed share when
   /// [rentor] is provided, persists the updated bill, and returns the
   /// **remaining** balance after crediting this bill.
   ///
-  /// The "paid" threshold is bill-type aware:
-  /// - Internet bills: paid when owed ≤ 50 % of total amount.
-  /// - All other types: paid when owed ≤ 30 % of total amount.
+  /// The "paid" threshold is the Property Manager share computed from
+  /// [rentors] as of the bill's due date (see
+  /// [PropertyManagerShare.isConsideredPaid]): the bill is paid once the unpaid
+  /// remainder is within that share of the total amount (plus a rounding
+  /// tolerance of max($1.00, 50 cents per rentor)).
+  ///
+  /// When [rentor] owes nothing on [bill] (e.g. it is due before their start
+  /// date) the bill is left untouched and [amountPaid] is returned unchanged so
+  /// the full amount stays available for later bills.
   Future<double> _updateLastPaymentStatus(
     double amountPaid, {
     Bill? bill,
     Rentor? rentor,
+    required List<Rentor> rentors,
   }) async {
     if (bill == null) {
       AppLogger().w("No bill provided for last payment status update");
@@ -443,14 +495,15 @@ class BillsHelper {
     double billAmountPaid = bill.amountPaid ?? 0.0;
     double amountPaidTowardsBill = amountPaid;
     if (rentor != null) {
-      // owedAmount returns 0.0 for excluded bill types (intentional — a rentor
-      // should not have payments applied to bills they are excluded from paying).
+      // owedAmount is 0.0 for excluded bill types and for bills due before the
+      // rentor's start date (intentional — a rentor should not have payments
+      // applied to bills they do not owe anything on).
       final owedAmount = rentor.owedAmount(bill);
       if (owedAmount <= 0) {
         AppLogger().d(
           "Rentor ${rentor.rentorId} has no owed amount for bill ${bill.billId}, skipping payment status update",
         );
-        return 0.0;
+        return amountPaid;
       }
 
       amountPaidTowardsBill = min(amountPaidTowardsBill, owedAmount);
@@ -459,9 +512,11 @@ class BillsHelper {
     bill.amountPaid = billAmountPaid;
 
     final amountOwed = billAmount - billAmountPaid;
-    final amountLeft =
-        (billAmount * (bill.type == BillType.internet ? 0.5 : 0.3));
-    if (_isConsideredPaid(bill)) {
+    final amountLeft = billAmount *
+        ((PropertyManagerShare.shareFor(bill.type, bill.dueDate, rentors) ??
+                0) /
+            100);
+    if (_isConsideredPaid(bill, rentors)) {
       AppLogger().d(
         "Bill ${bill.billId} is now fully paid. Amount paid: $billAmountPaid, amount owed: ${amountOwed.toInt()}, amount left: ${amountLeft.toInt()}",
       );

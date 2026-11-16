@@ -435,6 +435,9 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     } else {
       await _rentorsRepository.update(rentor);
     }
+    // Saving a rentor can change bill statuses (Property Manager share), so
+    // refresh bills before returning.
+    await _billsRepository.reload();
 
     if (mounted) {
       Navigator.pop(context, true);
