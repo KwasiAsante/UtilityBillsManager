@@ -1,7 +1,7 @@
 # Design: Property Manager Share
 
 **Date:** 2026-11-13
-**Status:** Pending approval
+**Status:** Approved
 **Repos:** `utility_bills_manager` (Flutter app) and `utility_bills_server` (Dart server)
 
 ---
