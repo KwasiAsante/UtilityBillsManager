@@ -291,14 +291,9 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
 
   // ── Raw paid helper (actual amounts, ignoring threshold) ─────────────────────
 
-  double _paidAmount(Bill bill) {
-    if (bill.status == PaymentStatus.paid) {
-      return bill.amountPaid ?? bill.amount;
-    } else if (bill.status == PaymentStatus.partial) {
-      return bill.amountPaid ?? 0.0;
-    }
-    return 0.0;
-  }
+  /// Same rule as the "considered paid" threshold ([PropertyManagerShare]):
+  /// [Bill.amountPaid] wins when set, so display and threshold never disagree.
+  double _paidAmount(Bill bill) => PropertyManagerShare.paidAmount(bill);
 
   // ── Grouping ─────────────────────────────────────────────────────────────────
 
