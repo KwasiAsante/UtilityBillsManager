@@ -6,6 +6,14 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+- **Property Manager share** replaces hardcoded 30%/50% thresholds (rounding allowance scales with rentors).
+- **Rentor start date** — rentors have an optional start date (bills due before it aren't split with them).
+- **Property Manager card** — read-only Property Manager card on the Rentors tab.
+
+### Changed
+- **Bill statuses refresh after saving a rentor.**
+
 ## [1.2.1+14] — 2026-09-29
 
 ### Added

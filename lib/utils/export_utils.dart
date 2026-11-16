@@ -40,9 +40,9 @@ class ExportUtils {
   static final _monthFmt = DateFormat('MMMM yyyy');
 
   static const _thresholdNote =
-      'Note: Electric/Gas/Water bills with ≤30% unpaid (or within \$1.00 of that threshold), '
-      'and Internet bills with ≤50% unpaid (or within \$1.00 of that threshold), '
-      'are considered paid. Amounts in this export reflect actual values.';
+      'Note: Bills whose unpaid amount is within the Property Manager\'s share '
+      '(plus a small rounding allowance) are considered paid. '
+      'Amounts in this export reflect actual values.';
 
   /// True when running natively on a desktop OS (not web, not mobile).
   static bool get _isDesktop {

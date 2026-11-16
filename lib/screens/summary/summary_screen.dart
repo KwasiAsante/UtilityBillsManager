@@ -13,6 +13,7 @@ import '../../data/repositories/rentors_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
 import '../../utils/dialogs/export_month_picker_dialog.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
+import '../../utils/bills/property_manager_share.dart';
 import '../../utils/export_utils.dart';
 import '../../utils/app_breakpoints.dart';
 import '../../widgets/notification_bell_icon.dart';
@@ -95,31 +96,9 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
 
   // ── Threshold logic ──────────────────────────────────────────────────────────
 
-  /// Returns the maximum unpaid-fraction that still counts as "considered paid"
-  /// for a given bill type, or null if no threshold applies.
-  static double? _unpaidThreshold(BillType type) {
-    switch (type) {
-      case BillType.electric:
-      case BillType.gas:
-      case BillType.water:
-        return 0.30; // ≤30% unpaid → considered paid
-      case BillType.internet:
-        return 0.50; // ≤50% unpaid → considered paid
-      default:
-        return null;
-    }
-  }
-
-  bool _isConsideredPaid(Bill bill) {
-    final threshold = _unpaidThreshold(bill.type);
-    if (threshold == null) return false;
-    final actualUnpaid = bill.amount - _paidAmount(bill);
-    if (actualUnpaid <= 0) return true;
-    // Within the percentage threshold, OR within $1.00 of the threshold amount.
-    final thresholdAmount = bill.amount * threshold;
-    return actualUnpaid <= thresholdAmount + 1.0 ||
-        bill.status == PaymentStatus.paid;
-  }
+  bool _isConsideredPaid(Bill bill) =>
+      PropertyManagerShare.isConsideredPaid(bill, _rentors) ||
+      bill.status == PaymentStatus.paid;
 
   /// The paid amount to display, respecting the toggle and threshold.
   double _displayPaid(Bill bill) {
@@ -312,14 +291,9 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
 
   // ── Raw paid helper (actual amounts, ignoring threshold) ─────────────────────
 
-  double _paidAmount(Bill bill) {
-    if (bill.status == PaymentStatus.paid) {
-      return bill.amountPaid ?? bill.amount;
-    } else if (bill.status == PaymentStatus.partial) {
-      return bill.amountPaid ?? 0.0;
-    }
-    return 0.0;
-  }
+  /// Same rule as the "considered paid" threshold ([PropertyManagerShare]):
+  /// [Bill.amountPaid] wins when set, so display and threshold never disagree.
+  double _paidAmount(Bill bill) => PropertyManagerShare.paidAmount(bill);
 
   // ── Grouping ─────────────────────────────────────────────────────────────────
 

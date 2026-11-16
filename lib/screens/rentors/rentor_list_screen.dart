@@ -12,6 +12,7 @@ import '../base/auth_reload_mixin.dart';
 import '../../utils/comparable_utils.dart';
 import '../../utils/app_breakpoints.dart';
 import '../../widgets/notification_bell_icon.dart';
+import '../../widgets/property_manager_card.dart';
 import '../../widgets/responsive_constraint.dart';
 import '../settings/settings_screen.dart';
 
@@ -409,9 +410,16 @@ class _RentorListScreenState extends BaseState<RentorListScreen>
                         child: ListView.builder(
                           controller: _scrollController,
                           padding: const EdgeInsets.only(bottom: 80),
-                          itemCount: rentors.length,
+                          itemCount: rentors.length + 1,
                           itemBuilder: (context, index) {
-                            final rentor = rentors[index];
+                            // Property Manager card above the rentors; uses the unfiltered
+                            // repository list so search/sort never affect it.
+                            if (index == 0) {
+                              return PropertyManagerCard(
+                                rentors: _rentorsRepository.rentors,
+                              );
+                            }
+                            final rentor = rentors[index - 1];
                             return Card(
                               child: ListTile(
                                 contentPadding: const EdgeInsets.symmetric(

@@ -37,6 +37,7 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
   final _phoneController = TextEditingController();
   final _percentageController = TextEditingController();
   final _lastPaymentDateController = TextEditingController();
+  final _startDateController = TextEditingController();
   final Map<BillType, TextEditingController> _billPercentageControllers = {};
 
   final RentorsRepository _rentorsRepository = RentorsRepository();
@@ -44,6 +45,7 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
   final PaymentsRepository _paymentsRepository = PaymentsRepository();
 
   DateTime? _lastPaymentDate;
+  DateTime? _startDate;
   late List<BillType> _selectedBillTypes;
   late List<BillType> _excludedBillTypes;
   final _amountOwedController = TextEditingController();
@@ -66,6 +68,14 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
         ).format(widget.rentor!.lastPaymentDate!);
         _lastPaymentDate = rentor.lastPaymentDate;
       }
+      // Editing keeps the stored start date as-is (null stays null) so saving
+      // never silently changes whether the rentor has always been active.
+      _startDate = rentor.startDate;
+      if (_startDate != null) {
+        _startDateController.text = DateFormat(
+          'yyyy-MM-dd',
+        ).format(_startDate!);
+      }
 
       // Populate only existing bill-specific percentages
       _selectedBillTypes = rentor.billPercentages.keys.toList();
@@ -78,6 +88,10 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     } else {
       _selectedBillTypes = [];
       _excludedBillTypes = [];
+      // A new rentor starts today (date-only).
+      final now = DateTime.now();
+      _startDate = DateTime(now.year, now.month, now.day);
+      _startDateController.text = DateFormat('yyyy-MM-dd').format(_startDate!);
     }
 
     if (widget.rentor != null) {
@@ -93,6 +107,7 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     _phoneController.dispose();
     _percentageController.dispose();
     _lastPaymentDateController.dispose();
+    _startDateController.dispose();
     _amountOwedController.dispose();
     for (var controller in _billPercentageControllers.values) {
       controller.dispose();
@@ -117,6 +132,38 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
         ).format(picked);
       });
     }
+  }
+
+  Future<void> _pickStartDate() async {
+    final now = DateTime.now();
+    var firstDate = DateTime(now.year - 5);
+    if (_startDate != null && _startDate!.isBefore(firstDate)) {
+      firstDate = _startDate!;
+    }
+    var lastDate = DateTime(now.year + 5);
+    if (_startDate != null && _startDate!.isAfter(lastDate)) {
+      lastDate = _startDate!;
+    }
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _startDate ?? now,
+      firstDate: firstDate,
+      lastDate: lastDate,
+    );
+
+    if (picked != null) {
+      setState(() {
+        _startDate = DateTime(picked.year, picked.month, picked.day);
+        _startDateController.text = DateFormat('yyyy-MM-dd').format(picked);
+      });
+    }
+  }
+
+  void _clearStartDate() {
+    setState(() {
+      _startDate = null;
+      _startDateController.clear();
+    });
   }
 
   double _getPercentageForBillType(BillType type) {
@@ -205,6 +252,7 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
           double.tryParse(_percentageController.text.trim()) ?? 0.0,
       billPercentages: const {},
       excludedBillTypes: _excludedBillTypes,
+      startDate: _startDate,
     );
     final breakdown = tempRentor.calculateOwedBreakdown(
       bills: periodBills,
@@ -428,6 +476,7 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
       lastPaymentDate: _lastPaymentDate,
       billPercentages: billPercentages,
       excludedBillTypes: _excludedBillTypes,
+      startDate: _startDate,
     );
 
     if (widget.rentor == null) {
@@ -435,6 +484,9 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     } else {
       await _rentorsRepository.update(rentor);
     }
+    // Saving a rentor can change bill statuses (Property Manager share), so
+    // refresh bills before returning.
+    await _billsRepository.reload();
 
     if (mounted) {
       Navigator.pop(context, true);
@@ -507,6 +559,26 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
                                 ),
                                 keyboardType: TextInputType.datetime,
                               ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _startDateController,
+                            readOnly: true,
+                            onTap: _pickStartDate,
+                            decoration: InputDecoration(
+                              labelText: 'Start date',
+                              helperText:
+                                  "Bills due before this date aren't split with this rentor. Leave empty if they've always been here.",
+                              helperMaxLines: 3,
+                              suffixIcon:
+                                  _startDate == null
+                                      ? null
+                                      : IconButton(
+                                        icon: const Icon(Icons.clear),
+                                        tooltip: 'Clear start date',
+                                        onPressed: _clearStartDate,
+                                      ),
                             ),
                           ),
                           const SizedBox(height: 20),
