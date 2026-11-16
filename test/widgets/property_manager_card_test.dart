@@ -90,6 +90,42 @@ void main() {
     );
   });
 
+  Widget gasRow(List<double> gasPercentages) {
+    return wrap([
+      for (var i = 0; i < gasPercentages.length; i++)
+        rentor(
+          name: 'R$i',
+          defaultPercentage: 10,
+          billPercentages: {BillType.gas: gasPercentages[i]},
+        ),
+    ], asOf: asOf);
+  }
+
+  testWidgets('positive float noise at a true 100% shows 0.00% and warns', (
+    tester,
+  ) async {
+    // 100 - (33.3 + 33.4 + 33.3) is +1.4e-14 in doubles, not 0.
+    await tester.pumpWidget(gasRow([33.3, 33.4, 33.3]));
+    expect(find.text('Gas  0.00%'), findsOneWidget);
+    expect(
+      find.textContaining('Rentor percentages for Gas add up to 100% or more'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('negative float noise at a true 100% shows 0.00%, not -0.00%', (
+    tester,
+  ) async {
+    // 100 - (99.4 + 0.2 + 0.4) is -1.4e-14 in doubles, not 0.
+    await tester.pumpWidget(gasRow([99.4, 0.2, 0.4]));
+    expect(find.text('Gas  0.00%'), findsOneWidget);
+    expect(find.text('Gas  -0.00%'), findsNothing);
+    expect(
+      find.textContaining('Rentor percentages for Gas add up to 100% or more'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('warning lists multiple types comma-separated', (tester) async {
     final rentors = [
       rentor(

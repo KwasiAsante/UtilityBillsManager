@@ -20,10 +20,16 @@ class PropertyManagerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shares = PropertyManagerShare.sharesAsOf(
-      asOf ?? DateTime.now(),
-      rentors,
-    );
+    // Snap float noise (e.g. 1.4e-14 from 100 - (33.3 + 33.4 + 33.3)) to 0 so
+    // a true 100% neither shows "-0.00%" nor misses the warning.
+    final shares = {
+      for (final entry
+          in PropertyManagerShare.sharesAsOf(
+            asOf ?? DateTime.now(),
+            rentors,
+          ).entries)
+        entry.key: entry.value.abs() < 1e-9 ? 0.0 : entry.value,
+    };
     if (shares.isEmpty) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
