@@ -140,11 +140,15 @@ class _AddEditRentorScreenState extends State<AddEditRentorScreen> {
     if (_startDate != null && _startDate!.isBefore(firstDate)) {
       firstDate = _startDate!;
     }
+    var lastDate = DateTime(now.year + 5);
+    if (_startDate != null && _startDate!.isAfter(lastDate)) {
+      lastDate = _startDate!;
+    }
     final picked = await showDatePicker(
       context: context,
       initialDate: _startDate ?? now,
       firstDate: firstDate,
-      lastDate: DateTime(now.year + 5),
+      lastDate: lastDate,
     );
 
     if (picked != null) {

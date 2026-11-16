@@ -89,4 +89,19 @@ void main() {
     // The clear button goes away once there is nothing to clear.
     expect(find.byIcon(Icons.clear), findsNothing);
   });
+  testWidgets(
+    'date picker opens when the stored start date is far in the future',
+    (tester) async {
+      final future = DateTime(DateTime.now().year + 10, 6, 15);
+      await tester.pumpWidget(wrap(rentorWith(startDate: future)));
+      await tester.pump();
+
+      await tester.ensureVisible(startDateField());
+      await tester.tap(startDateField());
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byType(DatePickerDialog), findsOneWidget);
+    },
+  );
 }
