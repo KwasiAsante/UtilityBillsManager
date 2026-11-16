@@ -203,6 +203,67 @@ void main() {
     });
   });
 
+  group('checkReadiness — rentor startDate straddling bill types', () {
+    final nov20 = DateTime(2026, 11, 20);
+    final start = DateTime(2026, 11, 13);
+
+    test(
+        'type due before startDate is not waited on: notification contains '
+        'only the post-start bill', () async {
+      final rentor = _rentor(
+        rentorId: 'r1',
+        billPercentages: {BillType.electric: 35, BillType.gas: 35},
+        startDate: start,
+      );
+      final electric = _bill(
+          billId: 'b1', type: BillType.electric, dueDate: DateTime(2026, 11, 5));
+      final gas = _bill(
+          billId: 'b2', type: BillType.gas, dueDate: DateTime(2026, 11, 18));
+
+      final result = await service.checkReadiness(
+        gas, [rentor], [electric, gas], now: nov20,
+      );
+
+      expect(result, hasLength(1));
+      expect(result.single.isWater, isFalse);
+      expect(result.single.bills, [gas]);
+    });
+
+    test('no regular notification when all required types are due before startDate',
+        () async {
+      final rentor = _rentor(
+        rentorId: 'r1',
+        billPercentages: {BillType.electric: 35, BillType.gas: 35},
+        startDate: start,
+      );
+      final electric = _bill(
+          billId: 'b1', type: BillType.electric, dueDate: DateTime(2026, 11, 5));
+      final gas = _bill(
+          billId: 'b2', type: BillType.gas, dueDate: DateTime(2026, 11, 8));
+
+      final result = await service.checkReadiness(
+        gas, [rentor], [electric, gas], now: nov20,
+      );
+
+      expect(result, isEmpty);
+    });
+
+    test('rentor without startDate still waits for the missing type', () async {
+      final rentor = _rentor(
+        rentorId: 'r1',
+        billPercentages: {BillType.electric: 35, BillType.gas: 35},
+      );
+      final gas = _bill(
+          billId: 'b2', type: BillType.gas, dueDate: DateTime(2026, 11, 18));
+
+      final result = await service.checkReadiness(
+        gas, [rentor], [gas], now: nov20,
+      );
+
+      expect(result, isEmpty);
+    });
+  });
+
   group('checkReadiness — tracker insertion', () {
     test('inserts tracker row for relevant rentor', () async {
       final rentor = _rentor(

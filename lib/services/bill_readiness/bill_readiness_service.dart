@@ -117,8 +117,18 @@ class BillReadinessService {
       }
       final regularSent =
           regularSentResult.isSuccess && (regularSentResult.data ?? false);
+      // Types whose bill this month is due before the rentor's start date are
+      // filtered out of [regularBills]; they must not be waited on.
+      final preStartTypes = allBills
+          .where((b) =>
+              b.dueDate.year == ref.year &&
+              b.dueDate.month == ref.month &&
+              !rentor.isActiveOn(b.dueDate))
+          .map((b) => b.type)
+          .toSet();
       if (!regularSent &&
-          _isRegularGroupComplete(rentor, regularBills, trackedIds)) {
+          _isRegularGroupComplete(
+              rentor, regularBills, trackedIds, preStartTypes)) {
         results.add(
             ComposeNotification(rentor: rentor, bills: regularBills, isWater: false));
       }
@@ -148,11 +158,18 @@ class BillReadinessService {
 
   /// Returns `true` when every non-water type in [rentor.billPercentages] has
   /// at least one eligible bill AND every eligible bill of that type is tracked.
+  ///
+  /// A required type in [preStartTypes] (its bill this month is due before the
+  /// rentor's start date) counts as satisfied. Never complete when
+  /// [regularBills] is empty, so a notification always has at least one bill.
   bool _isRegularGroupComplete(
     Rentor rentor,
     List<Bill> regularBills,
     Set<String> trackedIds,
+    Set<BillType> preStartTypes,
   ) {
+    if (regularBills.isEmpty) return false;
+
     final requiredTypes = rentor.billPercentages.keys
         .where((t) => t != BillType.water)
         .toList();
@@ -162,7 +179,10 @@ class BillReadinessService {
     for (final billType in requiredTypes) {
       final billsOfType =
           regularBills.where((b) => b.type == billType).toList();
-      if (billsOfType.isEmpty) return false; // still waiting for this type
+      if (billsOfType.isEmpty) {
+        if (preStartTypes.contains(billType)) continue; // pre-start: skip
+        return false; // still waiting for this type
+      }
       if (billsOfType.any((b) => !trackedIds.contains(b.billId))) return false;
     }
     return true;
