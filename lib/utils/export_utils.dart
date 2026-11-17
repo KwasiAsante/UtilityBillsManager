@@ -14,6 +14,7 @@ import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
 import '../../data/models/rentor.dart';
 import '../../data/models/summary_item.dart';
+import 'bills/property_manager_share.dart';
 
 /// A single row in a Summary sheet/page: either a month's Total/Paid/Unpaid,
 /// or (when [isYearTotal]) the rolled-up total for all months of one year.
@@ -39,7 +40,7 @@ class ExportUtils {
   static final _dateFmt = DateFormat('yyyy-MM-dd');
   static final _monthFmt = DateFormat('MMMM yyyy');
 
-  static const _thresholdNote =
+  static const _propertyManagerNote =
       'Note: Bills whose unpaid amount is within the Property Manager\'s share '
       '(plus a small rounding allowance) are considered paid. '
       'Amounts in this export reflect actual values.';
@@ -52,15 +53,9 @@ class ExportUtils {
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
-  /// Returns the actual amount paid toward [bill] based on its [PaymentStatus].
-  static double _paidAmount(Bill bill) {
-    if (bill.status == PaymentStatus.paid) {
-      return bill.amountPaid ?? bill.amount;
-    } else if (bill.status == PaymentStatus.partial) {
-      return bill.amountPaid ?? 0.0;
-    }
-    return 0.0;
-  }
+  /// The actual amount paid toward [bill]: the same rule as the Summary screen
+  /// ([PropertyManagerShare.paidAmount]), so exports and the screen agree.
+  static double _paidAmount(Bill bill) => PropertyManagerShare.paidAmount(bill);
 
   /// Groups [bills] by "MMMM yyyy" month label and sorts the resulting map
   /// with the most recent month first.
@@ -215,7 +210,7 @@ class ExportUtils {
     }
 
     buffer.writeln();
-    buffer.writeln(_csv(_thresholdNote));
+    buffer.writeln(_csv(_propertyManagerNote));
 
     return buffer.toString();
   }
@@ -499,7 +494,7 @@ class ExportUtils {
       }
 
       r++;
-      sheet.setCell(r, 0, _thresholdNote,
+      sheet.setCell(r, 0, _propertyManagerNote,
           style: builder.style(size: 9, color: _xlsxNoteGrey));
 
       sheet.colWidth(0, 14);
@@ -668,7 +663,7 @@ class ExportUtils {
                 pw.Spacer(),
                 pw.Divider(color: PdfColors.grey400),
                 pw.Text(
-                  '* $_thresholdNote',
+                  '* $_propertyManagerNote',
                   style: const pw.TextStyle(
                       fontSize: 8, color: PdfColors.grey600),
                 ),

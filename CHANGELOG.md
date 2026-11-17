@@ -15,6 +15,10 @@ All notable changes to this project are documented here.
 
 ### Changed
 - **Bill statuses refresh after saving a rentor.**
+- **Summary screen labels name the Property Manager** — the toggle reads "Show Property Manager share as unpaid" / "Count Property Manager share as paid", and a bill whose remainder is hidden notes "* Property Manager covers $X.XX" (or "* Marked paid" when it was marked paid beyond the share).
+
+### Fixed
+- **Exports' paid amounts match the Summary screen** — CSV/PDF exports now use the recorded amount paid first, the same rule as the screen, instead of deciding from the bill's status.
 
 ## [1.2.1+14] — 2026-09-29
 

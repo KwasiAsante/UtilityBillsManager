@@ -50,6 +50,37 @@ void main() {
       dir.deleteSync(recursive: true);
     });
 
+    test('paid amount follows the recorded amount, like the Summary screen',
+        () async {
+      final dir = Directory.systemTemp.createTempSync('export_test');
+      String? savedPath;
+      Future<String?> fakeSave(String suggestedName) async =>
+          savedPath = '${dir.path}/$suggestedName';
+
+      final bill = Bill(
+        billId: 'b1',
+        type: BillType.gas,
+        company: 'Crown Crest',
+        amount: 44.43,
+        dueDate: DateTime(2026, 4, 1),
+        status: PaymentStatus.unknown,
+        notes: null,
+        amountPaid: 20.0,
+      );
+
+      await ExportUtils.exportBillsToCSV(
+        [bill],
+        [],
+        [],
+        desktopSaveFn: fakeSave,
+      );
+
+      final content = File(savedPath!).readAsStringSync();
+      expect(content, contains('Crown Crest,2026-04-01,44.43,20.00,24.43,'));
+
+      dir.deleteSync(recursive: true);
+    });
+
     test('does not write file when saveFn returns null (user cancelled)', () async {
       final dir = Directory.systemTemp.createTempSync('export_test_cancel');
 
