@@ -23,11 +23,11 @@ Runs on **Android, iOS, macOS, Windows, Linux, and Web**.
 
 ## Features
 
-- **Bill Management** — Create, edit, and delete utility bills (electric, gas, water, internet, credit card). Track due dates, amounts, and payment status (paid / partial / unpaid / unknown).
+- **Bill Management** — Create, edit, and delete utility bills (electric, gas, water, internet, credit card). Track due dates, amounts, and payment status (paid / partial / unpaid / unknown), and filter by any status. **Recalculate** (per bill, or all bills) sets each bill's amount paid to what its assigned payments cover — oldest bill first, capped at each rentor's share — and never un-pays a bill marked paid. A warning icon flags bills whose rentors have all paid but came up short, showing how much more the Property Manager is covering.
 - **Payment Tracking** — Log payments, assign them to specific bills and rentors. Deleting a payment automatically reverses applied amounts.
-- **Rentor Management** — Manage rentors, assign percentage splits per bill type, exclude bill types, and track what each rentor owes. The **Calculate Amount Owed** button shows a per-bill-type breakdown accounting for percentages, exclusions, and prior payments.
+- **Rentor Management** — Manage rentors, assign percentage splits per bill type, exclude bill types, set a start date (bills due before it aren't split with them), and track what each rentor owes. A **Property Manager** card shows the share left after the rentors for each bill type. The **Calculate Amount Owed** button shows a per-bill-type breakdown accounting for percentages, exclusions, and prior payments.
 - **Email Sync (Gmail / IMAP)** — Sign in with Google (web) or connect via IMAP (native) to pull bill-related emails. Parsed emails are matched to bills and payments automatically. Sync can be triggered on-demand or run on a schedule. Negative/credit amounts (e.g. `-$45.00`) are parsed correctly and flagged with an **Unknown** status rather than assumed paid, since a credit on a bill is abnormal and warrants a manual look.
-- **Summary Screen** — Monthly overview grouped by bill type with "considered paid" threshold logic. A **Rentors Owed** card at the top shows what each rentor owes for the current month.
+- **Summary Screen** — Monthly overview grouped by bill type. A bill counts as paid once its unpaid remainder is within the **Property Manager share** (100% minus the active rentors' percentages, plus a small rounding allowance); a toggle switches between counting that share as paid and showing it as unpaid. A **Rentors Owed** card at the top shows what each rentor owes for the current month.
 - **Bill Summary Messages** — Select bills, preview a generated message (using a configurable template), and share directly to WhatsApp or any messaging app.
 - **Export** — Pick one or more months to export as CSV or PDF, including per-bill rentor contributions. CSV can combine every selected month into a single styled Excel workbook (a Summary sheet with per-year totals plus one sheet per month) or fall back to a plain CSV per month; PDF always produces one file with a summary page followed by a page per month.
 - **Real-Time Notifications** — Server-Sent Events (SSE) push `newBill` / `newPayment` events instantly. Firebase Cloud Messaging (FCM) handles push when the app is backgrounded. In-app notification bell with unread badge and slide-in panel.
@@ -193,6 +193,7 @@ lib/
 │   ├── update/                   # UpdateService · UpdateInfo (semver comparison)
 │   ├── bill_readiness/           # Due-date reminder logic
 │   ├── bill_summary/             # Rentor message generation (pure functions)
+│   ├── bill_recalculation/       # BillRecalculationRunner — saves recalculated bills
 │   ├── windows/                  # WindowManagerService · TrayManagerService
 │   └── logs/                     # ServerLogOutput · LogUploadService · LogFileService
 │
@@ -201,6 +202,8 @@ lib/
 │   ├── export_utils.dart         # CSV / PDF export (multi-month, styled Excel workbook)
 │   ├── preferences.dart          # SharedPreferences wrapper
 │   ├── bills/bills_parser.dart
+│   ├── bills/property_manager_share.dart   # Property Manager share + paid check
+│   ├── bills/bill_recalculation.dart       # Bill payment recalculation + gap detection
 │   ├── email/email_parser.dart
 │   ├── payments/payments_parser.dart
 │   ├── files/                    # file_utils · native_pdf_text_extractor
@@ -209,6 +212,8 @@ lib/
 │
 ├── widgets/
 │   ├── notification_bell_icon.dart
+│   ├── bill_gap_warning.dart
+│   ├── property_manager_card.dart
 │   ├── notification_panel.dart
 │   ├── update_banner.dart
 │   └── responsive_constraint.dart
@@ -258,6 +263,7 @@ erDiagram
         json billPercentages
         json excludedBillTypes
         string lastPaymentDate
+        string startDate
     }
     payments {
         int id PK
