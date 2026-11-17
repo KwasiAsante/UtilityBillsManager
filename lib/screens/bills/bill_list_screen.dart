@@ -643,7 +643,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
               },
               itemBuilder:
                   (context) =>
-                      ['All', 'Paid', 'Unpaid']
+                      ['All', 'Paid', 'Partial', 'Unpaid', 'Unknown']
                           .map(
                             (value) => CheckedPopupMenuItem<String>(
                               value: value,
@@ -709,7 +709,7 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
                     final result = await SingleChoiceDialog.show<String>(
                       context,
                       title: 'Filter by status',
-                      options: const ['All', 'Paid', 'Unpaid'],
+                      options: const ['All', 'Paid', 'Partial', 'Unpaid', 'Unknown'],
                       current: _selectedFilter,
                       labelBuilder: (value) => value,
                     );
