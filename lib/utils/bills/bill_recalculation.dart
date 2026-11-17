@@ -15,8 +15,10 @@ class BillRecalculation {
   /// The bill as it is now, untouched.
   final Bill bill;
 
-  /// The amount paid its payments actually cover, rounded to cents.
-  final double amountPaid;
+  /// The amount paid its payments actually cover, rounded to cents. It is the
+  /// bill's own [Bill.amountPaid] (possibly `null`) when the bill is `paid` and
+  /// the payments would not keep it considered paid.
+  final double? amountPaid;
 
   /// The status that goes with [amountPaid]; never lower than [Bill.status]
   /// when that is `paid`.
@@ -65,9 +67,11 @@ class BillGap {
 
 /// Sets each bill's amount paid to what its assigned payments actually cover.
 ///
-/// Every payment pays the bills it lists oldest-due-first, each capped at the
-/// paying rentor's whole-dollar share of that bill. Money left over once every
-/// listed bill is covered stays unassigned.
+/// Payments are replayed in payment-date order (tie: paymentId). Every payment
+/// pays the bills it lists oldest-due-first, each capped at what the paying
+/// rentor still owes on that bill: their whole-dollar share, less what their
+/// earlier payments already credited to it. Money left over once every listed
+/// bill is covered stays unassigned.
 ///
 /// Pure and dependency-free beyond the models.
 class BillPaymentRecalculator {
@@ -84,11 +88,7 @@ class BillPaymentRecalculator {
     List<Bill> bills,
     List<Rentor> rentors,
   ) {
-    final listing =
-        payments
-            .where((p) => p.billIds?.contains(bill.billId) ?? false)
-            .toList();
-    final totals = _totals(listing, bills, rentors);
+    final totals = _totals(payments, bills, rentors);
     final total = totals[bill.billId];
     return total == null ? null : _result(bill, total, rentors);
   }
@@ -153,6 +153,10 @@ class BillPaymentRecalculator {
 
   /// billId -> total credited across [payments], for every touchable bill that
   /// a payment from a known rentor lists (0 when the money ran out before it).
+  ///
+  /// Payments are replayed oldest first (tie: paymentId). Each (rentor, bill)
+  /// pair has a running amount still owed, shared across that rentor's
+  /// payments, so a rentor is never credited more than their share of a bill.
   static Map<String, double> _totals(
     List<Payment> payments,
     List<Bill> bills,
@@ -160,55 +164,45 @@ class BillPaymentRecalculator {
   ) {
     final billsById = {for (final b in bills) b.billId: b};
     final rentorsById = {for (final r in rentors) r.rentorId: r};
+    final ordered =
+        payments.toList()..sort((a, b) {
+          final byDate = a.paymentDate.compareTo(b.paymentDate);
+          return byDate != 0 ? byDate : a.paymentId.compareTo(b.paymentId);
+        });
+    final remainingOwed = <String, Map<String, double>>{};
     final totals = <String, double>{};
-    for (final payment in payments) {
-      if (!rentorsById.containsKey(payment.rentorId)) continue;
-      for (final id in payment.billIds ?? const <String>[]) {
-        final bill = billsById[id];
-        if (bill != null && bill.status != PaymentStatus.unknown) {
-          totals.putIfAbsent(id, () => 0);
-        }
+    for (final payment in ordered) {
+      final rentor = rentorsById[payment.rentorId];
+      if (rentor == null) continue;
+      final listed =
+          (payment.billIds ?? const <String>[])
+              .map((id) => billsById[id])
+              .whereType<Bill>()
+              .where((b) => b.status != PaymentStatus.unknown)
+              .toList()
+            ..sort((a, b) {
+              final byDue = a.dueDate.compareTo(b.dueDate);
+              return byDue != 0 ? byDue : a.billId.compareTo(b.billId);
+            });
+      for (final b in listed) {
+        totals.putIfAbsent(b.billId, () => 0);
       }
-      _creditsFrom(payment, billsById, rentorsById).forEach((id, credit) {
-        totals[id] = totals[id]! + credit;
-      });
+      final owedByBill = remainingOwed.putIfAbsent(rentor.rentorId, () => {});
+      var left = payment.amountPaid;
+      for (final b in listed) {
+        final owed = owedByBill.putIfAbsent(
+          b.billId,
+          () => Rentor.calculateOwedAmount(rentor, b, roundToWholeDollar: true),
+        );
+        if (owed <= 0) continue;
+        final credit = left < owed ? left : owed;
+        if (credit <= 0) break;
+        owedByBill[b.billId] = owed - credit;
+        totals[b.billId] = totals[b.billId]! + credit;
+        left -= credit;
+      }
     }
     return totals;
-  }
-
-  // For one payment: billId -> credit. Skips payments whose rentor is unknown.
-  static Map<String, double> _creditsFrom(
-    Payment payment,
-    Map<String, Bill> billsById,
-    Map<String, Rentor> rentorsById,
-  ) {
-    final rentor = rentorsById[payment.rentorId];
-    if (rentor == null) return const {};
-    final bills =
-        (payment.billIds ?? const <String>[])
-            .map((id) => billsById[id])
-            .whereType<Bill>()
-            .where((b) => b.status != PaymentStatus.unknown)
-            .toList()
-          ..sort((a, b) {
-            final byDue = a.dueDate.compareTo(b.dueDate);
-            return byDue != 0 ? byDue : a.billId.compareTo(b.billId);
-          });
-    var left = payment.amountPaid;
-    final credits = <String, double>{};
-    for (final b in bills) {
-      final owed = Rentor.calculateOwedAmount(
-        rentor,
-        b,
-        roundToWholeDollar: true,
-      );
-      if (owed <= 0) continue;
-      final credit = left < owed ? left : owed;
-      if (credit <= 0) break;
-      credits[b.billId] = (credits[b.billId] ?? 0) + credit;
-      left -= credit;
-    }
-    return credits;
   }
 
   static BillRecalculation _result(
@@ -217,23 +211,35 @@ class BillPaymentRecalculator {
     List<Rentor> rentors,
   ) {
     final amountPaid = _cents(total) / 100;
-    var status = PropertyManagerShare.recomputeStatus(
+    final status = PropertyManagerShare.recomputeStatus(
       _copyBill(bill, amountPaid, bill.status),
       rentors,
     );
-    // A recalculation never moves a bill down from paid.
-    if (bill.status == PaymentStatus.paid) status = PaymentStatus.paid;
+    if (bill.status != PaymentStatus.paid) {
+      return BillRecalculation(
+        bill: bill,
+        amountPaid: amountPaid,
+        status: status,
+      );
+    }
+    // A recalculation never moves a bill down from paid, nor lowers its amount
+    // paid to a figure that would no longer count as paid.
+    final lowers = amountPaid < PropertyManagerShare.paidAmount(bill);
+    final stillPaid = PropertyManagerShare.isConsideredPaid(
+      _copyBill(bill, amountPaid, bill.status),
+      rentors,
+    );
     return BillRecalculation(
       bill: bill,
-      amountPaid: amountPaid,
-      status: status,
+      amountPaid: lowers && !stillPaid ? bill.amountPaid : amountPaid,
+      status: PaymentStatus.paid,
     );
   }
 }
 
 int _cents(double? amount) => ((amount ?? 0) * 100).round();
 
-Bill _copyBill(Bill bill, double amountPaid, PaymentStatus status) => Bill(
+Bill _copyBill(Bill bill, double? amountPaid, PaymentStatus status) => Bill(
   id: bill.id,
   billId: bill.billId,
   company: bill.company,

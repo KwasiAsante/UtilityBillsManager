@@ -22,10 +22,15 @@ Bill bill({
   amountPaid: amountPaid,
 );
 
-Payment pay(String rentorId, double amount, List<String> billIds) => Payment(
+Payment pay(
+  String rentorId,
+  double amount,
+  List<String> billIds, {
+  DateTime? date,
+}) => Payment(
   rentorId: rentorId,
   amountPaid: amount,
-  paymentDate: DateTime(2025, 1, 18),
+  paymentDate: date ?? DateTime(2025, 1, 18),
   billIds: billIds,
 );
 
@@ -144,7 +149,7 @@ void main() {
       expect(r.amountPaid, 64);
     });
 
-    test('a paid bill stays paid when its amount drops', () {
+    test('a paid bill is not lowered below still-paid', () {
       final manual = bill(
         id: 'm',
         type: BillType.gas,
@@ -162,8 +167,103 @@ void main() {
             [manual],
             [joseph, ruth],
           )!;
-      expect(r.amountPaid, 16);
+      expect(r.amountPaid, 44.43);
       expect(r.status, PaymentStatus.paid);
+      expect(r.changed, isFalse);
+    });
+
+    test(
+      'an over-credited paid bill is lowered when it still counts as paid',
+      () {
+        final g = bill(
+          id: 'g',
+          type: BillType.gas,
+          amount: 45.99,
+          due: DateTime(2026, 1, 1),
+          status: PaymentStatus.paid,
+          amountPaid: 47,
+        );
+        final r =
+            BillPaymentRecalculator.recalculate(
+              g,
+              [
+                pay('J', 16, ['g']),
+                pay('R', 16, ['g']),
+              ],
+              [g],
+              [joseph, ruth],
+            )!;
+        expect(r.amountPaid, 32);
+        expect(r.status, PaymentStatus.paid);
+        expect(r.changed, isTrue);
+      },
+    );
+
+    test(
+      'a paid bill with no amount paid keeps it when payments fall short',
+      () {
+        final manual = bill(
+          id: 'm',
+          type: BillType.gas,
+          amount: 44.43,
+          due: DateTime(2025, 1, 1),
+          status: PaymentStatus.paid,
+        );
+        final r =
+            BillPaymentRecalculator.recalculate(
+              manual,
+              [
+                pay('J', 16, ['m']),
+              ],
+              [manual],
+              [joseph, ruth],
+            )!;
+        expect(r.amountPaid, isNull);
+        expect(r.status, PaymentStatus.paid);
+        expect(r.changed, isFalse);
+      },
+    );
+
+    test('a rentor is credited at most their share per bill across payments', () {
+      // Unpaid copies, so only these payments decide the amounts.
+      final bills = [
+        for (final b in [crown(), alectra(), enbridge()])
+          bill(
+            id: b.billId,
+            type: b.type,
+            amount: b.amount,
+            due: b.dueDate,
+            status: PaymentStatus.unpaid,
+          ),
+      ];
+      final payments = [
+        // Listed newest first on purpose; they are replayed by payment date.
+        pay('J', 108, [
+          'crown',
+          'alectra',
+          'enbridge',
+        ], date: DateTime(2025, 1, 18)),
+        pay('J', 10, ['crown'], date: DateTime(2025, 1, 10)),
+      ];
+      final byId = {
+        for (final r in BillPaymentRecalculator.recalculateAll(bills, payments, [
+          joseph,
+          ruth,
+        ]))
+          r.bill.billId: r,
+      };
+      expect(byId['crown']!.amountPaid, 16);
+      expect(byId['alectra']!.amountPaid, 51);
+      expect(byId['enbridge']!.amountPaid, 51);
+      for (final b in bills) {
+        expect(
+          BillPaymentRecalculator.recalculate(b, payments, bills, [
+            joseph,
+            ruth,
+          ])!.amountPaid,
+          byId[b.billId]!.amountPaid,
+        );
+      }
     });
 
     test('unknown-status bills are not touched and consume no money', () {
@@ -211,7 +311,13 @@ void main() {
     });
 
     test('excluded bill gets nothing and money carries on', () {
-      final b = bell();
+      final b = bill(
+        id: 'bell',
+        type: BillType.internet,
+        amount: 188.71,
+        due: DateTime(2025, 1, 23),
+        status: PaymentStatus.unpaid,
+      );
       final c = crown();
       // Joseph excludes internet, so Bell is owed 0 and skipped; the money
       // reaches Crown Crest.
