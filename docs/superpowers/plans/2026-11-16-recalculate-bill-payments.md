@@ -14,9 +14,9 @@
 
 - App repo only. No changes to `utility_bills_server`. No new packages.
 - A rentor's owed amount for a bill is `Rentor.calculateOwedAmount(rentor, bill, roundToWholeDollar: true)`.
-- Each payment pays its bills in due-date order, oldest first (tie: `billId` ascending), giving each `min(owed, money left)`. Bills owed 0 and bills with status `unknown` get nothing, and the money carries on.
+- Payments are replayed in `paymentDate` order (tie: `paymentId` ascending). Each payment pays its bills in due-date order, oldest first (tie: `billId` ascending), giving each `min(remainingOwed, money left)`, where `remainingOwed` starts at the rentor's owed amount for that bill and is shared across all of that rentor's payments (so a rentor is never credited more than their share of a bill in total). Bills owed 0 and bills with status `unknown` get nothing, and the money carries on. Single-bill `recalculate` returns that bill's entry from the full replay, so it always matches `recalculateAll`.
 - Recalculated amounts are rounded to cents: `(x * 100).round() / 100`.
-- Status = `PropertyManagerShare.recomputeStatus` with the new amount, **except a bill whose current status is `paid` stays `paid`**.
+- Status = `PropertyManagerShare.recomputeStatus` with the new amount, **except a bill whose current status is `paid` stays `paid`**. A `paid` bill's amount paid is also not lowered below "still paid": if the new amount is below `PropertyManagerShare.paidAmount(bill)` and `PropertyManagerShare.isConsideredPaid` is false at the new amount, the bill keeps its current `amountPaid` (including `null`); otherwise it is raised or lowered freely.
 - Never touch: bills with status `unknown`, or bills that no payment (with a known rentor) lists. Payments whose `rentorId` matches no rentor are ignored.
 - Only write bills whose amount paid (compared in cents, null = 0) or status changed.
 - Exact gap message: `Rentors paid $<paid> of $<owed> owed. The Property Manager is covering $<covering> instead of $<expected>.` All amounts use `toStringAsFixed(2)`.
@@ -484,7 +484,7 @@ Run: `flutter analyze` (expect no new issues beyond the 5 existing info-level on
 - [ ] **Step 7: Manual check (the user runs this, on a copy of the data)**
 
 In client mode against a copy of production data:
-1. **Crown Crest:** open the Bills screen. The Enbridge gas bill due 2025-01-27 shows the warning icon only after recalculating. Recalculate the Crown Crest gas bill due 2025-01-01: the snackbar reads `Bill updated: $32.00 paid, Paid.`
+1. **Crown Crest:** open the Bills screen. The Enbridge gas bill due 2025-01-27 already shows the warning icon before recalculating (its message reads "Rentors paid $81.00 of $136.00 owed…"); after recalculating it still shows the icon, now with $64.00 paid in the message. Recalculate the Crown Crest gas bill due 2025-01-01: the snackbar reads `Bill updated: $32.00 paid, Paid.`
 2. **All bills:** run "Recalculate all bills" and confirm. The snackbar gives a count. Enbridge (2025-01-27) shows $64 partial with the warning, and tapping the icon shows the exact gap message.
 3. **Idempotence:** run "Recalculate all bills" again. It reads `All bills already match their payments.`
 4. **Load failure:** stop the server and run "Recalculate all bills". It reads `Could not load data to recalculate: …` and no bill changes.

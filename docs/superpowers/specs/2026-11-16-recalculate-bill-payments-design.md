@@ -48,18 +48,30 @@ are real and should stay visible; the user fixes them by hand.
 For a bill **X**:
 
 1. Find every payment whose bills include X.
-2. For each such payment (rentor **R**, amount **M**), walk the payment's bills in
-   due-date order, oldest first (tie: billId), giving each bill
-   `min(R's owed amount for that bill, money left)`. R's owed amount is
-   `Rentor.calculateOwedAmount(R, bill, roundToWholeDollar: true)` — rounded to
-   the whole dollar like the server's payment apply, so a recalculated bill
+2. Replay payments in `paymentDate` order, oldest first (tie: `paymentId`
+   ascending). For each payment (rentor **R**, amount **M**), walk the payment's
+   bills in due-date order, oldest first (tie: billId), giving each bill
+   `min(R's remaining owed on that bill, money left)`. R's owed amount for a bill
+   is `Rentor.calculateOwedAmount(R, bill, roundToWholeDollar: true)` — rounded
+   to the whole dollar like the server's payment apply, so a recalculated bill
    matches what applying the payment records (builder's call, made in design).
    It is 0 when R excludes the type or hadn't started; such bills get nothing
-   and the money carries on. Bills with status `unknown` are skipped.
-   The credit from this payment to X is what reaches X.
+   and the money carries on. R's remaining owed on a bill starts at that owed
+   amount and is shared across all of R's payments: each credit reduces it, so
+   R is never credited more than their share of a bill in total, however many of
+   their payments list it. Bills with status `unknown` are skipped.
+   The credit from a payment to X is what reaches X. (Calculating X alone gives
+   the same answer as calculating every bill, because the replay always covers
+   all payments.)
 3. X's new amount paid = the sum of credits from all its payments.
 4. X's new status = `PropertyManagerShare.recomputeStatus` with the new amount,
-   **except** a bill currently `paid` stays `paid`.
+   **except** a bill currently `paid` stays `paid`. A `paid` bill's amount paid
+   is also never lowered to a figure that would no longer count as paid: if the
+   new amount is below its current amount paid (`PropertyManagerShare.paidAmount`,
+   which treats a missing amount paid on a paid bill as the full amount) and the
+   bill would not be considered paid (`PropertyManagerShare.isConsideredPaid`) at
+   the new amount, its amount paid is left as it is. Otherwise it is raised or
+   lowered freely and stays `paid`.
 5. If neither amount paid nor status changes, X is not written.
 
 Bills with no assigned payments, and `unknown`-status bills, are never touched.
