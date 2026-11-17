@@ -6,6 +6,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [1.3.0+15] — 2026-11-16
+
+Requires UtilityBillsServer v1.9.0 or later in client mode (rentor start dates and Property Manager share).
+
 ### Added
 - **Property Manager share** replaces hardcoded 30%/50% thresholds (rounding allowance scales with rentors).
 - **Rentor start date** — rentors have an optional start date (bills due before it aren't split with them).
@@ -16,6 +20,7 @@ All notable changes to this project are documented here.
 ### Changed
 - **Bill statuses refresh after saving a rentor.**
 - **Summary screen labels name the Property Manager** — the toggle reads "Show Property Manager share as unpaid" / "Count Property Manager share as paid", and a bill whose remainder is hidden notes "* Property Manager covers $X.XX" (or "* Marked paid" when it was marked paid beyond the share).
+- **Bills status filter** adds Partial and Unknown alongside All / Paid / Unpaid.
 
 ### Fixed
 - **Exports' paid amounts match the Summary screen** — CSV/PDF exports now use the recorded amount paid first, the same rule as the screen, instead of deciding from the bill's status.
