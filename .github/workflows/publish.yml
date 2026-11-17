@@ -65,6 +65,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.44.5
 
       - name: Install dependencies
         timeout-minutes: 10
@@ -265,6 +266,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.44.5
 
       - name: Install dependencies
         timeout-minutes: 10
@@ -318,6 +320,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.44.5
 
       - name: Install dependencies
         timeout-minutes: 10
@@ -388,6 +391,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          flutter-version: 3.44.5
 
       - name: Install dependencies
         timeout-minutes: 10
