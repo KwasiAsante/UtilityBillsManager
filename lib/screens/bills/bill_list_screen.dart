@@ -10,14 +10,19 @@ import '../../config/server_configuration.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/payment.dart';
 import '../../data/repositories/bills_repository.dart';
+import '../../data/repositories/payments_repository.dart';
+import '../../data/repositories/rentors_repository.dart';
 import '../../helpers/email/email_data_helper.dart';
 import '../../screens/base/auth_reload_mixin.dart';
 import '../../screens/base/google_sign_in_screen_state.dart';
+import '../../services/bill_recalculation/bill_recalculation_runner.dart';
 import '../../utils/constants.dart';
 import '../../utils/dialogs/due_date_filter_sheet.dart';
 import '../../utils/dialogs/single_choice_dialog.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../utils/app_breakpoints.dart';
+import '../../utils/bills/bill_recalculation.dart';
+import '../../widgets/bill_gap_warning.dart';
 import '../../widgets/notification_bell_icon.dart';
 import '../../widgets/responsive_constraint.dart';
 import '../settings/settings_screen.dart';
@@ -60,6 +65,8 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
   //endregion
 
   final BillsRepository _billsRepository = BillsRepository();
+  final PaymentsRepository _paymentsRepository = PaymentsRepository();
+  final RentorsRepository _rentorsRepository = RentorsRepository();
   final EmailDataHelper _emailDataHelper = EmailDataHelper();
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
@@ -67,6 +74,10 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
   Future<List<Bill>>? _bills;
   List<Bill> _allBills = [];
   bool _loading = false;
+  bool _recalculating = false;
+
+  /// Payment gaps by bill id, rebuilt whenever bills, payments or rentors change.
+  Map<String, BillGap> _gaps = {};
   bool _deferLoading =
       false; // used to defer loading until after Google sign-in if needed or when screen becomes visible
   bool _isListScrollable = false;
@@ -88,6 +99,8 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
 
     _scrollController.addListener(_checkScrollability);
     _billsRepository.addListener(_onBillsUpdated);
+    _paymentsRepository.addListener(_onPaymentsOrRentorsUpdated);
+    _rentorsRepository.addListener(_onPaymentsOrRentorsUpdated);
     updateAuthListener(visible: widget.isVisible);
 
     if (isGoogleSignInEnabled) {
@@ -137,6 +150,8 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
   void dispose() {
     unsubscribeFromSignedInEvents();
     _billsRepository.removeListener(_onBillsUpdated);
+    _paymentsRepository.removeListener(_onPaymentsOrRentorsUpdated);
+    _rentorsRepository.removeListener(_onPaymentsOrRentorsUpdated);
     _scrollController.removeListener(_checkScrollability);
     _scrollController.dispose();
     _searchController.dispose();
@@ -152,10 +167,28 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
       });
     } else {
       _allBills = _billsRepository.bills;
+      _rebuildGaps();
       _updateDisplayedBills();
     }
 
     _deferLoading = false;
+  }
+
+  void _onPaymentsOrRentorsUpdated() {
+    if (!mounted) return;
+    setState(_rebuildGaps);
+  }
+
+  /// Recomputes [_gaps] from the current bills, payments and rentors.
+  void _rebuildGaps() {
+    final payments = _paymentsRepository.payments;
+    final rentors = _rentorsRepository.rentors;
+    final gaps = <String, BillGap>{};
+    for (final bill in _allBills) {
+      final gap = BillPaymentRecalculator.gapFor(bill, payments, rentors);
+      if (gap != null) gaps[bill.billId] = gap;
+    }
+    _gaps = gaps;
   }
   //endregion
 
@@ -199,7 +232,115 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
     }
 
     if (!mounted) return;
-    await _billsRepository.reload();
+    await Future.wait([
+      _billsRepository.reload(),
+      _paymentsRepository.reload(),
+      _rentorsRepository.reload(),
+    ]);
+  }
+
+  /// Recalculates amount paid and status from assigned payments, for [bill]
+  /// alone or, when [bill] is null, for every bill (after confirmation).
+  Future<void> _recalculateBills({Bill? bill}) async {
+    if (_recalculating) return;
+
+    if (bill == null) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: const Text('Recalculate All Bills'),
+              content: const Text(
+                "Set every bill's amount paid to what its assigned payments cover? Bills marked paid stay paid.",
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Recalculate'),
+                ),
+              ],
+            ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+
+    setState(() => _recalculating = true);
+    var message = '';
+    try {
+      await Future.wait([
+        _billsRepository.reload(),
+        _paymentsRepository.reload(),
+        _rentorsRepository.reload(),
+      ]);
+      final loadError =
+          _billsRepository.lastError ??
+          _paymentsRepository.lastError ??
+          _rentorsRepository.lastError;
+      if (loadError != null) {
+        message = 'Could not load data to recalculate: $loadError';
+      } else {
+        final bills = _billsRepository.bills;
+        final payments = _paymentsRepository.payments;
+        final rentors = _rentorsRepository.rentors;
+        final runner = BillRecalculationRunner();
+
+        if (bill == null) {
+          final summary = await runner.apply(
+            BillPaymentRecalculator.recalculateAll(bills, payments, rentors),
+          );
+          await _billsRepository.reload();
+          if (summary.updated == 0 && summary.failed == 0) {
+            message = 'All bills already match their payments.';
+          } else if (summary.failed == 0) {
+            message = 'Recalculated bills: ${summary.updated} updated.';
+          } else {
+            message =
+                'Recalculated bills: ${summary.updated} updated, ${summary.failed} failed. Run it again to retry.';
+          }
+        } else {
+          // Look the bill up in the freshly reloaded list; the recalculator
+          // finds it by billId in that same list.
+          final fresh = bills.where((b) => b.billId == bill.billId).firstOrNull;
+          final recalculation =
+              fresh == null
+                  ? null
+                  : BillPaymentRecalculator.recalculate(
+                    fresh,
+                    payments,
+                    bills,
+                    rentors,
+                  );
+          if (recalculation == null) {
+            message = 'This bill has no payments to recalculate from.';
+          } else {
+            final summary = await runner.apply([recalculation]);
+            await _billsRepository.reload();
+            if (summary.failed > 0) {
+              message = 'Could not save bill: ${summary.errors.first}';
+            } else if (summary.updated == 0) {
+              message = 'Bill already matches its payments.';
+            } else {
+              message =
+                  'Bill updated: \$${recalculation.amountPaid.toStringAsFixed(2)} paid, ${PaymentStatusExtension.getName(recalculation.status)}.';
+            }
+          }
+        }
+      }
+    } catch (e) {
+      message = 'Could not recalculate: $e';
+    } finally {
+      if (mounted) setState(() => _recalculating = false);
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
   }
 
   Future<void> _deleteBill(Bill bill) async {
@@ -531,6 +672,12 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
               onPressed: _loading ? null : _syncBills,
             ),
             IconButton(
+              icon: const Icon(Icons.calculate_outlined),
+              tooltip: 'Recalculate all bills',
+              onPressed:
+                  _loading || _recalculating ? null : () => _recalculateBills(),
+            ),
+            IconButton(
               icon: const Icon(Icons.delete_sweep),
               tooltip: 'Delete all bills',
               color: Colors.red,
@@ -579,6 +726,9 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
                   case 'refresh':
                     if (!_loading) _syncBills();
                     break;
+                  case 'recalculate_all':
+                    if (!_loading && !_recalculating) _recalculateBills();
+                    break;
                   case 'settings':
                     Navigator.push(
                       context,
@@ -626,6 +776,14 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
                       child: ListTile(
                         leading: Icon(Icons.sync),
                         title: Text('Sync bills'),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'recalculate_all',
+                      child: ListTile(
+                        leading: Icon(Icons.calculate_outlined),
+                        title: Text('Recalculate all bills'),
                         contentPadding: EdgeInsets.zero,
                       ),
                     ),
@@ -780,7 +938,16 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
                                               ),
                                             ),
                                             const SizedBox(height: 6),
-                                            _buildStatusBadge(bill.status),
+                                            Row(
+                                              children: [
+                                                _buildStatusBadge(bill.status),
+                                                if (_gaps[bill.billId]
+                                                    case final gap?) ...[
+                                                  const SizedBox(width: 6),
+                                                  BillGapWarning(gap: gap),
+                                                ],
+                                              ],
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -797,6 +964,8 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
                                                         ),
                                               ),
                                             );
+                                          } else if (value == 'recalculate') {
+                                            await _recalculateBills(bill: bill);
                                           } else if (value == 'delete') {
                                             await _deleteBill(bill);
                                           }
@@ -806,6 +975,10 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
                                               const PopupMenuItem(
                                                 value: 'edit',
                                                 child: Text('Edit'),
+                                              ),
+                                              const PopupMenuItem(
+                                                value: 'recalculate',
+                                                child: Text('Recalculate'),
                                               ),
                                               const PopupMenuItem(
                                                 value: 'delete',

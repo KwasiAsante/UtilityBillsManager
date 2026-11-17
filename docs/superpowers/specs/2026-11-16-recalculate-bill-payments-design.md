@@ -1,6 +1,6 @@
 # Recalculate Bill Payments — Design
 
-**Status:** Draft
+**Status:** Approved
 **Date:** 2026-11-16
 **Repo:** utility_bills_manager (app only; no server changes)
 
