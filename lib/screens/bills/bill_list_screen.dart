@@ -22,6 +22,7 @@ import '../../utils/dialogs/single_choice_dialog.dart';
 import '../../utils/dialogs/sync_options_dialog.dart';
 import '../../utils/app_breakpoints.dart';
 import '../../utils/bills/bill_recalculation.dart';
+import '../../utils/bills/property_manager_share.dart';
 import '../../widgets/bill_gap_warning.dart';
 import '../../widgets/notification_bell_icon.dart';
 import '../../widgets/responsive_constraint.dart';
@@ -280,12 +281,18 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
           _billsRepository.lastError ??
           _paymentsRepository.lastError ??
           _rentorsRepository.lastError;
+      final bills = _billsRepository.bills;
+      final payments = _paymentsRepository.payments;
+      final rentors = _rentorsRepository.rentors;
       if (loadError != null) {
         message = 'Could not load data to recalculate: $loadError';
+      } else if (bills.isEmpty || payments.isEmpty || rentors.isEmpty) {
+        // Client mode swallows load errors and returns empty lists, so an
+        // empty list is treated as a failed load, not as "nothing to do".
+        message =
+            'Could not load data to recalculate: no bills, payments or '
+            'rentors were returned.';
       } else {
-        final bills = _billsRepository.bills;
-        final payments = _paymentsRepository.payments;
-        final rentors = _rentorsRepository.rentors;
         final runner = BillRecalculationRunner();
 
         if (bill == null) {
@@ -325,12 +332,18 @@ class _BillListScreenState extends GoogleSignInScreenState<BillListScreen>
               message = 'Bill already matches its payments.';
             } else {
               message =
-                  'Bill updated: \$${recalculation.amountPaid.toStringAsFixed(2)} paid, ${PaymentStatusExtension.getName(recalculation.status)}.';
+                  'Bill updated: \$${(recalculation.amountPaid ?? PropertyManagerShare.paidAmount(recalculation.bill)).toStringAsFixed(2)} paid, ${PaymentStatusExtension.getName(recalculation.status)}.';
             }
           }
         }
       }
     } catch (e) {
+      // Bills written before the failure are already saved; refresh the list.
+      try {
+        await _billsRepository.reload();
+      } catch (_) {
+        // Best effort only.
+      }
       message = 'Could not recalculate: $e';
     } finally {
       if (mounted) setState(() => _recalculating = false);
