@@ -373,4 +373,106 @@ void main() {
       expect(u.status, PaymentStatus.paid);
     });
   });
+
+  group('gapFor', () {
+    test('Enbridge after recalculation has a gap with the exact message', () {
+      final e = bill(
+        id: 'enbridge',
+        type: BillType.gas,
+        amount: 193.00,
+        due: DateTime(2025, 1, 27),
+        status: PaymentStatus.partial,
+        amountPaid: 64,
+      );
+      final gap =
+          BillPaymentRecalculator.gapFor(e, januaryPayments, [joseph, ruth])!;
+      expect(gap.paid, 64);
+      expect(gap.owed, 136);
+      expect(gap.covering, 129);
+      expect(gap.expectedCovering, 57);
+      expect(
+        gap.message,
+        'Rentors paid \$64.00 of \$136.00 owed. '
+        'The Property Manager is covering \$129.00 instead of \$57.00.',
+      );
+    });
+
+    test('no gap while a rentor has not paid yet', () {
+      final g = bill(
+        id: 'g',
+        type: BillType.gas,
+        amount: 47.60,
+        due: DateTime(2026, 11, 1),
+        status: PaymentStatus.partial,
+        amountPaid: 17,
+      );
+      expect(
+        BillPaymentRecalculator.gapFor(
+          g,
+          [
+            pay('J', 17, ['g']),
+          ],
+          [joseph, ruth],
+        ),
+        isNull,
+      );
+    });
+
+    test('no gap on a paid bill', () {
+      final e = bill(
+        id: 'enbridge',
+        type: BillType.gas,
+        amount: 193.00,
+        due: DateTime(2025, 1, 27),
+        status: PaymentStatus.paid,
+        amountPaid: 64,
+      );
+      expect(
+        BillPaymentRecalculator.gapFor(e, januaryPayments, [joseph, ruth]),
+        isNull,
+      );
+    });
+
+    test('no gap when the shortfall is within the rounding allowance', () {
+      final g = bill(
+        id: 'g',
+        type: BillType.gas,
+        amount: 45.99,
+        due: DateTime(2026, 1, 1),
+        status: PaymentStatus.partial,
+        amountPaid: 31.5,
+      );
+      expect(
+        BillPaymentRecalculator.gapFor(
+          g,
+          [
+            pay('J', 16, ['g']),
+            pay('R', 15.5, ['g']),
+          ],
+          [joseph, ruth],
+        ),
+        isNull,
+      );
+    });
+
+    test('no gap when no rentor owes on the bill', () {
+      final rent = bill(
+        id: 'rent',
+        type: BillType.rent,
+        amount: 1000,
+        due: DateTime(2026, 1, 1),
+        status: PaymentStatus.unpaid,
+      );
+      expect(
+        BillPaymentRecalculator.gapFor(
+          rent,
+          [
+            pay('J', 10, ['rent']),
+          ],
+          [joseph, ruth],
+        ),
+        isNull,
+      );
+    });
+  });
 }

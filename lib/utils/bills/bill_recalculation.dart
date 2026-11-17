@@ -31,6 +31,38 @@ class BillRecalculation {
   Bill toUpdatedBill() => _copyBill(bill, amountPaid, status);
 }
 
+/// A shortfall on a bill: every rentor who owes on it has paid something, yet
+/// the Property Manager is covering more than their own share.
+class BillGap {
+  const BillGap({
+    required this.billAmount,
+    required this.paid,
+    required this.owed,
+  });
+
+  /// The bill's full amount.
+  final double billAmount;
+
+  /// The amount paid toward the bill so far.
+  final double paid;
+
+  /// The sum of the rentors' whole-dollar shares of the bill.
+  final double owed;
+
+  /// What the Property Manager is covering right now.
+  double get covering => billAmount - paid;
+
+  /// What the Property Manager would cover if the rentors had paid in full.
+  double get expectedCovering => billAmount - owed;
+
+  /// A plain-language description of the gap.
+  String get message =>
+      'Rentors paid \$${paid.toStringAsFixed(2)} of '
+      '\$${owed.toStringAsFixed(2)} owed. '
+      'The Property Manager is covering \$${covering.toStringAsFixed(2)} '
+      'instead of \$${expectedCovering.toStringAsFixed(2)}.';
+}
+
 /// Sets each bill's amount paid to what its assigned payments actually cover.
 ///
 /// Every payment pays the bills it lists oldest-due-first, each capped at the
@@ -74,6 +106,49 @@ class BillPaymentRecalculator {
         if (totals[bill.billId] != null)
           _result(bill, totals[bill.billId]!, rentors),
     ];
+  }
+
+  /// The [BillGap] on [bill], or `null` when there is none.
+  ///
+  /// There is a gap only when [bill] is neither `paid` nor `unknown`, at least
+  /// one rentor owes on it (whole-dollar share above zero), every such rentor
+  /// has a payment that lists it, and it still isn't considered paid once the
+  /// Property Manager's share and rounding tolerance are allowed for.
+  static BillGap? gapFor(
+    Bill bill,
+    List<Payment> payments,
+    List<Rentor> rentors,
+  ) {
+    if (bill.status == PaymentStatus.paid ||
+        bill.status == PaymentStatus.unknown) {
+      return null;
+    }
+    var owed = 0.0;
+    var anyOwes = false;
+    for (final rentor in rentors) {
+      final share = Rentor.calculateOwedAmount(
+        rentor,
+        bill,
+        roundToWholeDollar: true,
+      );
+      if (share <= 0) continue;
+      anyOwes = true;
+      final hasPaid = payments.any(
+        (p) =>
+            p.rentorId == rentor.rentorId &&
+            (p.billIds?.contains(bill.billId) ?? false),
+      );
+      if (!hasPaid) return null;
+      owed += share;
+    }
+    if (!anyOwes || PropertyManagerShare.isConsideredPaid(bill, rentors)) {
+      return null;
+    }
+    return BillGap(
+      billAmount: bill.amount,
+      paid: PropertyManagerShare.paidAmount(bill),
+      owed: owed,
+    );
   }
 
   /// billId -> total credited across [payments], for every touchable bill that
