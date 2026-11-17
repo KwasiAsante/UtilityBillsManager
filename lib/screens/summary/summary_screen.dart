@@ -90,25 +90,28 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
   }
   bool _isListScrollable = false;
 
-  /// When false (default): bills within the "considered paid" threshold show
-  /// $0 unpaid. When true: actual unpaid amounts are always shown.
-  bool _showActualUnpaid = false;
+  /// When false (default): a bill that counts as paid (its unpaid remainder is
+  /// within the Property Manager share, or it is marked paid) shows $0 unpaid.
+  /// When true: the Property Manager share is shown as unpaid (actual amounts).
+  bool _showPropertyManagerShare = false;
 
-  // ── Threshold logic ──────────────────────────────────────────────────────────
+  // ── Property Manager share ───────────────────────────────────────────────────
 
-  bool _isConsideredPaid(Bill bill) =>
+  bool _countsAsPaid(Bill bill) =>
       PropertyManagerShare.isConsideredPaid(bill, _rentors) ||
       bill.status == PaymentStatus.paid;
 
-  /// The paid amount to display, respecting the toggle and threshold.
+  /// The paid amount to display, respecting the toggle and the Property Manager
+  /// share.
   double _displayPaid(Bill bill) {
-    if (!_showActualUnpaid && _isConsideredPaid(bill)) return bill.amount;
+    if (!_showPropertyManagerShare && _countsAsPaid(bill)) return bill.amount;
     return _paidAmount(bill);
   }
 
-  /// The unpaid amount to display, respecting the toggle and threshold.
+  /// The unpaid amount to display, respecting the toggle and the Property Manager
+  /// share.
   double _displayUnpaid(Bill bill) {
-    if (!_showActualUnpaid && _isConsideredPaid(bill)) return 0.0;
+    if (!_showPropertyManagerShare && _countsAsPaid(bill)) return 0.0;
     return bill.amount - _paidAmount(bill);
   }
 
@@ -289,10 +292,10 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
     return names.toList();
   }
 
-  // ── Raw paid helper (actual amounts, ignoring threshold) ─────────────────────
+  // ── Raw paid helper (actual amounts, ignoring the Property Manager share) ────
 
-  /// Same rule as the "considered paid" threshold ([PropertyManagerShare]):
-  /// [Bill.amountPaid] wins when set, so display and threshold never disagree.
+  /// Same rule as the Property Manager share check ([PropertyManagerShare]):
+  /// [Bill.amountPaid] wins when set, so the display and the check never disagree.
   double _paidAmount(Bill bill) => PropertyManagerShare.paidAmount(bill);
 
   // ── Grouping ─────────────────────────────────────────────────────────────────
@@ -423,8 +426,8 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
     final displayUnpaid = _displayUnpaid(bill);
     final rentorNames = _rentorNamesForBill(bill);
 
-    // A bill that is considered paid but still has a remainder worth showing
-    final hasHiddenRemainder = _isConsideredPaid(bill) && actualUnpaid > 0.005;
+    // A bill that counts as paid but still has a remainder worth showing
+    final hasHiddenRemainder = _countsAsPaid(bill) && actualUnpaid > 0.005;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -460,10 +463,12 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
                     ),
                   ),
                 ],
-                if (hasHiddenRemainder && !_showActualUnpaid) ...[
+                if (hasHiddenRemainder && !_showPropertyManagerShare) ...[
                   const SizedBox(height: 2),
                   Text(
-                    '* within paid threshold',
+                    PropertyManagerShare.isConsideredPaid(bill, _rentors)
+                        ? '* Property Manager covers \$${actualUnpaid.toStringAsFixed(2)}'
+                        : '* Marked paid',
                     style: TextStyle(
                       fontSize: 10,
                       color: Colors.orange[700],
@@ -496,7 +501,7 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
               ),
               if (displayUnpaid > 0.005)
                 Text(
-                  'Unpaid: \$${displayUnpaid.toStringAsFixed(2)}${hasHiddenRemainder && _showActualUnpaid ? ' *' : ''}',
+                  'Unpaid: \$${displayUnpaid.toStringAsFixed(2)}${hasHiddenRemainder && _showPropertyManagerShare ? ' *' : ''}',
                   style: const TextStyle(
                     color: Colors.red,
                     fontSize: 11,
@@ -864,18 +869,18 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
           if (AppBreakpoints.isWide(context))
             IconButton(
               icon: Icon(
-                _showActualUnpaid ? Icons.visibility : Icons.visibility_off,
+                _showPropertyManagerShare ? Icons.visibility : Icons.visibility_off,
                 color:
-                    _showActualUnpaid
+                    _showPropertyManagerShare
                         ? Theme.of(context).colorScheme.primary
                         : null,
               ),
               tooltip:
-                  _showActualUnpaid
-                      ? 'Hide actual unpaid amounts'
-                      : 'Show actual unpaid amounts',
+                  _showPropertyManagerShare
+                      ? 'Count Property Manager share as paid'
+                      : 'Show Property Manager share as unpaid',
               onPressed:
-                  () => setState(() => _showActualUnpaid = !_showActualUnpaid),
+                  () => setState(() => _showPropertyManagerShare = !_showPropertyManagerShare),
             ),
           if (AppBreakpoints.isWide(context))
             IconButton(
@@ -912,17 +917,17 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
                       ),
                     ),
                     PopupMenuItem(
-                      value: 'toggle_unpaid',
+                      value: 'toggle_property_manager_share',
                       child: ListTile(
                         leading: Icon(
-                          _showActualUnpaid
+                          _showPropertyManagerShare
                               ? Icons.visibility
                               : Icons.visibility_off,
                         ),
                         title: Text(
-                          _showActualUnpaid
-                              ? 'Hide actual unpaid amounts'
-                              : 'Show actual unpaid amounts',
+                          _showPropertyManagerShare
+                              ? 'Count Property Manager share as paid'
+                              : 'Show Property Manager share as unpaid',
                         ),
                         contentPadding: EdgeInsets.zero,
                       ),
@@ -966,8 +971,8 @@ class _SummaryScreenState extends GoogleSignInScreenState<SummaryScreen>
               onSelected: (String value) {
                 if (value == 'sync') {
                   if (!_loading) _syncData();
-                } else if (value == 'toggle_unpaid') {
-                  setState(() => _showActualUnpaid = !_showActualUnpaid);
+                } else if (value == 'toggle_property_manager_share') {
+                  setState(() => _showPropertyManagerShare = !_showPropertyManagerShare);
                 } else if (value == 'export_csv') {
                   _exportToCSV();
                 } else if (value == 'export_pdf') {
