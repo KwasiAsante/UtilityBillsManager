@@ -1,7 +1,7 @@
-import 'package:utility_bills_manager/data/models/bill.dart';
-import 'package:utility_bills_manager/data/models/result.dart';
-import 'package:utility_bills_manager/helpers/bills/bills_helper.dart';
-import 'package:utility_bills_manager/utils/bills/bill_recalculation.dart';
+import '../../data/models/bill.dart';
+import '../../data/models/result.dart';
+import '../../helpers/bills/bills_helper.dart';
+import '../../utils/bills/bill_recalculation.dart';
 
 /// The result of applying a batch of bill recalculations.
 class RecalculationSummary {
@@ -51,7 +51,8 @@ class BillRecalculationRunner {
     var failed = 0;
     final errors = <String>[];
 
-    final updateBill = _updateBill ?? (Bill bill) => BillsHelper().updateBill(bill);
+    final updateBill =
+        _updateBill ?? (Bill bill) => BillsHelper().updateBill(bill);
 
     for (final recalc in recalculations) {
       if (!recalc.changed) {

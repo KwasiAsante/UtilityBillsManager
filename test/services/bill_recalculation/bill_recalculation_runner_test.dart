@@ -54,10 +54,12 @@ void main() {
 
     test('writes only changed bills', () async {
       final written = <Bill>[];
-      final runner = BillRecalculationRunner(updateBill: (b) async {
-        written.add(b);
-        return Result.success(data: b);
-      });
+      final runner = BillRecalculationRunner(
+        updateBill: (b) async {
+          written.add(b);
+          return Result.success(data: b);
+        },
+      );
       final summary = await runner.apply([changedCrown, unchangedBell]);
       expect(written.map((b) => b.billId), ['crown']);
       expect(written.single.amountPaid, 32);
@@ -66,10 +68,13 @@ void main() {
     });
 
     test('keeps going after a failed save', () async {
-      final runner = BillRecalculationRunner(updateBill: (b) async =>
-          b.billId == 'crown'
-              ? Result.error(errorMessage: 'boom')
-              : Result.success(data: b));
+      final runner = BillRecalculationRunner(
+        updateBill:
+            (b) async =>
+                b.billId == 'crown'
+                    ? Result.error(errorMessage: 'boom')
+                    : Result.success(data: b),
+      );
       final summary = await runner.apply([changedCrown, changedEnbridge]);
       expect(summary.updated, 1);
       expect(summary.failed, 1);
@@ -78,8 +83,8 @@ void main() {
 
     test('nothing to do', () async {
       final summary = await BillRecalculationRunner(
-              updateBill: (b) async => fail('should not write'))
-          .apply([unchangedBell]);
+        updateBill: (b) async => fail('should not write'),
+      ).apply([unchangedBell]);
       expect([summary.updated, summary.failed], [0, 0]);
     });
   });
