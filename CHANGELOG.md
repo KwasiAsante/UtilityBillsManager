@@ -10,6 +10,8 @@ All notable changes to this project are documented here.
 - **Property Manager share** replaces hardcoded 30%/50% thresholds (rounding allowance scales with rentors).
 - **Rentor start date** — rentors have an optional start date (bills due before it aren't split with them).
 - **Property Manager card** — read-only Property Manager card on the Rentors tab.
+- **Recalculate bill payments** — Bills screen "Recalculate" (per bill) and "Recalculate all bills" set each bill's amount paid to what its assigned payments cover (oldest bill first, capped at each rentor's share); bills marked paid stay paid.
+- **Payment gap warning** — bills whose rentors have all paid but came up short show a warning icon explaining how much more the Property Manager is covering.
 
 ### Changed
 - **Bill statuses refresh after saving a rentor.**
